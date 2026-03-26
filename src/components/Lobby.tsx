@@ -27,7 +27,6 @@ const Lobby: React.FC = () => {
     pendingLeases: '0'
   });
   const [loading, setLoading] = useState(true);
-  const [currencySymbol, setCurrencySymbol] = useState('$');
 
   useEffect(() => {
     const fetchDashboardStats = async () => {
@@ -43,17 +42,16 @@ const Lobby: React.FC = () => {
           .single();
         
         const symbol = currencySymbols[ownerData?.currency || 'USD'] || '$';
-        setCurrencySymbol(symbol);
 
-        // 1. Get all properties to calculate occupancy
+        // 1. Get all units for properties owned by this user
+        // Using relationship mapping: units -> properties (owner_id)
         const { data: units } = await supabase
           .from('units')
-          .select('id, status')
-          .innerJoin('properties', 'property_id', 'id')
+          .select('id, status, properties!inner(owner_id)')
           .eq('properties.owner_id', user.id);
 
         const totalUnits = units?.length || 0;
-        const occupiedUnits = units?.filter(u => u.status === 'Occupied').length || 0;
+        const occupiedUnits = (units as any[])?.filter(u => u.status === 'Occupied').length || 0;
         const occupancy = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0;
 
         // 2. Get monthly revenue from payments this month

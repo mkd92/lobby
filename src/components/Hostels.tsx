@@ -3,14 +3,6 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import '../styles/Properties.css';
 
-interface Hostel {
-  id: string;
-  name: string;
-  address: string;
-  created_at: string;
-  rooms: { count: number }[];
-}
-
 const Hostels: React.FC = () => {
   const [hostels, setHostels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

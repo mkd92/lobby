@@ -76,9 +76,12 @@ const CustomSelect: React.FC<{
   placeholder?: string;
   disabled?: boolean;
   prefilled?: boolean;
-}> = ({ options, value, onChange, placeholder = 'Select…', disabled = false, prefilled = false }) => {
+  searchable?: boolean;
+}> = ({ options, value, onChange, placeholder = 'Select…', disabled = false, prefilled = false, searchable = false }) => {
   const [open, setOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const ref = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -88,7 +91,20 @@ const CustomSelect: React.FC<{
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  useEffect(() => {
+    if (open && searchable) {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    } else {
+      setSearchTerm('');
+    }
+  }, [open, searchable]);
+
   const selected = options.find(o => o.value === value);
+  const filteredOptions = options.filter(o => 
+    o.label.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (o.sub && o.sub.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
   const triggerClass = [
     'custom-select-trigger',
     open     ? 'open'      : '',
@@ -99,9 +115,11 @@ const CustomSelect: React.FC<{
   const toggle = () => { if (!disabled) setOpen(o => !o); };
 
   const handleKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+    if (e.key === 'Enter' || e.key === ' ') { 
+      if (!open) { e.preventDefault(); toggle(); }
+    }
     if (e.key === 'Escape') setOpen(false);
-    if (open) {
+    if (open && !searchable) {
       const idx = options.findIndex(o => o.value === value);
       if (e.key === 'ArrowDown') { e.preventDefault(); onChange(options[(idx + 1) % options.length]?.value ?? value); }
       if (e.key === 'ArrowUp')   { e.preventDefault(); onChange(options[(idx - 1 + options.length) % options.length]?.value ?? value); }
@@ -126,10 +144,23 @@ const CustomSelect: React.FC<{
 
       {open && !disabled && (
         <div className="custom-options">
-          {options.length === 0 ? (
-            <div className="custom-option-empty">No options available</div>
+          {searchable && (
+            <div className="custom-select-search-wrap">
+              <input
+                ref={searchInputRef}
+                type="text"
+                className="custom-select-search"
+                placeholder="Type to search…"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                onClick={e => e.stopPropagation()}
+              />
+            </div>
+          )}
+          {filteredOptions.length === 0 ? (
+            <div className="custom-option-empty">No options found</div>
           ) : (
-            options.map(opt => (
+            filteredOptions.map(opt => (
               <div
                 key={opt.value}
                 className={`custom-option ${value === opt.value ? 'selected' : ''}`}
@@ -686,6 +717,7 @@ const Leases: React.FC = () => {
                     value={form.tenant_id}
                     onChange={v => setForm(f => ({ ...f, tenant_id: v }))}
                     placeholder="Select tenant…"
+                    searchable={true}
                   />
                 </div>
 
