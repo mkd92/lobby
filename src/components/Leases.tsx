@@ -9,7 +9,7 @@ interface Tenant    { id: string; full_name: string; email: string; phone: strin
 interface Property  { id: string; name: string; }
 interface Unit      { id: string; unit_number: string; type: string; base_rent: number; status: string; }
 interface Hostel    { id: string; name: string; }
-interface Room      { id: string; room_number: string; floor: number; }
+interface Room      { id: string; room_number: string; floor: number; beds?: Bed[]; }
 interface Bed       { id: string; bed_number: string; price: number; status: string; }
 
 interface Lease {
@@ -301,8 +301,23 @@ const Leases: React.FC = () => {
   };
 
   const loadRooms = async (hostelId: string) => {
-    const { data } = await supabase.from('rooms').select('id, room_number, floor').eq('hostel_id', hostelId).order('room_number');
-    setRooms((data as Room[]) || []);
+    const { data } = await supabase
+      .from('rooms')
+      .select('id, room_number, floor, beds(id, status)')
+      .eq('hostel_id', hostelId)
+      .order('room_number');
+    
+    let filtered = (data as unknown as Room[]) || [];
+    if (!editingLease) {
+      // Show only rooms that have at least one vacant bed
+      filtered = filtered.filter(r => r.beds?.some(b => b.status === 'Vacant'));
+    } else {
+      // In edit mode, show rooms with vacant beds PLUS the room that has the currently leased bed
+      filtered = filtered.filter(r => 
+        r.beds?.some(b => b.status === 'Vacant' || b.id === editingLease.bed_id)
+      );
+    }
+    setRooms(filtered);
   };
 
   const loadBeds = async (roomId: string) => {
