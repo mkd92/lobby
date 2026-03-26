@@ -7,10 +7,10 @@ import '../styles/Leases.css';
 // ── Types ──────────────────────────────────────────────────────────────
 interface Tenant    { id: string; full_name: string; email: string; phone: string; }
 interface Property  { id: string; name: string; }
-interface Unit      { id: string; unit_number: string; type: string; base_rent: number; }
+interface Unit      { id: string; unit_number: string; type: string; base_rent: number; status: string; }
 interface Hostel    { id: string; name: string; }
 interface Room      { id: string; room_number: string; floor: number; }
-interface Bed       { id: string; bed_number: string; price: number; }
+interface Bed       { id: string; bed_number: string; price: number; status: string; }
 
 interface Lease {
   id: string;
@@ -289,8 +289,15 @@ const Leases: React.FC = () => {
   };
 
   const loadUnits = async (propertyId: string) => {
-    const { data } = await supabase.from('units').select('id, unit_number, type, base_rent').eq('property_id', propertyId).order('unit_number');
-    setUnits((data as Unit[]) || []);
+    const { data } = await supabase.from('units').select('id, unit_number, type, base_rent, status').eq('property_id', propertyId).order('unit_number');
+    let filtered = (data as Unit[]) || [];
+    if (!editingLease) {
+      filtered = filtered.filter(u => u.status === 'Vacant');
+    } else {
+      // In edit mode, show Vacant units PLUS the currently leased unit
+      filtered = filtered.filter(u => u.status === 'Vacant' || u.id === editingLease.unit_id);
+    }
+    setUnits(filtered);
   };
 
   const loadRooms = async (hostelId: string) => {
@@ -299,8 +306,15 @@ const Leases: React.FC = () => {
   };
 
   const loadBeds = async (roomId: string) => {
-    const { data } = await supabase.from('beds').select('id, bed_number, price').eq('room_id', roomId).order('bed_number');
-    setBeds((data as Bed[]) || []);
+    const { data } = await supabase.from('beds').select('id, bed_number, price, status').eq('room_id', roomId).order('bed_number');
+    let filtered = (data as Bed[]) || [];
+    if (!editingLease) {
+      filtered = filtered.filter(b => b.status === 'Vacant');
+    } else {
+      // In edit mode, show Vacant beds PLUS the currently leased bed
+      filtered = filtered.filter(b => b.status === 'Vacant' || b.id === editingLease.bed_id);
+    }
+    setBeds(filtered);
   };
 
   // ── Open modal ─────────────────────────────────────────────────────
@@ -318,7 +332,7 @@ const Leases: React.FC = () => {
     loadFormData();
   };
 
-  const openEdit = (lease: Lease) => {
+  const openEdit = async (lease: Lease) => {
     setEditingLease(lease);
     setLeaseType(lease.bed_id ? 'hostel' : 'property');
     setForm({
@@ -333,8 +347,25 @@ const Leases: React.FC = () => {
       status:           lease.status,
       notes:            lease.notes || '',
     });
-    setSelectedPropertyId(''); setSelectedHostelId(''); setSelectedRoomId('');
-    setUnits([]); setRooms([]); setBeds([]);
+    
+    // Set cascade selection IDs
+    if (lease.unit_id) {
+      const { data: unitData } = await supabase.from('units').select('property_id').eq('id', lease.unit_id).single();
+      if (unitData) {
+        setSelectedPropertyId(unitData.property_id);
+        loadUnits(unitData.property_id);
+      }
+    } else if (lease.bed_id) {
+      const { data: bedData } = await supabase.from('beds').select('rooms(id, hostel_id)').eq('id', lease.bed_id).single();
+      if (bedData) {
+        const room = (bedData.rooms as any);
+        setSelectedHostelId(room.hostel_id);
+        setSelectedRoomId(room.id);
+        loadRooms(room.hostel_id);
+        loadBeds(room.id);
+      }
+    }
+
     setRentPrefilled(false);
     setFirstMonthPrefilled(false);
     setFirstMonthBreakdown('');
