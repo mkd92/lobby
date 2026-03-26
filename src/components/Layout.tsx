@@ -87,6 +87,11 @@ const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boolean) => 
           <span className="material-symbols-outlined mr-3">logout</span>
           {!isCollapsed && <span>Sign Out</span>}
         </button>
+        {!isCollapsed && (
+          <div className="px-6 py-4 opacity-30 text-[0.65rem] font-mono">
+            Build: {new Date(__BUILD_TIME__).toLocaleString()}
+          </div>
+        )}
       </div>
     </aside>
   );
@@ -131,6 +136,9 @@ const MobileBottomNav: React.FC = () => {
               <span className="material-symbols-outlined">payments</span>
               <span>Payments</span>
             </Link>
+            <div className="px-6 py-4 opacity-30 text-[0.6rem] font-mono text-center mt-4">
+              Build: {new Date(__BUILD_TIME__).toLocaleString()}
+            </div>
           </div>
         </div>
       )}
