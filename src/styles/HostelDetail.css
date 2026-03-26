@@ -1,0 +1,368 @@
+/* HostelDetail.css */
+
+.hostel-detail-container {
+  max-width: 1200px;
+}
+
+/* ── Page header ── */
+.hostel-page-header {
+  margin-bottom: 2.5rem;
+}
+
+.hostel-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 0.875rem;
+  margin-bottom: 1.5rem;
+  transition: opacity 0.2s;
+  font-family: var(--font-main);
+}
+
+.hostel-back-btn:hover { opacity: 0.7; }
+.hostel-back-btn .material-symbols-outlined { font-size: 1.1rem; }
+
+.hostel-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.hostel-title-group h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.4rem;
+}
+
+.hostel-title-group p {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--on-surface-variant);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.hostel-header-stats {
+  display: flex;
+  gap: 2rem;
+  flex-shrink: 0;
+}
+
+.stat-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-block .label {
+  font-size: var(--font-label-small);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.5;
+  margin-bottom: 0.25rem;
+}
+
+.stat-block .value {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--primary);
+}
+
+/* ── Add Room Section ── */
+.add-room-section {
+  background: var(--surface-container-low);
+  padding: 1.75rem 2rem;
+  border-radius: 1.75rem;
+  margin-bottom: 2.5rem;
+  border: 1px solid var(--outline-variant);
+}
+
+.add-room-section h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 1.25rem !important;
+}
+
+.add-room-form {
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-end;
+}
+
+/* ── Rooms List title row ── */
+.rooms-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+}
+
+/* ── Room Card ── */
+.room-card {
+  background: var(--surface-container-lowest);
+  border-radius: 1.75rem;
+  box-shadow: var(--shadow-ambient);
+  margin-bottom: 1.75rem;
+  border: 1px solid var(--outline-variant);
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.room-card:hover {
+  border-color: var(--primary);
+}
+
+.room-card-header {
+  padding: 1.25rem 1.5rem;
+  background: var(--surface-container-low);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+.room-info-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  min-width: 0;
+}
+
+.room-icon-circle {
+  width: 44px;
+  height: 44px;
+  background: var(--primary);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.room-title-group h3 {
+  margin: 0 0 0.15rem;
+  font-size: 1rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.room-title-group p {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.55;
+}
+
+.room-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex-shrink: 0;
+}
+
+/* ── Inline forms (add bed / edit room) ── */
+.inline-add-bed {
+  background: var(--surface-container-high);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--outline-variant);
+  animation: slideDown 0.25s ease-out;
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-12px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+.bed-edit-row td {
+  background: var(--surface-container-high);
+  padding: 0.75rem 1.5rem;
+}
+
+/* ── Beds table ── */
+.beds-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.beds-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 520px;
+}
+
+.beds-table th {
+  text-align: left;
+  padding: 0.875rem 1.5rem;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--on-surface-variant);
+  opacity: 0.6;
+  border-bottom: 1px solid var(--outline-variant);
+  white-space: nowrap;
+}
+
+.beds-table td {
+  padding: 1rem 1.5rem;
+  font-size: var(--font-body-medium);
+  border-bottom: 1px solid var(--surface-container-low);
+  color: var(--on-surface);
+}
+
+.beds-table tr:last-child td { border-bottom: none; }
+
+.beds-table tbody tr:hover td {
+  background: var(--surface-container-low);
+}
+
+.bed-no {
+  font-weight: 800;
+  color: var(--on-surface);
+}
+
+.bed-price {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* ── Mobile card view for beds ── */
+.bed-cards-list {
+  display: none;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.bed-card {
+  background: var(--surface-container-low);
+  border-radius: 1rem;
+  padding: 1rem 1.125rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid var(--outline-variant);
+}
+
+.bed-card-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.bed-card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--surface-container-high);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--primary);
+}
+
+.bed-card-icon .material-symbols-outlined { font-size: 1.1rem; }
+
+.bed-card-info .bed-no {
+  display: block;
+  font-size: 0.9rem;
+  margin-bottom: 0.2rem;
+}
+
+.bed-card-info .bed-price {
+  font-size: 0.8rem;
+}
+
+.bed-card-right {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex-shrink: 0;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .hostel-title-row {
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .hostel-header-stats {
+    gap: 1.25rem;
+    flex-wrap: wrap;
+  }
+
+  .stat-block .value {
+    font-size: 1.25rem;
+  }
+
+  .add-room-section {
+    padding: 1.25rem;
+    border-radius: 1.25rem;
+    margin-bottom: 2rem;
+  }
+
+  .add-room-form {
+    flex-direction: column;
+    gap: 0.875rem;
+  }
+
+  .add-room-form .primary-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .rooms-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .room-card {
+    border-radius: 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .room-card-header {
+    flex-wrap: wrap;
+    padding: 1rem 1.125rem;
+  }
+
+  .room-header-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .inline-add-bed {
+    flex-direction: column;
+    gap: 0.875rem;
+    padding: 1rem 1.125rem;
+  }
+
+  .inline-add-bed .primary-button,
+  .inline-add-bed .delete-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Hide desktop table, show bed cards */
+  .beds-table-scroll { display: none; }
+  .bed-cards-list    { display: flex; }
+}

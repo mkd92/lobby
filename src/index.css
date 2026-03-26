@@ -1,0 +1,68 @@
+@import './styles/design-tokens.css';
+
+:root {
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-main);
+  background-color: var(--surface);
+  color: var(--on-surface);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: var(--transition-theme);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+aside, header, main, section, nav {
+  border: none !important;
+}
+
+h1 {
+  font-size: var(--font-display-medium);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+h2 {
+  font-size: var(--font-headline-small);
+  font-weight: 700;
+  margin: 0;
+}
+
+p {
+  font-size: var(--font-body-medium);
+  line-height: 1.6;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+[data-theme="dark"] .glass {
+  background: rgba(27, 34, 53, 0.75);
+}
+
+.tonal-sidebar {
+  background-color: var(--surface-container-low);
+  height: 100vh;
+  padding: 2rem;
+  width: 280px;
+}

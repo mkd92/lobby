@@ -1,0 +1,15 @@
+#root {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.App {
+  height: 100vh;
+  height: 100dvh; /* Use dynamic viewport height for mobile */
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
