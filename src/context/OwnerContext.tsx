@@ -41,12 +41,14 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     setOwnerLoading(true);
 
-    supabase
-      .from('staff')
-      .select('owner_id')
-      .eq('staff_email', session.user.email)
-      .maybeSingle()
-      .then(({ data: staffRecord }) => {
+    const resolveOwner = async () => {
+      try {
+        const { data: staffRecord } = await supabase
+          .from('staff')
+          .select('owner_id')
+          .eq('staff_email', session.user.email)
+          .maybeSingle();
+
         if (staffRecord?.owner_id) {
           setOwnerId(staffRecord.owner_id);
           setIsStaff(true);
@@ -54,13 +56,14 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setOwnerId(session.user!.id);
           setIsStaff(false);
         }
-      })
-      .catch((error) => {
+      } catch (error) {
         console.error('OwnerContext error:', error);
-      })
-      .finally(() => {
+      } finally {
         setOwnerLoading(false);
-      });
+      }
+    };
+
+    resolveOwner();
   }, [session]);
 
   return (
