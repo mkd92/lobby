@@ -1,7 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import type { Session } from '@supabase/supabase-js';
-import { supabase } from './supabaseClient';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useOwner } from './context/OwnerContext';
 import Lobby from './components/Lobby';
 import Layout from './components/Layout';
 import Auth from './components/Auth';
@@ -19,32 +17,9 @@ import Leases from './components/Leases';
 import './App.css';
 
 function App() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  const { session, ownerLoading } = useOwner();
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      
-      if (session && window.location.pathname === '/login') {
-        navigate('/');
-      } else if (!session) {
-        navigate('/login');
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  if (loading) {
+  if (ownerLoading) {
     return <div className="h-screen flex items-center justify-center bg-surface">Loading...</div>;
   }
 

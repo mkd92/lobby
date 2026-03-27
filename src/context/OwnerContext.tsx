@@ -1,22 +1,29 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../supabaseClient';
 
 interface OwnerContextType {
+  session: Session | null;
   ownerId: string | null;
   isStaff: boolean;
   ownerLoading: boolean;
 }
 
-const OwnerContext = createContext<OwnerContextType>({ ownerId: null, isStaff: false, ownerLoading: true });
+const OwnerContext = createContext<OwnerContextType>({
+  session: null, ownerId: null, isStaff: false, ownerLoading: true,
+});
 
 export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [session, setSession] = useState<Session | null>(null);
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [isStaff, setIsStaff] = useState(false);
   const [ownerLoading, setOwnerLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!session?.user) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      setSession(newSession);
+
+      if (!newSession?.user) {
         setOwnerId(null);
         setIsStaff(false);
         setOwnerLoading(false);
@@ -28,14 +35,14 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const { data: staffRecord } = await supabase
           .from('staff')
           .select('owner_id')
-          .eq('staff_email', session.user.email)
+          .eq('staff_email', newSession.user.email)
           .maybeSingle();
 
         if (staffRecord?.owner_id) {
           setOwnerId(staffRecord.owner_id);
           setIsStaff(true);
         } else {
-          setOwnerId(session.user.id);
+          setOwnerId(newSession.user.id);
           setIsStaff(false);
         }
       } catch (error) {
@@ -49,7 +56,7 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   return (
-    <OwnerContext.Provider value={{ ownerId, isStaff, ownerLoading }}>
+    <OwnerContext.Provider value={{ session, ownerId, isStaff, ownerLoading }}>
       {children}
     </OwnerContext.Provider>
   );
