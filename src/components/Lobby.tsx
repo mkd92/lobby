@@ -5,6 +5,10 @@ import { AreaChart, Area, ResponsiveContainer, Tooltip, PieChart, Pie, Cell } fr
 import { useOwner } from '../context/OwnerContext';
 import '../styles/Lobby.css';
 
+const currencySymbols: { [key: string]: string } = {
+  USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$'
+};
+
 const DataPulse: React.FC = () => (
   <span className="data-pulse"></span>
 );
@@ -26,7 +30,7 @@ const MetricCard: React.FC<{ label: string; value: string; trend?: string; sub?:
 );
 
 const Lobby: React.FC = () => {
-  const { ownerId, isStaff, currencySymbol: symbol } = useOwner();
+  const { ownerId, isStaff, ownerLoading } = useOwner();
   const [stats, setStats] = useState({
     monthlyRevenue: '—',
     overdueAmount: '—',
@@ -41,10 +45,11 @@ const Lobby: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Wait until OwnerContext has resolved before fetching
+    if (ownerLoading || !ownerId) return;
+
     const fetchDashboardStats = async () => {
       try {
-        if (!ownerId) return;
-
         const today = new Date();
         const currentYear = today.getFullYear();
         const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -55,7 +60,6 @@ const Lobby: React.FC = () => {
         const yearStart = `${currentYear}-01-01`;
         const yearEnd = `${currentYear}-12-31`;
 
-        // Build last 6 months labels
         const last6: { label: string; short: string }[] = [];
         for (let i = 5; i >= 0; i--) {
           const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
@@ -65,14 +69,16 @@ const Lobby: React.FC = () => {
           });
         }
 
-        // Fetch units, beds, and both lease types in parallel
-        const [unitsRes, bedsRes, unitLeasesRes, bedLeasesRes] = await Promise.all([
+        // All 5 fetches in parallel — currency included
+        const [ownerRes, unitsRes, bedsRes, unitLeasesRes, bedLeasesRes] = await Promise.all([
+          supabase.from('owners').select('currency').eq('id', ownerId).single(),
           supabase.from('units').select('id, status, properties!inner(owner_id)').eq('properties.owner_id', ownerId),
           supabase.from('beds').select('id, status, rooms!inner(hostels!inner(owner_id))').eq('rooms.hostels.owner_id', ownerId),
           supabase.from('leases').select('id, end_date, status, units!inner(properties!inner(owner_id))').eq('units.properties.owner_id', ownerId).not('unit_id', 'is', null),
           supabase.from('leases').select('id, end_date, status, beds!inner(rooms!inner(hostels!inner(owner_id)))').eq('beds.rooms.hostels.owner_id', ownerId).not('bed_id', 'is', null),
         ]);
 
+        const symbol = currencySymbols[ownerRes.data?.currency || 'USD'] || '$';
         const units = unitsRes.data || [];
         const beds = bedsRes.data || [];
         const totalUnits = units.length;
@@ -88,7 +94,6 @@ const Lobby: React.FC = () => {
           l.end_date >= todayStr && l.end_date <= thirtyDaysLaterStr
         ).length;
 
-        // Fetch payments only if there are leases
         let monthlyRevenue = 0;
         let annualRevenue = 0;
         let overdueAmount = 0;
@@ -131,28 +136,21 @@ const Lobby: React.FC = () => {
     };
 
     fetchDashboardStats();
-  }, [ownerId]);
+  }, [ownerId, ownerLoading]);
 
   const occupiedUnits = stats.totalUnits - stats.vacantUnits;
   const occupiedBeds  = stats.totalBeds  - stats.vacantBeds;
 
   const unitDonutData = stats.totalUnits > 0
-    ? [
-        { name: 'Occupied', value: occupiedUnits },
-        { name: 'Vacant',   value: stats.vacantUnits },
-      ]
+    ? [{ name: 'Occupied', value: occupiedUnits }, { name: 'Vacant', value: stats.vacantUnits }]
     : [{ name: 'No data', value: 1 }];
 
   const bedDonutData = stats.totalBeds > 0
-    ? [
-        { name: 'Occupied', value: occupiedBeds },
-        { name: 'Vacant',   value: stats.vacantBeds },
-      ]
+    ? [{ name: 'Occupied', value: occupiedBeds }, { name: 'Vacant', value: stats.vacantBeds }]
     : [{ name: 'No data', value: 1 }];
 
   return (
     <>
-      {/* Editorial header */}
       <header className="lobby-header">
         <div>
           <p className="lobby-eyebrow">
@@ -174,10 +172,7 @@ const Lobby: React.FC = () => {
         )}
       </header>
 
-      {/* Asymmetric metrics grid */}
       <section className="lobby-metrics-grid">
-
-        {/* Hero card — Monthly Revenue with sparkline */}
         <Link to="/payments" className="lobby-hero-card" style={{ textDecoration: 'none' }}>
           <div>
             <span className="mc-eyebrow">Monthly Revenue</span>
@@ -206,18 +201,15 @@ const Lobby: React.FC = () => {
           <span className="metric-card-arrow material-symbols-outlined">arrow_forward</span>
         </Link>
 
-        {/* Right sub-grid */}
         <div className="lobby-sub-grid">
           <MetricCard label="Overdue Amount"    value={stats.overdueAmount}    trend="Unpaid"       to="/payments" />
           <MetricCard label="Lease Expirations" value={stats.leaseExpirations} trend="Next 30 days" to="/leases" />
         </div>
       </section>
 
-      {/* Detail strip */}
       <section className="lobby-detail-strip">
         <MetricCard label="Annual Revenue" value={stats.annualRevenue} trend="Year to Date" to="/payments" />
 
-        {/* Property units card with donut */}
         <Link to="/properties" className="metric-card metric-card-link lobby-units-card" style={{ textDecoration: 'none' }}>
           <div className="lobby-units-left">
             <div className="mc-eyebrow">Property Units</div>
@@ -239,7 +231,6 @@ const Lobby: React.FC = () => {
           <span className="metric-card-arrow material-symbols-outlined">arrow_forward</span>
         </Link>
 
-        {/* Hostel beds card with donut */}
         <Link to="/hostels" className="metric-card metric-card-link lobby-units-card" style={{ textDecoration: 'none' }}>
           <div className="lobby-units-left">
             <div className="mc-eyebrow">Hostel Beds</div>

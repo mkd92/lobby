@@ -49,27 +49,16 @@ const HostelDetail: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     try {
-      if (ownerId) {
-        const { data: ownerData } = await supabase
-          .from('owners').select('currency').eq('id', ownerId).single();
-        const symbols: { [key: string]: string } = {
-          USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$'
-        };
-        setCurrencySymbol(symbols[ownerData?.currency || 'USD'] || '$');
-      }
-
-      const { data: hData, error: hError } = await supabase
-        .from('hostels').select('*').eq('id', id).single();
-      if (hError) throw hError;
-      setHostel(hData);
-
-      const { data: rData, error: rError } = await supabase
-        .from('rooms')
-        .select('*, beds (*)')
-        .eq('hostel_id', id)
-        .order('room_number', { ascending: true });
-      if (rError) throw rError;
-      setRooms(rData || []);
+      const symbols: { [key: string]: string } = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
+      const [hRes, rRes, ownerRes] = await Promise.all([
+        supabase.from('hostels').select('*').eq('id', id).single(),
+        supabase.from('rooms').select('*, beds (*)').eq('hostel_id', id).order('room_number', { ascending: true }),
+        ownerId ? supabase.from('owners').select('currency').eq('id', ownerId).single() : Promise.resolve(null),
+      ]);
+      if (hRes.error) throw hRes.error;
+      setHostel(hRes.data);
+      setRooms(rRes.data || []);
+      if (ownerRes?.data) setCurrencySymbol(symbols[ownerRes.data.currency || 'USD'] || '$');
     } catch (error) {
       console.error('Error fetching hostel details:', error);
       navigate('/hostels');

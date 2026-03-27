@@ -115,38 +115,26 @@ const Payments: React.FC = () => {
   const fetchPayments = useCallback(async () => {
     setLoading(true);
     try {
+      const symbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
+
+      // RPC must run before SELECT so generated payments are included
       await supabase.rpc('generate_monthly_rent_payments');
 
-      const { data, error } = await supabase
-        .from('payments')
-        .select(`
-          *,
-          leases (
-            rent_amount,
-            tenants (full_name),
-            units (unit_number, properties (name)),
-            beds (bed_number, rooms (room_number, hostels (name)))
-          )
-        `)
-        .order('payment_date', { ascending: false });
-
-      if (error) throw error;
-      setPayments((data as unknown as Payment[]) || []);
+      const [paymentsRes, ownerRes] = await Promise.all([
+        supabase.from('payments').select(`*, leases (rent_amount, tenants (full_name), units (unit_number, properties (name)), beds (bed_number, rooms (room_number, hostels (name))))`).order('payment_date', { ascending: false }),
+        ownerId ? supabase.from('owners').select('currency').eq('id', ownerId).single() : Promise.resolve(null),
+      ]);
+      if (paymentsRes.error) throw paymentsRes.error;
+      setPayments((paymentsRes.data as unknown as Payment[]) || []);
+      if (ownerRes?.data) setCurrencySymbol(symbols[ownerRes.data.currency || 'USD'] || '$');
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  const fetchCurrency = useCallback(async () => {
-    if (!ownerId) return;
-    const { data } = await supabase.from('owners').select('currency').eq('id', ownerId).single();
-    const symbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
-    setCurrencySymbol(symbols[data?.currency || 'USD'] || '$');
   }, [ownerId]);
 
-  useEffect(() => { fetchPayments(); fetchCurrency(); }, [fetchPayments, fetchCurrency]);
+  useEffect(() => { fetchPayments(); }, [fetchPayments]);
 
   // ── Open modals ────────────────────────────────────────────────────
   const openLogPayment = (payment: Payment) => {

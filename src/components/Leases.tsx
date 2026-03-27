@@ -222,41 +222,28 @@ const Leases: React.FC = () => {
   const fetchLeases = useCallback(async () => {
     setLoading(true);
     try {
-      // Auto-expire any active leases whose end_date has passed
       const today = new Date().toISOString().split('T')[0];
-      await supabase
-        .from('leases')
-        .update({ status: 'Expired' })
-        .eq('status', 'Active')
-        .lt('end_date', today)
-        .not('end_date', 'is', null);
+      const symbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
 
-      const { data, error } = await supabase
-        .from('leases')
-        .select(`
-          *,
-          tenants (id, full_name, email, phone),
-          units (unit_number, type, base_rent, properties (name)),
-          beds (bed_number, price, rooms (room_number, hostels (name)))
-        `)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      setLeases((data as unknown as Lease[]) || []);
+      // Auto-expire must complete before the SELECT so status is accurate
+      await supabase.from('leases').update({ status: 'Expired' }).eq('status', 'Active').lt('end_date', today).not('end_date', 'is', null);
+
+      // Then fetch leases and currency in parallel
+      const [leasesRes, ownerRes] = await Promise.all([
+        supabase.from('leases').select(`*, tenants (id, full_name, email, phone), units (unit_number, type, base_rent, properties (name)), beds (bed_number, price, rooms (room_number, hostels (name)))`).order('created_at', { ascending: false }),
+        ownerId ? supabase.from('owners').select('currency').eq('id', ownerId).single() : Promise.resolve(null),
+      ]);
+      if (leasesRes.error) throw leasesRes.error;
+      setLeases((leasesRes.data as unknown as Lease[]) || []);
+      if (ownerRes?.data) setCurrencySymbol(symbols[ownerRes.data.currency || 'USD'] || '$');
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  const fetchCurrency = useCallback(async () => {
-    if (!ownerId) return;
-    const { data } = await supabase.from('owners').select('currency').eq('id', ownerId).single();
-    const symbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
-    setCurrencySymbol(symbols[data?.currency || 'USD'] || '$');
   }, [ownerId]);
 
-  useEffect(() => { fetchLeases(); fetchCurrency(); }, [fetchLeases, fetchCurrency]);
+  useEffect(() => { fetchLeases(); }, [fetchLeases]);
 
   // Auto-calculate first month rent whenever rent or start date changes
   useEffect(() => {

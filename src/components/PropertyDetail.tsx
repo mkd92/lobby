@@ -119,17 +119,15 @@ const PropertyDetail: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     try {
-      if (ownerId) {
-        const { data: ownerData } = await supabase.from('owners').select('currency').eq('id', ownerId).single();
-        if (ownerData) setCurrency(ownerData.currency || 'USD');
-      }
-      const { data: propData, error: propError } = await supabase.from('properties').select('*').eq('id', id).single();
-      if (propError) throw propError;
-      setProperty(propData);
-
-      const { data: unitData, error: unitError } = await supabase.from('units').select('*').eq('property_id', id).order('unit_number', { ascending: true });
-      if (unitError) throw unitError;
-      setUnits(unitData || []);
+      const [propRes, unitRes, ownerRes] = await Promise.all([
+        supabase.from('properties').select('*').eq('id', id).single(),
+        supabase.from('units').select('*').eq('property_id', id).order('unit_number', { ascending: true }),
+        ownerId ? supabase.from('owners').select('currency').eq('id', ownerId).single() : Promise.resolve(null),
+      ]);
+      if (propRes.error) throw propRes.error;
+      setProperty(propRes.data);
+      setUnits(unitRes.data || []);
+      if (ownerRes?.data) setCurrency(ownerRes.data.currency || 'USD');
     } catch (error) {
       console.error('Error fetching property details:', error);
       navigate('/properties');

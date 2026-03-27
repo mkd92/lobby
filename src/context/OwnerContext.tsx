@@ -1,57 +1,37 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 
-const currencySymbols: { [key: string]: string } = {
-  USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$'
-};
-
 interface OwnerContextType {
   ownerId: string | null;
   isStaff: boolean;
   ownerLoading: boolean;
-  currencySymbol: string;
 }
 
-const OwnerContext = createContext<OwnerContextType>({
-  ownerId: null,
-  isStaff: false,
-  ownerLoading: true,
-  currencySymbol: '$',
-});
+const OwnerContext = createContext<OwnerContextType>({ ownerId: null, isStaff: false, ownerLoading: true });
 
 export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [isStaff, setIsStaff] = useState(false);
   const [ownerLoading, setOwnerLoading] = useState(true);
-  const [currencySymbol, setCurrencySymbol] = useState('$');
 
   const resolve = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setOwnerLoading(false); return; }
+    // getSession reads from localStorage — instant, no network call
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) { setOwnerLoading(false); return; }
 
-    // Run staff check and owner profile fetch in parallel
-    const [staffResult, ownerResult] = await Promise.all([
-      supabase.from('staff').select('owner_id').eq('staff_email', user.email).maybeSingle(),
-      supabase.from('owners').select('currency').eq('id', user.id).maybeSingle(),
-    ]);
+    const { data: staffRecord } = await supabase
+      .from('staff')
+      .select('owner_id')
+      .eq('staff_email', session.user.email)
+      .maybeSingle();
 
-    let resolvedOwnerId = user.id;
-    if (staffResult.data?.owner_id) {
-      resolvedOwnerId = staffResult.data.owner_id;
+    if (staffRecord?.owner_id) {
+      setOwnerId(staffRecord.owner_id);
       setIsStaff(true);
     } else {
+      setOwnerId(session.user.id);
       setIsStaff(false);
     }
-    setOwnerId(resolvedOwnerId);
-
-    // If staff, fetch owner's currency; otherwise use what we already fetched
-    let currency = ownerResult.data?.currency || 'USD';
-    if (staffResult.data?.owner_id) {
-      const { data: ownerData } = await supabase
-        .from('owners').select('currency').eq('id', resolvedOwnerId).maybeSingle();
-      currency = ownerData?.currency || 'USD';
-    }
-    setCurrencySymbol(currencySymbols[currency] || '$');
     setOwnerLoading(false);
   };
 
@@ -65,7 +45,7 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   return (
-    <OwnerContext.Provider value={{ ownerId, isStaff, ownerLoading, currencySymbol }}>
+    <OwnerContext.Provider value={{ ownerId, isStaff, ownerLoading }}>
       {children}
     </OwnerContext.Provider>
   );
