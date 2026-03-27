@@ -194,18 +194,18 @@ const Settings: React.FC = () => {
         <p className="settings-description">Staff members can view all your data but cannot make changes.</p>
 
         <form onSubmit={handleAddStaff} className="settings-row" style={{ alignItems: 'flex-end', gap: '0.75rem' }}>
-          <div style={{ flex: 1 }}>
-            <label className="settings-label">Add Staff Email</label>
+          <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+            <label>Add Staff Email</label>
             <input
               type="email"
-              className="settings-input"
+              className="auth-input"
               placeholder="staff@example.com"
               value={newStaffEmail}
               onChange={e => setNewStaffEmail(e.target.value)}
               required
             />
           </div>
-          <button type="submit" className="primary-button" disabled={staffLoading} style={{ padding: '0.65rem 1.25rem' }}>
+          <button type="submit" className="primary-button" disabled={staffLoading} style={{ padding: '0.65rem 1.25rem', flexShrink: 0 }}>
             {staffLoading ? 'Adding...' : 'Add'}
           </button>
         </form>
@@ -220,9 +220,10 @@ const Settings: React.FC = () => {
                 </div>
                 <button
                   onClick={() => handleRemoveStaff(s.id)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--error)', display: 'flex', alignItems: 'center', padding: '0.25rem' }}
+                  style={{ background: 'none', border: '1px solid var(--error)', cursor: 'pointer', color: 'var(--error)', display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.75rem', borderRadius: '0.5rem', fontSize: '0.75rem', fontWeight: 600 }}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>remove_circle</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>remove_circle</span>
+                  Revoke
                 </button>
               </div>
             ))}
