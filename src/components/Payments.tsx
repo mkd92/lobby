@@ -115,8 +115,9 @@ const Payments: React.FC = () => {
   const fetchPayments = useCallback(async () => {
     setLoading(true);
     try {
-      // RPC must complete before SELECT so generated payments are included
-      await supabase.rpc('generate_monthly_rent_payments');
+      // Fire-and-forget RPC — don't block data loading
+      void supabase.rpc('generate_monthly_rent_payments');
+
       const { data, error } = await supabase
         .from('payments')
         .select(`*, leases (rent_amount, tenants (full_name), units (unit_number, properties (name)), beds (bed_number, rooms (room_number, hostels (name))))`)

@@ -222,9 +222,10 @@ const Leases: React.FC = () => {
   const fetchLeases = useCallback(async () => {
     setLoading(true);
     try {
+      // Fire-and-forget auto-expire — don't block data loading
       const today = new Date().toISOString().split('T')[0];
-      // Auto-expire first, then fetch (RLS filters to owner automatically)
-      await supabase.from('leases').update({ status: 'Expired' }).eq('status', 'Active').lt('end_date', today).not('end_date', 'is', null);
+      void supabase.from('leases').update({ status: 'Expired' }).eq('status', 'Active').lt('end_date', today).not('end_date', 'is', null);
+
       const { data, error } = await supabase
         .from('leases')
         .select(`*, tenants (id, full_name, email, phone), units (unit_number, type, base_rent, properties (name)), beds (bed_number, price, rooms (room_number, hostels (name)))`)
