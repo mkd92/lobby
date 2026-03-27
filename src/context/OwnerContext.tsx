@@ -15,23 +15,28 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [ownerLoading, setOwnerLoading] = useState(true);
 
   const resolve = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setOwnerLoading(false); return; }
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setOwnerLoading(false); return; }
 
-    const { data: staffRecord } = await supabase
-      .from('staff')
-      .select('owner_id')
-      .eq('staff_email', user.email)
-      .maybeSingle();
+      const { data: staffRecord } = await supabase
+        .from('staff')
+        .select('owner_id')
+        .eq('staff_email', user.email)
+        .maybeSingle();
 
-    if (staffRecord?.owner_id) {
-      setOwnerId(staffRecord.owner_id);
-      setIsStaff(true);
-    } else {
-      setOwnerId(user.id);
-      setIsStaff(false);
+      if (staffRecord?.owner_id) {
+        setOwnerId(staffRecord.owner_id);
+        setIsStaff(true);
+      } else {
+        setOwnerId(user.id);
+        setIsStaff(false);
+      }
+    } catch (error) {
+      console.error('OwnerContext resolve error:', error);
+    } finally {
+      setOwnerLoading(false);
     }
-    setOwnerLoading(false);
   };
 
   useEffect(() => {
