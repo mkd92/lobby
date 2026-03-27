@@ -31,8 +31,8 @@ CREATE POLICY "Staff can read their own record."
 
 
 -- ── 2. Helper function ──────────────────────────────────────────────────────
--- Returns TRUE when the currently logged-in user is a staff member of p_owner_id.
--- SECURITY DEFINER so it can bypass RLS on the staff table internally.
+-- Wrapping in (SELECT ...) in each policy causes PostgreSQL to evaluate
+-- this STABLE function once per query (not once per row) — much faster.
 
 CREATE OR REPLACE FUNCTION public.is_staff_of(p_owner_id uuid)
 RETURNS boolean
@@ -49,12 +49,11 @@ $$;
 
 
 -- ── 3. owners ───────────────────────────────────────────────────────────────
--- Staff needs to read owner profile for currency symbol, name, etc.
 
 DROP POLICY IF EXISTS "Staff can view their owner profile." ON public.owners;
 CREATE POLICY "Staff can view their owner profile."
   ON public.owners FOR SELECT
-  USING (is_staff_of(id));
+  USING ((SELECT is_staff_of(id)));
 
 
 -- ── 4. properties ───────────────────────────────────────────────────────────
@@ -62,7 +61,7 @@ CREATE POLICY "Staff can view their owner profile."
 DROP POLICY IF EXISTS "Staff can view owner properties." ON public.properties;
 CREATE POLICY "Staff can view owner properties."
   ON public.properties FOR SELECT
-  USING (is_staff_of(owner_id));
+  USING ((SELECT is_staff_of(owner_id)));
 
 
 -- ── 5. units ────────────────────────────────────────────────────────────────
@@ -74,7 +73,7 @@ CREATE POLICY "Staff can view owner units."
     EXISTS (
       SELECT 1 FROM public.properties p
       WHERE p.id = units.property_id
-        AND is_staff_of(p.owner_id)
+        AND (SELECT is_staff_of(p.owner_id))
     )
   );
 
@@ -84,7 +83,7 @@ CREATE POLICY "Staff can view owner units."
 DROP POLICY IF EXISTS "Staff can view owner tenants." ON public.tenants;
 CREATE POLICY "Staff can view owner tenants."
   ON public.tenants FOR SELECT
-  USING (is_staff_of(owner_id));
+  USING ((SELECT is_staff_of(owner_id)));
 
 
 -- ── 7. hostels ──────────────────────────────────────────────────────────────
@@ -92,7 +91,7 @@ CREATE POLICY "Staff can view owner tenants."
 DROP POLICY IF EXISTS "Staff can view owner hostels." ON public.hostels;
 CREATE POLICY "Staff can view owner hostels."
   ON public.hostels FOR SELECT
-  USING (is_staff_of(owner_id));
+  USING ((SELECT is_staff_of(owner_id)));
 
 
 -- ── 8. rooms ────────────────────────────────────────────────────────────────
@@ -104,7 +103,7 @@ CREATE POLICY "Staff can view owner rooms."
     EXISTS (
       SELECT 1 FROM public.hostels h
       WHERE h.id = rooms.hostel_id
-        AND is_staff_of(h.owner_id)
+        AND (SELECT is_staff_of(h.owner_id))
     )
   );
 
@@ -119,7 +118,7 @@ CREATE POLICY "Staff can view owner beds."
       SELECT 1 FROM public.rooms r
       JOIN public.hostels h ON h.id = r.hostel_id
       WHERE r.id = beds.room_id
-        AND is_staff_of(h.owner_id)
+        AND (SELECT is_staff_of(h.owner_id))
     )
   );
 
@@ -130,21 +129,19 @@ DROP POLICY IF EXISTS "Staff can view owner leases." ON public.leases;
 CREATE POLICY "Staff can view owner leases."
   ON public.leases FOR SELECT
   USING (
-    -- Unit-based lease
     (unit_id IS NOT NULL AND EXISTS (
       SELECT 1 FROM public.units u
       JOIN public.properties p ON p.id = u.property_id
       WHERE u.id = leases.unit_id
-        AND is_staff_of(p.owner_id)
+        AND (SELECT is_staff_of(p.owner_id))
     ))
     OR
-    -- Bed-based lease
     (bed_id IS NOT NULL AND EXISTS (
       SELECT 1 FROM public.beds b
       JOIN public.rooms r ON r.id = b.room_id
       JOIN public.hostels h ON h.id = r.hostel_id
       WHERE b.id = leases.bed_id
-        AND is_staff_of(h.owner_id)
+        AND (SELECT is_staff_of(h.owner_id))
     ))
   );
 
@@ -160,7 +157,7 @@ CREATE POLICY "Staff can view owner payments."
       JOIN public.units u ON u.id = l.unit_id
       JOIN public.properties p ON p.id = u.property_id
       WHERE l.id = payments.lease_id
-        AND is_staff_of(p.owner_id)
+        AND (SELECT is_staff_of(p.owner_id))
     )
     OR
     EXISTS (
@@ -169,6 +166,6 @@ CREATE POLICY "Staff can view owner payments."
       JOIN public.rooms r ON r.id = b.room_id
       JOIN public.hostels h ON h.id = r.hostel_id
       WHERE l.id = payments.lease_id
-        AND is_staff_of(h.owner_id)
+        AND (SELECT is_staff_of(h.owner_id))
     )
   );

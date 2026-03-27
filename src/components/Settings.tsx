@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useTheme } from '../context/ThemeContext';
 import '../styles/Auth.css';
@@ -19,6 +20,7 @@ type UpdateStatus = 'idle' | 'checking' | 'up-to-date' | 'updating' | 'error';
 
 const Settings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -382,6 +384,23 @@ const Settings: React.FC = () => {
             </button>
           </div>
         </form>
+      </div>
+
+      {/* Sign Out */}
+      <div className="settings-card" style={{ borderColor: 'var(--error-container)' }}>
+        <h2 className="settings-section-title" style={{ color: 'var(--error)' }}>
+          <span className="material-symbols-outlined">logout</span>
+          Sign Out
+        </h2>
+        <p className="settings-description">You will be signed out of your account on this device.</p>
+        <button
+          className="primary-button"
+          style={{ background: 'var(--error)', marginTop: '1rem' }}
+          onClick={async () => { await supabase.auth.signOut(); navigate('/login'); }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle', marginRight: '0.35rem' }}>logout</span>
+          Sign Out
+        </button>
       </div>
     </div>
   );

@@ -5,10 +5,6 @@ import { AreaChart, Area, ResponsiveContainer, Tooltip, PieChart, Pie, Cell } fr
 import { useOwner } from '../context/OwnerContext';
 import '../styles/Lobby.css';
 
-const currencySymbols: { [key: string]: string } = {
-  USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$'
-};
-
 const DataPulse: React.FC = () => (
   <span className="data-pulse"></span>
 );
@@ -30,7 +26,7 @@ const MetricCard: React.FC<{ label: string; value: string; trend?: string; sub?:
 );
 
 const Lobby: React.FC = () => {
-  const { ownerId, isStaff } = useOwner();
+  const { ownerId, isStaff, currencySymbol: symbol } = useOwner();
   const [stats, setStats] = useState({
     monthlyRevenue: '—',
     overdueAmount: '—',
@@ -49,13 +45,6 @@ const Lobby: React.FC = () => {
       try {
         if (!ownerId) return;
 
-        const { data: ownerData } = await supabase
-          .from('owners')
-          .select('currency')
-          .eq('id', ownerId)
-          .single();
-        const symbol = currencySymbols[ownerData?.currency || 'USD'] || '$';
-
         const today = new Date();
         const currentYear = today.getFullYear();
         const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -66,52 +55,6 @@ const Lobby: React.FC = () => {
         const yearStart = `${currentYear}-01-01`;
         const yearEnd = `${currentYear}-12-31`;
 
-        // Units (properties)
-        const { data: units } = await supabase
-          .from('units')
-          .select('id, status, properties!inner(owner_id)')
-          .eq('properties.owner_id', ownerId);
-
-        const totalUnits = units?.length || 0;
-        const vacantUnits = (units as any[])?.filter(u => u.status === 'Vacant').length || 0;
-
-        // Beds (hostels)
-        const { data: beds } = await supabase
-          .from('beds')
-          .select('id, status, rooms!inner(hostels!inner(owner_id))')
-          .eq('rooms.hostels.owner_id', ownerId);
-
-        const totalBeds = beds?.length || 0;
-        const vacantBeds = (beds as any[])?.filter(b => b.status === 'Vacant').length || 0;
-
-        // Leases
-        const { data: unitLeases } = await supabase
-          .from('leases')
-          .select('id, end_date, status, units!inner(properties!inner(owner_id))')
-          .eq('units.properties.owner_id', ownerId)
-          .not('unit_id', 'is', null);
-
-        const { data: bedLeases } = await supabase
-          .from('leases')
-          .select('id, end_date, status, beds!inner(rooms!inner(hostels!inner(owner_id)))')
-          .eq('beds.rooms.hostels.owner_id', ownerId)
-          .not('bed_id', 'is', null);
-
-        const allLeases = [...(unitLeases || []), ...(bedLeases || [])];
-        const leaseIds = allLeases.map((l: any) => l.id);
-
-        const expiringCount = allLeases.filter((l: any) =>
-          l.status === 'Active' &&
-          l.end_date &&
-          l.end_date >= todayStr &&
-          l.end_date <= thirtyDaysLaterStr
-        ).length;
-
-        // Payments
-        let monthlyRevenue = 0;
-        let annualRevenue = 0;
-        let overdueAmount = 0;
-
         // Build last 6 months labels
         const last6: { label: string; short: string }[] = [];
         for (let i = 5; i >= 0; i--) {
@@ -121,6 +64,34 @@ const Lobby: React.FC = () => {
             short: d.toLocaleString('default', { month: 'short' }),
           });
         }
+
+        // Fetch units, beds, and both lease types in parallel
+        const [unitsRes, bedsRes, unitLeasesRes, bedLeasesRes] = await Promise.all([
+          supabase.from('units').select('id, status, properties!inner(owner_id)').eq('properties.owner_id', ownerId),
+          supabase.from('beds').select('id, status, rooms!inner(hostels!inner(owner_id))').eq('rooms.hostels.owner_id', ownerId),
+          supabase.from('leases').select('id, end_date, status, units!inner(properties!inner(owner_id))').eq('units.properties.owner_id', ownerId).not('unit_id', 'is', null),
+          supabase.from('leases').select('id, end_date, status, beds!inner(rooms!inner(hostels!inner(owner_id)))').eq('beds.rooms.hostels.owner_id', ownerId).not('bed_id', 'is', null),
+        ]);
+
+        const units = unitsRes.data || [];
+        const beds = bedsRes.data || [];
+        const totalUnits = units.length;
+        const vacantUnits = (units as any[]).filter(u => u.status === 'Vacant').length;
+        const totalBeds = beds.length;
+        const vacantBeds = (beds as any[]).filter(b => b.status === 'Vacant').length;
+
+        const allLeases = [...(unitLeasesRes.data || []), ...(bedLeasesRes.data || [])];
+        const leaseIds = allLeases.map((l: any) => l.id);
+
+        const expiringCount = allLeases.filter((l: any) =>
+          l.status === 'Active' && l.end_date &&
+          l.end_date >= todayStr && l.end_date <= thirtyDaysLaterStr
+        ).length;
+
+        // Fetch payments only if there are leases
+        let monthlyRevenue = 0;
+        let annualRevenue = 0;
+        let overdueAmount = 0;
         const revenueByMonth: Record<string, number> = {};
         last6.forEach(m => { revenueByMonth[m.label] = 0; });
 
@@ -141,12 +112,7 @@ const Lobby: React.FC = () => {
           });
         }
 
-        const chartData = last6.map(m => ({
-          month: m.short,
-          revenue: revenueByMonth[m.label] || 0,
-        }));
-
-        setRevenueChart(chartData);
+        setRevenueChart(last6.map(m => ({ month: m.short, revenue: revenueByMonth[m.label] || 0 })));
         setStats({
           monthlyRevenue: formatCurrency(monthlyRevenue, symbol),
           overdueAmount: formatCurrency(overdueAmount, symbol),
