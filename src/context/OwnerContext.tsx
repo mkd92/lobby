@@ -44,31 +44,43 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const resolveOwner = async () => {
       try {
-        // Check if this user is a staff member
-        const staffSnap = await getDocs(
-          query(collection(db, 'staff'), where('staff_email', '==', user.email))
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Firestore timeout — check that Firestore database is created in Firebase Console')), 10000)
         );
 
-        if (!staffSnap.empty) {
-          const staffData = staffSnap.docs[0].data();
-          setOwnerId(staffData.owner_id);
-          setIsStaff(true);
-        } else {
-          // Owner — ensure owner doc exists
-          const ownerRef = doc(db, 'owners', user.uid);
-          const ownerSnap = await getDoc(ownerRef);
-          if (!ownerSnap.exists()) {
-            await setDoc(ownerRef, {
-              full_name: user.displayName || '',
-              email: user.email || '',
-              currency: 'USD',
-            });
-          }
-          setOwnerId(user.uid);
-          setIsStaff(false);
-        }
+        await Promise.race([
+          (async () => {
+            // Check if this user is a staff member
+            const staffSnap = await getDocs(
+              query(collection(db, 'staff'), where('staff_email', '==', user.email))
+            );
+
+            if (!staffSnap.empty) {
+              const staffData = staffSnap.docs[0].data();
+              setOwnerId(staffData.owner_id);
+              setIsStaff(true);
+            } else {
+              // Owner — ensure owner doc exists
+              const ownerRef = doc(db, 'owners', user.uid);
+              const ownerSnap = await getDoc(ownerRef);
+              if (!ownerSnap.exists()) {
+                await setDoc(ownerRef, {
+                  full_name: user.displayName || '',
+                  email: user.email || '',
+                  currency: 'USD',
+                });
+              }
+              setOwnerId(user.uid);
+              setIsStaff(false);
+            }
+          })(),
+          timeout,
+        ]);
       } catch (error) {
         console.error('OwnerContext error:', error);
+        // Fall back to treating user as owner so app doesn't stay frozen
+        setOwnerId(user.uid);
+        setIsStaff(false);
       } finally {
         setOwnerLoading(false);
       }
