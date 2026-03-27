@@ -1,18 +1,24 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
+import { useQuery } from '@tanstack/react-query';
 import '../styles/Properties.css';
+
+interface HostelData {
+  id: string;
+  name: string;
+  address: string;
+  roomCount: number;
+}
 
 const Hostels: React.FC = () => {
   const { ownerId, isStaff } = useOwner();
-  const [hostels, setHostels] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  const fetchHostels = useCallback(async () => {
-    if (!ownerId) return;
-    try {
+  const { data: hostels = [], isLoading } = useQuery<HostelData[]>({
+    queryKey: ['hostels', ownerId],
+    queryFn: async () => {
       const [hostelSnap, roomSnap] = await Promise.all([
         getDocs(query(collection(db, 'hostels'), where('owner_id', '==', ownerId))),
         getDocs(query(collection(db, 'rooms'), where('owner_id', '==', ownerId))),
@@ -24,21 +30,22 @@ const Hostels: React.FC = () => {
         if (hid) roomCounts[hid] = (roomCounts[hid] || 0) + 1;
       });
 
-      const list = hostelSnap.docs
-        .map(d => ({ id: d.id, ...d.data(), roomCount: roomCounts[d.id] || 0 }))
-        .sort((a: any, b: any) => a.name.localeCompare(b.name));
+      const data = hostelSnap.docs.map(d => {
+        const dData = d.data();
+        return {
+          id: d.id,
+          name: dData.name || '',
+          address: dData.address || '',
+          roomCount: roomCounts[d.id] || 0,
+        };
+      });
 
-      setHostels(list);
-    } catch (error) {
-      console.error('Error fetching hostels:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [ownerId]);
+      return data.sort((a, b) => a.name.localeCompare(b.name));
+    },
+    enabled: !!ownerId,
+  });
 
-  useEffect(() => { fetchHostels(); }, [fetchHostels]);
-
-  if (loading) return <div className="p-12">Loading hostels...</div>;
+  if (isLoading) return <div className="p-12">Loading hostels...</div>;
 
   return (
     <div className="properties-container">

@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import '../styles/Properties.css';
 import '../styles/Units.css';
 import '../styles/Leases.css';
@@ -19,30 +20,23 @@ interface Customer {
 const Customers: React.FC = () => {
   const { showAlert, showConfirm, DialogMount } = useDialog();
   const { ownerId, isStaff } = useOwner();
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
 
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [editForm, setEditForm] = useState({ full_name: '', email: '', phone: '' });
   const [saving, setSaving] = useState(false);
 
-  const fetchCustomers = useCallback(async () => {
-    if (!ownerId) return;
-    try {
+  const { data: customers = [], isLoading } = useQuery({
+    queryKey: ['customers', ownerId],
+    queryFn: async () => {
       const snap = await getDocs(query(collection(db, 'tenants'), where('owner_id', '==', ownerId)));
-      const list: Customer[] = snap.docs
+      return snap.docs
         .map(d => ({ id: d.id, ...d.data() } as Customer))
         .sort((a, b) => a.full_name.localeCompare(b.full_name));
-      setCustomers(list);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [ownerId]);
-
-  useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
+    },
+    enabled: !!ownerId,
+  });
 
   const filteredCustomers = customers.filter(c => {
     const q = searchQuery.toLowerCase();
@@ -61,7 +55,7 @@ const Customers: React.FC = () => {
     try {
       await updateDoc(doc(db, 'tenants', editingCustomer.id), editForm);
       setEditingCustomer(null);
-      fetchCustomers();
+      queryClient.invalidateQueries({ queryKey: ['customers', ownerId] });
     } catch (err) {
       showAlert((err as Error).message);
     } finally {
@@ -81,7 +75,7 @@ const Customers: React.FC = () => {
     if (!ok) return;
     try {
       await deleteDoc(doc(db, 'tenants', customer.id));
-      fetchCustomers();
+      queryClient.invalidateQueries({ queryKey: ['customers', ownerId] });
     } catch (err) {
       showAlert((err as Error).message);
     }
@@ -93,7 +87,7 @@ const Customers: React.FC = () => {
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  if (loading) return <div className="p-12">Loading customers...</div>;
+  if (isLoading) return <div className="p-12">Loading customers...</div>;
 
   return (
     <div className="properties-container" style={{ padding: '1rem' }}>

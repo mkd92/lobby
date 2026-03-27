@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   doc,
@@ -11,6 +11,7 @@ import {
 import { db } from '../firebaseClient';
 import { AreaChart, Area, ResponsiveContainer, Tooltip, PieChart, Pie, Cell } from 'recharts';
 import { useOwner } from '../context/OwnerContext';
+import { useQuery } from '@tanstack/react-query';
 import '../styles/Lobby.css';
 
 const currencySymbols: { [key: string]: string } = {
@@ -39,7 +40,101 @@ const MetricCard: React.FC<{ label: string; value: string; trend?: string; sub?:
 
 const Lobby: React.FC = () => {
   const { ownerId, isStaff, ownerLoading } = useOwner();
-  const [stats, setStats] = useState({
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['dashboard', ownerId],
+    enabled: !!ownerId && !ownerLoading,
+    queryFn: async () => {
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
+      const todayStr = today.toISOString().split('T')[0];
+      const thirtyDaysLater = new Date(today);
+      thirtyDaysLater.setDate(today.getDate() + 30);
+      const thirtyDaysLaterStr = thirtyDaysLater.toISOString().split('T')[0];
+      const yearStart = `${currentYear}-01-01`;
+      const yearEnd = `${currentYear}-12-31`;
+
+      const last6: { label: string; short: string }[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        last6.push({
+          label: d.toLocaleString('default', { month: 'long', year: 'numeric' }),
+          short: d.toLocaleString('default', { month: 'short' }),
+        });
+      }
+
+      // All 5 fetches in parallel — currency included
+      const [ownerSnap, unitsSnap, bedsSnap, leasesSnap, paymentsSnap] = await Promise.all([
+        getDoc(doc(db, 'owners', ownerId!)),
+        getDocs(query(collection(db, 'units'), where('owner_id', '==', ownerId))),
+        getDocs(query(collection(db, 'beds'), where('owner_id', '==', ownerId))),
+        getDocs(query(collection(db, 'leases'), where('owner_id', '==', ownerId))),
+        getDocs(query(collection(db, 'payments'), where('owner_id', '==', ownerId))),
+      ]);
+
+      const currency = (ownerSnap.data() as { currency?: string })?.currency || 'USD';
+      const symbol = currencySymbols[currency] || '$';
+
+      const units = unitsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as { id: string; status: string }[];
+      const beds  = bedsSnap.docs.map(d => ({ id: d.id, ...d.data() }))  as { id: string; status: string }[];
+
+      const totalUnits  = units.length;
+      const vacantUnits = units.filter(u => u.status === 'Vacant').length;
+      const totalBeds   = beds.length;
+      const vacantBeds  = beds.filter(b => b.status === 'Vacant').length;
+
+      const allLeases = leasesSnap.docs.map(d => ({ id: d.id, ...d.data() })) as {
+        id: string;
+        status: string;
+        end_date?: string;
+      }[];
+
+      const expiringCount = allLeases.filter(l =>
+        l.status === 'Active' && l.end_date &&
+        l.end_date >= todayStr && l.end_date <= thirtyDaysLaterStr
+      ).length;
+
+      let monthlyRevenue = 0;
+      let annualRevenue  = 0;
+      let overdueAmount  = 0;
+      const revenueByMonth: Record<string, number> = {};
+      last6.forEach(m => { revenueByMonth[m.label] = 0; });
+
+      const payments = paymentsSnap.docs.map(d => d.data()) as {
+        amount: number;
+        status: string;
+        month_for: string;
+        payment_date: string;
+      }[];
+
+      payments.forEach(p => {
+        const amount = Number(p.amount);
+        if (p.status === 'Paid' && p.month_for === currentMonth) monthlyRevenue += amount;
+        if (p.status === 'Paid' && p.payment_date >= yearStart && p.payment_date <= yearEnd) annualRevenue += amount;
+        if (p.status === 'Pending' || p.status === 'Partial') overdueAmount += amount;
+        if (p.status === 'Paid' && revenueByMonth[p.month_for] !== undefined) {
+          revenueByMonth[p.month_for] += amount;
+        }
+      });
+
+      const revenueChart = last6.map(m => ({ month: m.short, revenue: revenueByMonth[m.label] || 0 }));
+      const stats = {
+        monthlyRevenue: formatCurrency(monthlyRevenue, symbol),
+        overdueAmount:  formatCurrency(overdueAmount, symbol),
+        leaseExpirations: String(expiringCount),
+        annualRevenue:  formatCurrency(annualRevenue, symbol),
+        totalUnits,
+        vacantUnits,
+        totalBeds,
+        vacantBeds,
+      };
+
+      return { stats, revenueChart };
+    },
+  });
+
+  const stats = data?.stats ?? {
     monthlyRevenue: '—',
     overdueAmount: '—',
     leaseExpirations: '—',
@@ -48,109 +143,8 @@ const Lobby: React.FC = () => {
     vacantUnits: 0,
     totalBeds: 0,
     vacantBeds: 0,
-  });
-  const [revenueChart, setRevenueChart] = useState<{ month: string; revenue: number }[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (ownerLoading) return; // still resolving — wait
-    if (!ownerId) { setLoading(false); return; } // resolved but no user
-
-    const fetchDashboardStats = async () => {
-      try {
-        const today = new Date();
-        const currentYear = today.getFullYear();
-        const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
-        const todayStr = today.toISOString().split('T')[0];
-        const thirtyDaysLater = new Date(today);
-        thirtyDaysLater.setDate(today.getDate() + 30);
-        const thirtyDaysLaterStr = thirtyDaysLater.toISOString().split('T')[0];
-        const yearStart = `${currentYear}-01-01`;
-        const yearEnd = `${currentYear}-12-31`;
-
-        const last6: { label: string; short: string }[] = [];
-        for (let i = 5; i >= 0; i--) {
-          const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-          last6.push({
-            label: d.toLocaleString('default', { month: 'long', year: 'numeric' }),
-            short: d.toLocaleString('default', { month: 'short' }),
-          });
-        }
-
-        // All 5 fetches in parallel — currency included
-        const [ownerSnap, unitsSnap, bedsSnap, leasesSnap, paymentsSnap] = await Promise.all([
-          getDoc(doc(db, 'owners', ownerId)),
-          getDocs(query(collection(db, 'units'), where('owner_id', '==', ownerId))),
-          getDocs(query(collection(db, 'beds'), where('owner_id', '==', ownerId))),
-          getDocs(query(collection(db, 'leases'), where('owner_id', '==', ownerId))),
-          getDocs(query(collection(db, 'payments'), where('owner_id', '==', ownerId))),
-        ]);
-
-        const currency = (ownerSnap.data() as { currency?: string })?.currency || 'USD';
-        const symbol = currencySymbols[currency] || '$';
-
-        const units = unitsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as { id: string; status: string }[];
-        const beds  = bedsSnap.docs.map(d => ({ id: d.id, ...d.data() }))  as { id: string; status: string }[];
-
-        const totalUnits  = units.length;
-        const vacantUnits = units.filter(u => u.status === 'Vacant').length;
-        const totalBeds   = beds.length;
-        const vacantBeds  = beds.filter(b => b.status === 'Vacant').length;
-
-        const allLeases = leasesSnap.docs.map(d => ({ id: d.id, ...d.data() })) as {
-          id: string;
-          status: string;
-          end_date?: string;
-        }[];
-
-        const expiringCount = allLeases.filter(l =>
-          l.status === 'Active' && l.end_date &&
-          l.end_date >= todayStr && l.end_date <= thirtyDaysLaterStr
-        ).length;
-
-        let monthlyRevenue = 0;
-        let annualRevenue  = 0;
-        let overdueAmount  = 0;
-        const revenueByMonth: Record<string, number> = {};
-        last6.forEach(m => { revenueByMonth[m.label] = 0; });
-
-        const payments = paymentsSnap.docs.map(d => d.data()) as {
-          amount: number;
-          status: string;
-          month_for: string;
-          payment_date: string;
-        }[];
-
-        payments.forEach(p => {
-          const amount = Number(p.amount);
-          if (p.status === 'Paid' && p.month_for === currentMonth) monthlyRevenue += amount;
-          if (p.status === 'Paid' && p.payment_date >= yearStart && p.payment_date <= yearEnd) annualRevenue += amount;
-          if (p.status === 'Pending' || p.status === 'Partial') overdueAmount += amount;
-          if (p.status === 'Paid' && revenueByMonth[p.month_for] !== undefined) {
-            revenueByMonth[p.month_for] += amount;
-          }
-        });
-
-        setRevenueChart(last6.map(m => ({ month: m.short, revenue: revenueByMonth[m.label] || 0 })));
-        setStats({
-          monthlyRevenue: formatCurrency(monthlyRevenue, symbol),
-          overdueAmount:  formatCurrency(overdueAmount, symbol),
-          leaseExpirations: String(expiringCount),
-          annualRevenue:  formatCurrency(annualRevenue, symbol),
-          totalUnits,
-          vacantUnits,
-          totalBeds,
-          vacantBeds,
-        });
-      } catch (error) {
-        console.error('Error fetching dashboard stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDashboardStats();
-  }, [ownerId, ownerLoading]);
+  };
+  const revenueChart = data?.revenueChart ?? [];
 
   const occupiedUnits = stats.totalUnits - stats.vacantUnits;
   const occupiedBeds  = stats.totalBeds  - stats.vacantBeds;
@@ -169,7 +163,7 @@ const Lobby: React.FC = () => {
         <div>
           <p className="lobby-eyebrow">
             <DataPulse />
-            {loading ? 'Updating metrics...' : 'Live Data Analytics'}
+            {isLoading ? 'Updating metrics...' : 'Live Data Analytics'}
           </p>
           <h1 className="lobby-display-title">Operations Dashboard</h1>
           {isStaff && (

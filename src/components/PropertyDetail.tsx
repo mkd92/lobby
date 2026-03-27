@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import '../styles/Units.css';
 import '../styles/Properties.css';
 
@@ -91,12 +92,9 @@ const PropertyDetail: React.FC = () => {
   const navigate = useNavigate();
   const { showAlert, showConfirm, DialogMount } = useDialog();
   const { ownerId, isStaff } = useOwner();
+  const queryClient = useQueryClient();
   const addDropdownRef = useRef<HTMLDivElement>(null);
-  const [property, setProperty] = useState<Property | null>(null);
-  const [units, setUnits] = useState<Unit[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [currency, setCurrency] = useState('USD');
 
   // Add unit form
   const [newUnit, setNewUnit] = useState({ unit_number: '', floor: 0, type: 'Studio', base_rent: 0, area_sqft: 0 });
@@ -118,8 +116,9 @@ const PropertyDetail: React.FC = () => {
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
-  const fetchData = useCallback(async () => {
-    try {
+  const { data, isLoading } = useQuery({
+    queryKey: ['property', id, ownerId],
+    queryFn: async () => {
       const [propSnap, unitsSnap, ownerSnap] = await Promise.all([
         getDoc(doc(db, 'properties', id!)),
         getDocs(query(collection(db, 'units'), where('property_id', '==', id))),
@@ -127,24 +126,22 @@ const PropertyDetail: React.FC = () => {
       ]);
 
       if (!propSnap.exists()) throw new Error('Property not found');
-      setProperty({ id: propSnap.id, ...propSnap.data() } as Property);
+
+      const property: Property = { id: propSnap.id, ...propSnap.data() } as Property;
 
       const fetchedUnits: Unit[] = unitsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Unit));
       fetchedUnits.sort((a, b) => a.unit_number.localeCompare(b.unit_number));
-      setUnits(fetchedUnits);
 
-      if (ownerSnap && ownerSnap.exists()) {
-        setCurrency(ownerSnap.data().currency || 'USD');
-      }
-    } catch (error) {
-      console.error('Error fetching property details:', error);
-      navigate('/properties');
-    } finally {
-      setLoading(false);
-    }
-  }, [id, navigate, ownerId]);
+      const currency = (ownerSnap && ownerSnap.exists()) ? (ownerSnap.data().currency || 'USD') : 'USD';
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+      return { property, units: fetchedUnits, currency };
+    },
+    enabled: !!id && !!ownerId,
+  });
+
+  const property = data?.property ?? null;
+  const units = data?.units ?? [];
+  const currency = data?.currency ?? 'USD';
 
   // ── Add unit ────────────────────────────────────────────────────────
   const handleAddUnit = async (e: React.FormEvent) => {
@@ -158,7 +155,7 @@ const PropertyDetail: React.FC = () => {
         created_at: serverTimestamp(),
       });
       setNewUnit({ unit_number: '', floor: 0, type: 'Studio', base_rent: 0, area_sqft: 0 });
-      fetchData();
+      queryClient.invalidateQueries({ queryKey: ['property', id, ownerId] });
     } catch (error) {
       showAlert('Error adding unit: ' + (error as Error).message);
     }
@@ -176,7 +173,7 @@ const PropertyDetail: React.FC = () => {
     try {
       await updateDoc(doc(db, 'units', editingUnitId), editUnitData);
       setEditingUnitId(null);
-      fetchData();
+      queryClient.invalidateQueries({ queryKey: ['property', id, ownerId] });
     } catch (error) {
       showAlert((error as Error).message);
     }
@@ -197,7 +194,7 @@ const PropertyDetail: React.FC = () => {
     try {
       await deleteDoc(doc(db, 'units', unit.id));
       setEditingUnitId(null);
-      fetchData();
+      queryClient.invalidateQueries({ queryKey: ['property', id, ownerId] });
     } catch (error) {
       showAlert((error as Error).message);
     }
@@ -215,7 +212,7 @@ const PropertyDetail: React.FC = () => {
     try {
       await updateDoc(doc(db, 'properties', id!), editPropertyData);
       setEditingProperty(false);
-      fetchData();
+      queryClient.invalidateQueries({ queryKey: ['property', id, ownerId] });
     } catch (error) {
       showAlert((error as Error).message);
     }
@@ -249,7 +246,7 @@ const PropertyDetail: React.FC = () => {
 
   const sym = currencySymbols[currency] || '$';
 
-  if (loading) return <div className="p-12">Loading property dashboard...</div>;
+  if (isLoading) return <div className="p-12">Loading property dashboard...</div>;
   if (!property) return null;
 
   return (

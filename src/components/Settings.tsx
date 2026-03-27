@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { auth, db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
 import { useTheme } from '../context/ThemeContext';
@@ -25,50 +26,55 @@ const Settings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const { ownerId, user } = useOwner();
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
   const [saving, setSaving] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [staffEmails, setStaffEmails] = useState<{ id: string; staff_email: string }[]>([]);
   const [newStaffEmail, setNewStaffEmail] = useState('');
   const [staffLoading, setStaffLoading] = useState(false);
 
   const [profile, setProfile] = useState({
     full_name: '',
     email: '',
-    currency: 'USD'
+    currency: 'USD',
   });
 
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-  useEffect(() => {
-    if (!ownerId) return;
+  const { data, isLoading } = useQuery({
+    queryKey: ['settings', ownerId],
+    queryFn: async () => {
+      if (!ownerId) throw new Error('No ownerId');
+      const [ownerSnap, staffSnap] = await Promise.all([
+        getDoc(doc(db, 'owners', ownerId)),
+        getDocs(query(collection(db, 'staff'), where('owner_id', '==', ownerId))),
+      ]);
 
-    const fetchProfile = async () => {
-      try {
-        const ownerSnap = await getDoc(doc(db, 'owners', ownerId));
-        if (ownerSnap.exists()) {
-          const data = ownerSnap.data();
-          setProfile({
-            full_name: data.full_name || '',
-            email: data.email || user?.email || '',
-            currency: data.currency || 'USD',
-          });
-        }
-
-        // Fetch staff members
-        const staffSnap = await getDocs(query(collection(db, 'staff'), where('owner_id', '==', ownerId)));
-        setStaffEmails(staffSnap.docs.map(d => ({ id: d.id, staff_email: d.data().staff_email })));
-      } catch (error) {
-        console.error('Error fetching profile:', error);
-      } finally {
-        setLoading(false);
+      let profileData = { full_name: '', email: '', currency: 'USD' };
+      if (ownerSnap.exists()) {
+        const d = ownerSnap.data();
+        profileData = {
+          full_name: d.full_name || '',
+          email: d.email || user?.email || '',
+          currency: d.currency || 'USD',
+        };
       }
-    };
 
-    fetchProfile();
-  }, [ownerId, user]);
+      const staffEmails = staffSnap.docs.map(d => ({ id: d.id, staff_email: d.data().staff_email }));
+
+      return { profile: profileData, staffEmails };
+    },
+    enabled: !!ownerId,
+  });
+
+  // Sync query data into editable local profile state
+  useEffect(() => {
+    if (data?.profile) setProfile(data.profile);
+  }, [data]);
+
+  const staffEmails = data?.staffEmails ?? [];
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -123,9 +129,9 @@ const Settings: React.FC = () => {
     setStaffLoading(true);
     try {
       const email = newStaffEmail.trim().toLowerCase();
-      const docRef = await addDoc(collection(db, 'staff'), { owner_id: ownerId, staff_email: email });
-      setStaffEmails(prev => [...prev, { id: docRef.id, staff_email: email }]);
+      await addDoc(collection(db, 'staff'), { owner_id: ownerId, staff_email: email });
       setNewStaffEmail('');
+      queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
     } catch (error) {
       console.error('Error adding staff:', error);
     }
@@ -134,7 +140,7 @@ const Settings: React.FC = () => {
 
   const handleRemoveStaff = async (id: string) => {
     await deleteDoc(doc(db, 'staff', id));
-    setStaffEmails(prev => prev.filter(s => s.id !== id));
+    queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -149,6 +155,7 @@ const Settings: React.FC = () => {
         currency: profile.currency,
       });
       setMessage({ type: 'success', text: 'Settings updated successfully!' });
+      queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
     } catch (error) {
       setMessage({ type: 'error', text: (error as Error).message });
     } finally {
@@ -163,7 +170,7 @@ const Settings: React.FC = () => {
 
   const currentCurrency = currencies.find(c => c.code === profile.currency) || currencies[0];
 
-  if (loading) return <div className="p-12">Loading settings...</div>;
+  if (isLoading) return <div className="p-12">Loading settings...</div>;
 
   return (
     <div className="settings-page">

@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import '../styles/Properties.css';
 
 const propertyTypes = ['Residential', 'Commercial', 'Industrial', 'Mixed'];
@@ -20,17 +21,17 @@ const Properties: React.FC = () => {
   const navigate = useNavigate();
   const { showAlert, showConfirm, DialogMount } = useDialog();
   const { ownerId, isStaff } = useOwner();
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [editData, setEditData] = useState({ name: '', address: '', type: '' });
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const fetchProperties = useCallback(async () => {
-    if (!ownerId) return;
-    try {
+  const { data: properties = [], isLoading } = useQuery({
+    queryKey: ['properties', ownerId],
+    enabled: !!ownerId,
+    queryFn: async () => {
       const [propSnap, unitSnap] = await Promise.all([
         getDocs(query(collection(db, 'properties'), where('owner_id', '==', ownerId))),
         getDocs(query(collection(db, 'units'), where('owner_id', '==', ownerId))),
@@ -46,15 +47,9 @@ const Properties: React.FC = () => {
         .map(d => ({ id: d.id, ...d.data(), unitCount: unitCounts[d.id] || 0 } as Property))
         .sort((a, b) => a.name.localeCompare(b.name));
 
-      setProperties(props);
-    } catch (error) {
-      console.error('Error fetching properties:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [ownerId]);
-
-  useEffect(() => { fetchProperties(); }, [fetchProperties]);
+      return props;
+    },
+  });
 
   const openEdit = (e: React.MouseEvent, property: Property) => {
     e.preventDefault();
@@ -71,7 +66,7 @@ const Properties: React.FC = () => {
     try {
       await updateDoc(doc(db, 'properties', editingProperty.id), editData);
       setEditingProperty(null);
-      fetchProperties();
+      queryClient.invalidateQueries({ queryKey: ['properties', ownerId] });
     } catch (err) {
       showAlert((err as Error).message);
     } finally {
@@ -97,13 +92,13 @@ const Properties: React.FC = () => {
 
     try {
       await deleteDoc(doc(db, 'properties', property.id));
-      fetchProperties();
+      queryClient.invalidateQueries({ queryKey: ['properties', ownerId] });
     } catch (err) {
       showAlert((err as Error).message);
     }
   };
 
-  if (loading) return <div className="p-12">Loading properties...</div>;
+  if (isLoading) return <div className="p-12">Loading properties...</div>;
 
   return (
     <div className="properties-container">

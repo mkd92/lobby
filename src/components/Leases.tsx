@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   collection, query, where, getDocs, doc, getDoc,
   addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp,
@@ -6,6 +6,7 @@ import {
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import '../styles/Units.css';
 import '../styles/Leases.css';
 
@@ -195,10 +196,8 @@ const CustomSelect: React.FC<{
 const Leases: React.FC = () => {
   const { showAlert, showConfirm, DialogMount } = useDialog();
   const { ownerId, isStaff } = useOwner();
-  const [leases, setLeases]       = useState<Lease[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const queryClient = useQueryClient();
   const [filter, setFilter]       = useState<FilterTab>('All');
-  const [currencySymbol, setCurrencySymbol] = useState('₹');
 
   // Modal
   const [showModal, setShowModal]       = useState(false);
@@ -225,11 +224,11 @@ const Leases: React.FC = () => {
   const [firstMonthBreakdown,    setFirstMonthBreakdown]    = useState('');
   const firstMonthUserEdited = useRef(false);
 
-  // ── Fetch ──────────────────────────────────────────────────────────
-  const fetchLeases = useCallback(async () => {
-    if (!ownerId) return;
-    setLoading(true);
-    try {
+  // ── Queries ────────────────────────────────────────────────────────
+  const { data: leases = [], isLoading } = useQuery({
+    queryKey: ['leases', ownerId],
+    queryFn: async () => {
+      if (!ownerId) return [];
       // Fire-and-forget auto-expire — don't block data loading
       void (async () => {
         const today = new Date().toISOString().split('T')[0];
@@ -262,24 +261,24 @@ const Leases: React.FC = () => {
         const tb = b.created_at?.seconds ?? 0;
         return tb - ta;
       });
-      setLeases(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [ownerId]);
+      return data;
+    },
+    enabled: !!ownerId,
+  });
 
-  const fetchCurrency = useCallback(async () => {
-    if (!ownerId) return;
-    const ownerDoc = await getDoc(doc(db, 'owners', ownerId));
-    const data = ownerDoc.data();
-    const symbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
-    setCurrencySymbol(symbols[data?.currency || 'USD'] || '$');
-  }, [ownerId]);
+  const { data: currencySymbol = '₹' } = useQuery({
+    queryKey: ['currency', ownerId],
+    queryFn: async () => {
+      if (!ownerId) return '₹';
+      const ownerDoc = await getDoc(doc(db, 'owners', ownerId));
+      const data = ownerDoc.data();
+      const symbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
+      return symbols[data?.currency || 'USD'] || '$';
+    },
+    enabled: !!ownerId,
+  });
 
-  // Run both concurrently
-  useEffect(() => { fetchLeases(); fetchCurrency(); }, [fetchLeases, fetchCurrency]);
+  const invalidateLeases = () => queryClient.invalidateQueries({ queryKey: ['leases', ownerId] });
 
   // Auto-calculate first month rent whenever rent or start date changes
   useEffect(() => {
@@ -647,7 +646,7 @@ const Leases: React.FC = () => {
         }
       }
 
-      closeModal(); fetchLeases();
+      closeModal(); invalidateLeases();
     } catch (err) {
       showAlert((err as Error).message);
     } finally {
@@ -661,7 +660,7 @@ const Leases: React.FC = () => {
     if (!ok) return;
     try {
       await deleteDoc(doc(db, 'leases', id));
-      fetchLeases();
+      invalidateLeases();
     } catch (err) {
       showAlert((err as Error).message);
     }
@@ -728,7 +727,7 @@ const Leases: React.FC = () => {
 
       {/* Table & Cards */}
       <div className="leases-content-area">
-        {loading ? (
+        {isLoading ? (
           <div style={{ padding: '4rem', textAlign: 'center', opacity: 0.5 }}>Loading leases…</div>
         ) : filtered.length === 0 ? (
           <div style={{ padding: '4rem', textAlign: 'center', opacity: 0.4 }}>

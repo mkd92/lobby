@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   collection, query, where, getDocs, doc, getDoc,
   addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp,
 } from 'firebase/firestore';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
@@ -98,11 +99,10 @@ const CustomSelect: React.FC<{
 const Payments: React.FC = () => {
   const { showAlert, showConfirm, DialogMount } = useDialog();
   const { ownerId, isStaff } = useOwner();
-  const [payments, setPayments]   = useState<Payment[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const queryClient = useQueryClient();
+
   const [filter, setFilter]       = useState<FilterTab>('All');
   const [search, setSearch]       = useState('');
-  const [currencySymbol, setCurrencySymbol] = useState('₹');
 
   // Modal state
   const [showModal, setShowModal]           = useState(false);
@@ -118,14 +118,13 @@ const Payments: React.FC = () => {
   });
 
   // ── Generate monthly payments (replaces Supabase RPC) ──────────────
-  const generateMonthlyPayments = async () => {
-    if (!ownerId) return;
+  const generateMonthlyPayments = async (ownerIdValue: string) => {
     const today = new Date();
     const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
 
     const leasesSnap = await getDocs(query(
       collection(db, 'leases'),
-      where('owner_id', '==', ownerId),
+      where('owner_id', '==', ownerIdValue),
       where('status', '==', 'Active')
     ));
 
@@ -142,7 +141,7 @@ const Payments: React.FC = () => {
       if (existingSnap.empty) {
         const newRef = doc(collection(db, 'payments'));
         batch.set(newRef, {
-          owner_id: ownerId,
+          owner_id: ownerIdValue,
           lease_id: leaseDoc.id,
           tenant_name: lease.tenant_name || '',
           unit_number: lease.unit_number || null,
@@ -164,13 +163,13 @@ const Payments: React.FC = () => {
     if (hasChanges) await batch.commit();
   };
 
-  // ── Fetch ──────────────────────────────────────────────────────────
-  const fetchPayments = useCallback(async () => {
-    if (!ownerId) return;
-    setLoading(true);
-    try {
+  // ── Queries ────────────────────────────────────────────────────────
+  const { data: payments = [], isLoading } = useQuery({
+    queryKey: ['payments', ownerId],
+    queryFn: async () => {
+      if (!ownerId) return [];
       // Fire-and-forget monthly generation — don't block data loading
-      void generateMonthlyPayments();
+      void generateMonthlyPayments(ownerId);
 
       const snap = await getDocs(query(
         collection(db, 'payments'),
@@ -180,25 +179,24 @@ const Payments: React.FC = () => {
       const data: Payment[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as Payment));
       // Sort by payment_date descending
       data.sort((a, b) => (b.payment_date || '').localeCompare(a.payment_date || ''));
-      setPayments(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ownerId]);
+      return data;
+    },
+    enabled: !!ownerId,
+  });
 
-  const fetchCurrency = useCallback(async () => {
-    if (!ownerId) return;
-    const ownerDoc = await getDoc(doc(db, 'owners', ownerId));
-    const data = ownerDoc.data();
-    const symbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
-    setCurrencySymbol(symbols[data?.currency || 'USD'] || '$');
-  }, [ownerId]);
+  const { data: currencySymbol = '₹' } = useQuery({
+    queryKey: ['currency', ownerId],
+    queryFn: async () => {
+      if (!ownerId) return '₹';
+      const ownerDoc = await getDoc(doc(db, 'owners', ownerId));
+      const data = ownerDoc.data();
+      const symbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
+      return symbols[data?.currency || 'USD'] || '$';
+    },
+    enabled: !!ownerId,
+  });
 
-  // Run both concurrently
-  useEffect(() => { fetchPayments(); fetchCurrency(); }, [fetchPayments, fetchCurrency]);
+  const invalidatePayments = () => queryClient.invalidateQueries({ queryKey: ['payments', ownerId] });
 
   // ── Open modals ────────────────────────────────────────────────────
   const openLogPayment = (payment: Payment) => {
@@ -281,7 +279,7 @@ const Payments: React.FC = () => {
       }
 
       closeModal();
-      fetchPayments();
+      invalidatePayments();
     } catch (err) {
       showAlert((err as Error).message);
     } finally {
@@ -295,7 +293,7 @@ const Payments: React.FC = () => {
     if (!ok) return;
     try {
       await deleteDoc(doc(db, 'payments', id));
-      fetchPayments();
+      invalidatePayments();
     } catch (err) {
       showAlert((err as Error).message);
     }
@@ -386,7 +384,7 @@ const Payments: React.FC = () => {
         <span className="label-small opacity-50">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div style={{ padding: '4rem', textAlign: 'center', opacity: 0.5 }}>Loading payments…</div>
       ) : filtered.length === 0 ? (
         <div style={{ padding: '4rem', textAlign: 'center', opacity: 0.4 }}>

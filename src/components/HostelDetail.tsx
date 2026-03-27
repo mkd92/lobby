@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   doc,
@@ -12,6 +12,7 @@ import {
   where,
   serverTimestamp,
 } from 'firebase/firestore';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
@@ -43,10 +44,7 @@ const HostelDetail: React.FC = () => {
   const navigate = useNavigate();
   const { showAlert, showConfirm, DialogMount } = useDialog();
   const { ownerId, isStaff } = useOwner();
-  const [hostel, setHostel] = useState<Hostel | null>(null);
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [currencySymbol, setCurrencySymbol] = useState('$');
+  const queryClient = useQueryClient();
 
   const [newRoom, setNewRoom] = useState({ room_number: '', floor: 0 });
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
@@ -59,9 +57,10 @@ const HostelDetail: React.FC = () => {
   const [editingBedId, setEditingBedId] = useState<string | null>(null);
   const [editBedData, setEditBedData] = useState({ bed_number: '', price: 0, status: 'Vacant' as Bed['status'] });
 
-  const fetchData = useCallback(async () => {
-    if (!id) return;
-    try {
+  const { data, isLoading } = useQuery({
+    queryKey: ['hostel', id, ownerId],
+    queryFn: async () => {
+      if (!id) throw new Error('No hostel id');
       const symbols: { [key: string]: string } = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
 
       const [hostelSnap, roomsSnap, bedsSnap, ownerSnap] = await Promise.all([
@@ -73,10 +72,10 @@ const HostelDetail: React.FC = () => {
 
       if (!hostelSnap.exists()) {
         navigate('/hostels');
-        return;
+        throw new Error('Hostel not found');
       }
 
-      setHostel({ id: hostelSnap.id, ...hostelSnap.data() } as Hostel);
+      const hostel = { id: hostelSnap.id, ...hostelSnap.data() } as Hostel;
 
       const allBeds = bedsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as (Bed & { room_id: string })[];
 
@@ -84,26 +83,27 @@ const HostelDetail: React.FC = () => {
         .map(d => ({ id: d.id, ...d.data() } as Room & { room_id?: string }))
         .sort((a, b) => String(a.room_number).localeCompare(String(b.room_number), undefined, { numeric: true }));
 
-      const roomsWithBeds: Room[] = roomsList.map(r => ({
+      const rooms: Room[] = roomsList.map(r => ({
         ...r,
         beds: allBeds.filter(b => b.room_id === r.id),
       }));
 
-      setRooms(roomsWithBeds);
-
+      let currencySymbol = '$';
       if (ownerSnap && 'exists' in ownerSnap && ownerSnap.exists()) {
         const currency = (ownerSnap.data() as { currency?: string })?.currency || 'USD';
-        setCurrencySymbol(symbols[currency] || '$');
+        currencySymbol = symbols[currency] || '$';
       }
-    } catch (error) {
-      console.error('Error fetching hostel details:', error);
-      navigate('/hostels');
-    } finally {
-      setLoading(false);
-    }
-  }, [id, navigate, ownerId]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+      return { hostel, rooms, currencySymbol };
+    },
+    enabled: !!id && ownerId !== undefined,
+  });
+
+  const hostel = data?.hostel ?? null;
+  const rooms = data?.rooms ?? [];
+  const currencySymbol = data?.currencySymbol ?? '$';
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['hostel', id, ownerId] });
 
   const handleAddRoom = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,7 +117,7 @@ const HostelDetail: React.FC = () => {
         created_at: serverTimestamp(),
       });
       setNewRoom({ room_number: '', floor: 0 });
-      fetchData();
+      invalidate();
     } catch (error) { showAlert((error as Error).message); }
   };
 
@@ -146,7 +146,7 @@ const HostelDetail: React.FC = () => {
       await Promise.all(bedsToInsert.map(bed => addDoc(collection(db, 'beds'), bed)));
       setNewBed({ count: 1, price: 0 });
       setSelectedRoomId(null);
-      fetchData();
+      invalidate();
     } catch (error) { showAlert((error as Error).message); }
   };
 
@@ -162,7 +162,7 @@ const HostelDetail: React.FC = () => {
     try {
       await updateDoc(doc(db, 'rooms', editingRoomId), editRoomData);
       setEditingRoomId(null);
-      fetchData();
+      invalidate();
     } catch (error) { showAlert((error as Error).message); }
   };
 
@@ -177,7 +177,7 @@ const HostelDetail: React.FC = () => {
     try {
       await deleteDoc(doc(db, 'rooms', room.id));
       setEditingRoomId(null);
-      fetchData();
+      invalidate();
     } catch (error) { showAlert((error as Error).message); }
   };
 
@@ -192,7 +192,7 @@ const HostelDetail: React.FC = () => {
     try {
       await updateDoc(doc(db, 'beds', editingBedId), editBedData);
       setEditingBedId(null);
-      fetchData();
+      invalidate();
     } catch (error) { showAlert((error as Error).message); }
   };
 
@@ -206,11 +206,11 @@ const HostelDetail: React.FC = () => {
     try {
       await deleteDoc(doc(db, 'beds', bed.id));
       setEditingBedId(null);
-      fetchData();
+      invalidate();
     } catch (error) { showAlert((error as Error).message); }
   };
 
-  if (loading) return <div className="p-12">Loading hostel...</div>;
+  if (isLoading) return <div className="p-12">Loading hostel...</div>;
   if (!hostel) return null;
 
   const totalBeds  = rooms.reduce((acc, room) => acc + (room.beds?.length || 0), 0);

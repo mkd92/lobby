@@ -1,8 +1,19 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ThemeProvider } from './context/ThemeContext'
 import { OwnerProvider } from './context/OwnerContext'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5,   // cache for 5 minutes
+      gcTime: 1000 * 60 * 10,     // keep in memory for 10 minutes
+      retry: 1,
+    },
+  },
+})
 import './index.css'
 import App from './App.tsx'
 import { registerSW } from 'virtual:pwa-register'
@@ -40,12 +51,14 @@ window.__updateSW = updateSW
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <ThemeProvider>
-        <OwnerProvider>
-          <App />
-        </OwnerProvider>
-      </ThemeProvider>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <ThemeProvider>
+          <OwnerProvider>
+            <App />
+          </OwnerProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   </StrictMode>,
 )
