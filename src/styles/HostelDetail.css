@@ -97,6 +97,71 @@
   align-items: flex-end;
 }
 
+/* ── Vacancy filter ── */
+.rooms-vacancy-filter {
+  display: flex;
+  gap: 0.4rem;
+  background: var(--surface-container-low);
+  padding: 0.3rem;
+  border-radius: 2rem;
+}
+
+.vacancy-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 1rem;
+  border-radius: 2rem;
+  border: none;
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--on-surface-variant);
+  transition: var(--transition-fast);
+  white-space: nowrap;
+  font-family: var(--font-main);
+}
+
+.vacancy-filter-btn.active {
+  background: var(--primary);
+  color: white;
+}
+
+.vacancy-count {
+  background: rgba(255,255,255,0.25);
+  padding: 0.1rem 0.45rem;
+  border-radius: 1rem;
+  font-size: 0.7rem;
+}
+
+.vacancy-filter-btn:not(.active) .vacancy-count {
+  background: rgba(0, 135, 90, 0.12);
+  color: var(--primary);
+}
+
+/* ── Vacant / Full pills on room cards ── */
+.room-vacant-pill,
+.room-full-pill {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.room-vacant-pill {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.room-full-pill {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
 /* ── Rooms List title row ── */
 .rooms-title-row {
   display: flex;
@@ -325,6 +390,16 @@
     gap: 0.875rem;
   }
 
+  .add-room-form .unit-input-group {
+    flex: none !important;
+    width: 100% !important;
+  }
+
+  .add-room-form .unit-mini-input {
+    width: 100% !important;
+    box-sizing: border-box;
+  }
+
   .add-room-form .primary-button {
     width: 100%;
     justify-content: center;
@@ -333,6 +408,7 @@
   .rooms-title-row {
     flex-direction: column;
     align-items: flex-start;
+    gap: 1rem;
   }
 
   .room-card {
@@ -354,6 +430,16 @@
     flex-direction: column;
     gap: 0.875rem;
     padding: 1rem 1.125rem;
+  }
+
+  .inline-add-bed .unit-input-group {
+    flex: none !important;
+    width: 100% !important;
+  }
+
+  .inline-add-bed .unit-mini-input {
+    width: 100% !important;
+    box-sizing: border-box;
   }
 
   .inline-add-bed .primary-button,

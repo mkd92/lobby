@@ -12,26 +12,27 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt',
       injectRegister: 'script',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: ['favicon.svg', 'icon.svg'],
       manifest: {
         name: 'Kinetic Architect - Lobby',
         short_name: 'Lobby',
         description: 'Lobby Management System for Kinetic Architect',
-        theme_color: '#3525cd',
-        background_color: '#f4f6fc',
+        theme_color: '#00875a',
+        background_color: '#001a0d',
         display: 'standalone',
+        orientation: 'portrait',
         start_url: '/',
         icons: [
           {
-            src: 'logo.png',
-            sizes: '512x512',
-            type: 'image/png',
+            src: 'icon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
             purpose: 'any'
           },
           {
-            src: 'logo.png',
-            sizes: '512x512',
-            type: 'image/png',
+            src: 'icon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
             purpose: 'maskable'
           }
         ]

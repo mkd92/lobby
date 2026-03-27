@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import { AreaChart, Area, ResponsiveContainer, Tooltip, PieChart, Pie, Cell } from 'recharts';
+import { useOwner } from '../context/OwnerContext';
 import '../styles/Lobby.css';
 
 const currencySymbols: { [key: string]: string } = {
@@ -11,43 +13,46 @@ const DataPulse: React.FC = () => (
   <span className="data-pulse"></span>
 );
 
-const MetricCard: React.FC<{ label: string; value: string; trend?: string; sub?: string }> = ({ label, value, trend, sub }) => (
-  <div className="metric-card">
-    <div className="label-small uppercase tracking-widest opacity-50 mb-2">{label}</div>
-    <div className="display-medium font-black tracking-tight">{value}</div>
-    {sub && <div className="metric-sub">{sub}</div>}
-    {trend && <div className="metric-trend">{trend}</div>}
-  </div>
-);
-
 const formatCurrency = (amount: number, symbol: string): string => {
   if (amount >= 1_000_000) return `${symbol}${(amount / 1_000_000).toFixed(1)}M`;
   if (amount >= 1_000) return `${symbol}${(amount / 1_000).toFixed(1)}k`;
   return `${symbol}${amount.toFixed(0)}`;
 };
 
+const MetricCard: React.FC<{ label: string; value: string; trend?: string; sub?: string; to: string }> = ({ label, value, trend, sub, to }) => (
+  <Link to={to} className="metric-card metric-card-link" style={{ textDecoration: 'none' }}>
+    <div className="mc-eyebrow">{label}</div>
+    <div className="mc-value">{value}</div>
+    {sub && <div className="mc-sub">{sub}</div>}
+    {trend && <div className="mc-trend">{trend}</div>}
+    <span className="metric-card-arrow material-symbols-outlined">arrow_forward</span>
+  </Link>
+);
+
 const Lobby: React.FC = () => {
+  const { ownerId, isStaff } = useOwner();
   const [stats, setStats] = useState({
     monthlyRevenue: '—',
     overdueAmount: '—',
     leaseExpirations: '—',
     annualRevenue: '—',
-    totalUnits: '—',
-    vacantUnits: '—',
+    totalUnits: 0,
+    vacantUnits: 0,
+    totalBeds: 0,
+    vacantBeds: 0,
   });
+  const [revenueChart, setRevenueChart] = useState<{ month: string; revenue: number }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchDashboardStats = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!ownerId) return;
 
-        // Currency preference
         const { data: ownerData } = await supabase
           .from('owners')
           .select('currency')
-          .eq('id', user.id)
+          .eq('id', ownerId)
           .single();
         const symbol = currencySymbols[ownerData?.currency || 'USD'] || '$';
 
@@ -61,33 +66,40 @@ const Lobby: React.FC = () => {
         const yearStart = `${currentYear}-01-01`;
         const yearEnd = `${currentYear}-12-31`;
 
-        // 1. Total units and vacant count
+        // Units (properties)
         const { data: units } = await supabase
           .from('units')
           .select('id, status, properties!inner(owner_id)')
-          .eq('properties.owner_id', user.id);
+          .eq('properties.owner_id', ownerId);
 
         const totalUnits = units?.length || 0;
         const vacantUnits = (units as any[])?.filter(u => u.status === 'Vacant').length || 0;
 
-        // 2. All leases for this owner — unit leases
+        // Beds (hostels)
+        const { data: beds } = await supabase
+          .from('beds')
+          .select('id, status, rooms!inner(hostels!inner(owner_id))')
+          .eq('rooms.hostels.owner_id', ownerId);
+
+        const totalBeds = beds?.length || 0;
+        const vacantBeds = (beds as any[])?.filter(b => b.status === 'Vacant').length || 0;
+
+        // Leases
         const { data: unitLeases } = await supabase
           .from('leases')
           .select('id, end_date, status, units!inner(properties!inner(owner_id))')
-          .eq('units.properties.owner_id', user.id)
+          .eq('units.properties.owner_id', ownerId)
           .not('unit_id', 'is', null);
 
-        // All leases for this owner — bed (hostel) leases
         const { data: bedLeases } = await supabase
           .from('leases')
           .select('id, end_date, status, beds!inner(rooms!inner(hostels!inner(owner_id)))')
-          .eq('beds.rooms.hostels.owner_id', user.id)
+          .eq('beds.rooms.hostels.owner_id', ownerId)
           .not('bed_id', 'is', null);
 
         const allLeases = [...(unitLeases || []), ...(bedLeases || [])];
         const leaseIds = allLeases.map((l: any) => l.id);
 
-        // Upcoming lease expirations — active leases ending within 30 days
         const expiringCount = allLeases.filter((l: any) =>
           l.status === 'Active' &&
           l.end_date &&
@@ -95,10 +107,22 @@ const Lobby: React.FC = () => {
           l.end_date <= thirtyDaysLaterStr
         ).length;
 
-        // 3. Payments for this owner's leases
+        // Payments
         let monthlyRevenue = 0;
         let annualRevenue = 0;
         let overdueAmount = 0;
+
+        // Build last 6 months labels
+        const last6: { label: string; short: string }[] = [];
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+          last6.push({
+            label: d.toLocaleString('default', { month: 'long', year: 'numeric' }),
+            short: d.toLocaleString('default', { month: 'short' }),
+          });
+        }
+        const revenueByMonth: Record<string, number> = {};
+        last6.forEach(m => { revenueByMonth[m.label] = 0; });
 
         if (leaseIds.length > 0) {
           const { data: payments } = await supabase
@@ -108,25 +132,30 @@ const Lobby: React.FC = () => {
 
           payments?.forEach((p: any) => {
             const amount = Number(p.amount);
-            if (p.status === 'Paid' && p.month_for === currentMonth) {
-              monthlyRevenue += amount;
-            }
-            if (p.status === 'Paid' && p.payment_date >= yearStart && p.payment_date <= yearEnd) {
-              annualRevenue += amount;
-            }
-            if (p.status === 'Pending' || p.status === 'Partial') {
-              overdueAmount += amount;
+            if (p.status === 'Paid' && p.month_for === currentMonth) monthlyRevenue += amount;
+            if (p.status === 'Paid' && p.payment_date >= yearStart && p.payment_date <= yearEnd) annualRevenue += amount;
+            if (p.status === 'Pending' || p.status === 'Partial') overdueAmount += amount;
+            if (p.status === 'Paid' && revenueByMonth[p.month_for] !== undefined) {
+              revenueByMonth[p.month_for] += amount;
             }
           });
         }
 
+        const chartData = last6.map(m => ({
+          month: m.short,
+          revenue: revenueByMonth[m.label] || 0,
+        }));
+
+        setRevenueChart(chartData);
         setStats({
           monthlyRevenue: formatCurrency(monthlyRevenue, symbol),
           overdueAmount: formatCurrency(overdueAmount, symbol),
           leaseExpirations: String(expiringCount),
           annualRevenue: formatCurrency(annualRevenue, symbol),
-          totalUnits: String(totalUnits),
-          vacantUnits: String(vacantUnits),
+          totalUnits,
+          vacantUnits,
+          totalBeds,
+          vacantBeds,
         });
       } catch (error) {
         console.error('Error fetching dashboard stats:', error);
@@ -136,51 +165,135 @@ const Lobby: React.FC = () => {
     };
 
     fetchDashboardStats();
-  }, []);
+  }, [ownerId]);
+
+  const occupiedUnits = stats.totalUnits - stats.vacantUnits;
+  const occupiedBeds  = stats.totalBeds  - stats.vacantBeds;
+
+  const unitDonutData = stats.totalUnits > 0
+    ? [
+        { name: 'Occupied', value: occupiedUnits },
+        { name: 'Vacant',   value: stats.vacantUnits },
+      ]
+    : [{ name: 'No data', value: 1 }];
+
+  const bedDonutData = stats.totalBeds > 0
+    ? [
+        { name: 'Occupied', value: occupiedBeds },
+        { name: 'Vacant',   value: stats.vacantBeds },
+      ]
+    : [{ name: 'No data', value: 1 }];
 
   return (
     <>
-      <header className="main-header">
-        <div className="header-top flex justify-between items-center mb-12">
-          <div>
-            <h1 className="font-display">Portfolio Overview</h1>
-            <p className="text-on-surface-variant flex items-center">
-              <DataPulse /> {loading ? 'Updating metrics...' : 'Live Data Analytics'}
-            </p>
-          </div>
+      {/* Editorial header */}
+      <header className="lobby-header">
+        <div>
+          <p className="lobby-eyebrow">
+            <DataPulse />
+            {loading ? 'Updating metrics...' : 'Live Data Analytics'}
+          </p>
+          <h1 className="lobby-display-title">Operations Dashboard</h1>
+          {isStaff && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--on-surface-variant)', background: 'var(--surface-container-high)', borderRadius: '999px', padding: '0.2rem 0.7rem', marginTop: '0.5rem' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>visibility</span>
+              View Only
+            </span>
+          )}
+        </div>
+        {!isStaff && (
           <Link to="/properties/new" className="primary-button glass" style={{ textDecoration: 'none' }}>
             + New Property
           </Link>
-        </div>
+        )}
       </header>
 
-      <section className="metrics-grid">
-        <MetricCard label="Monthly Revenue" value={stats.monthlyRevenue} trend="Current Month" />
-        <MetricCard label="Overdue Amount" value={stats.overdueAmount} trend="Unpaid & Partial" />
-        <MetricCard label="Lease Expirations" value={stats.leaseExpirations} trend="Next 30 days" />
-        <MetricCard label="Annual Revenue" value={stats.annualRevenue} trend="Year to Date" />
-        <MetricCard label="Units" value={stats.totalUnits} sub={`${stats.vacantUnits} vacant`} />
+      {/* Asymmetric metrics grid */}
+      <section className="lobby-metrics-grid">
+
+        {/* Hero card — Monthly Revenue with sparkline */}
+        <Link to="/payments" className="lobby-hero-card" style={{ textDecoration: 'none' }}>
+          <div>
+            <span className="mc-eyebrow">Monthly Revenue</span>
+            <div className="lobby-hero-value">{stats.monthlyRevenue}</div>
+            <div className="mc-trend">Current Month</div>
+          </div>
+          <div className="lobby-sparkline">
+            <ResponsiveContainer width="100%" height={72}>
+              <AreaChart data={revenueChart} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="var(--primary)" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Tooltip
+                  contentStyle={{ background: 'var(--surface-container-lowest)', border: '1px solid var(--outline-variant)', borderRadius: '0.5rem', fontSize: '0.75rem' }}
+                  labelStyle={{ color: 'var(--on-surface-variant)' }}
+                  itemStyle={{ color: 'var(--primary)' }}
+                  formatter={(v: any) => [Number(v).toLocaleString(), 'Revenue']}
+                />
+                <Area type="monotone" dataKey="revenue" stroke="var(--primary)" strokeWidth={2} fill="url(#revenueGrad)" dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <span className="metric-card-arrow material-symbols-outlined">arrow_forward</span>
+        </Link>
+
+        {/* Right sub-grid */}
+        <div className="lobby-sub-grid">
+          <MetricCard label="Overdue Amount"    value={stats.overdueAmount}    trend="Unpaid"       to="/payments" />
+          <MetricCard label="Lease Expirations" value={stats.leaseExpirations} trend="Next 30 days" to="/leases" />
+        </div>
       </section>
 
-      <section className="featured-property mt-16">
-        <div className="label-small uppercase tracking-widest opacity-50 mb-4">Quick Actions</div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Link to="/properties" className="property-banner glass p-8 rounded-3xl relative overflow-hidden block" style={{ textDecoration: 'none' }}>
-            <span className="material-symbols-outlined mb-4" style={{ fontSize: '2.5rem' }}>domain</span>
-            <h3 className="font-bold">Manage Properties</h3>
-            <p className="opacity-70">View and update units</p>
-          </Link>
-          <Link to="/payments" className="property-banner glass p-8 rounded-3xl relative overflow-hidden block" style={{ textDecoration: 'none' }}>
-            <span className="material-symbols-outlined mb-4" style={{ fontSize: '2.5rem' }}>payments</span>
-            <h3 className="font-bold">Rent Collection</h3>
-            <p className="opacity-70">Track payments & arrears</p>
-          </Link>
-          <Link to="/leases" className="property-banner glass p-8 rounded-3xl relative overflow-hidden block" style={{ textDecoration: 'none' }}>
-            <span className="material-symbols-outlined mb-4" style={{ fontSize: '2.5rem' }}>description</span>
-            <h3 className="font-bold">Leases</h3>
-            <p className="opacity-70">Manage active leases</p>
-          </Link>
-        </div>
+      {/* Detail strip */}
+      <section className="lobby-detail-strip">
+        <MetricCard label="Annual Revenue" value={stats.annualRevenue} trend="Year to Date" to="/payments" />
+
+        {/* Property units card with donut */}
+        <Link to="/properties" className="metric-card metric-card-link lobby-units-card" style={{ textDecoration: 'none' }}>
+          <div className="lobby-units-left">
+            <div className="mc-eyebrow">Property Units</div>
+            <div className="mc-value">{stats.totalUnits}</div>
+            <div className="mc-sub">{stats.vacantUnits} vacant</div>
+          </div>
+          <div className="lobby-donut">
+            <PieChart width={88} height={88}>
+              <Pie data={unitDonutData} cx={40} cy={40} innerRadius={28} outerRadius={40} dataKey="value" strokeWidth={0}>
+                <Cell fill="var(--primary)" opacity={0.9} />
+                <Cell fill="var(--outline-variant)" opacity={0.5} />
+              </Pie>
+            </PieChart>
+            <div className="lobby-donut-label">
+              <span>{stats.totalUnits > 0 ? Math.round((occupiedUnits / stats.totalUnits) * 100) : 0}%</span>
+              <span>occ.</span>
+            </div>
+          </div>
+          <span className="metric-card-arrow material-symbols-outlined">arrow_forward</span>
+        </Link>
+
+        {/* Hostel beds card with donut */}
+        <Link to="/hostels" className="metric-card metric-card-link lobby-units-card" style={{ textDecoration: 'none' }}>
+          <div className="lobby-units-left">
+            <div className="mc-eyebrow">Hostel Beds</div>
+            <div className="mc-value">{stats.totalBeds}</div>
+            <div className="mc-sub">{stats.vacantBeds} vacant</div>
+          </div>
+          <div className="lobby-donut">
+            <PieChart width={88} height={88}>
+              <Pie data={bedDonutData} cx={40} cy={40} innerRadius={28} outerRadius={40} dataKey="value" strokeWidth={0}>
+                <Cell fill="var(--primary)" opacity={0.9} />
+                <Cell fill="var(--outline-variant)" opacity={0.5} />
+              </Pie>
+            </PieChart>
+            <div className="lobby-donut-label">
+              <span>{stats.totalBeds > 0 ? Math.round((occupiedBeds / stats.totalBeds) * 100) : 0}%</span>
+              <span>occ.</span>
+            </div>
+          </div>
+          <span className="metric-card-arrow material-symbols-outlined">arrow_forward</span>
+        </Link>
       </section>
     </>
   );

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useDialog } from '../hooks/useDialog';
+import { useOwner } from '../context/OwnerContext';
 import '../styles/Units.css';
 import '../styles/HostelDetail.css';
 
@@ -29,6 +30,7 @@ const HostelDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { showAlert, showConfirm, DialogMount } = useDialog();
+  const { ownerId, isStaff } = useOwner();
   const [hostel, setHostel] = useState<Hostel | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +40,8 @@ const HostelDetail: React.FC = () => {
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [newBed, setNewBed] = useState({ count: 1, price: 0 });
 
+  const [vacancyFilter, setVacancyFilter] = useState<'All' | 'Vacant' | 'Full'>('All');
+
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [editRoomData, setEditRoomData] = useState({ room_number: '', floor: 0 });
   const [editingBedId, setEditingBedId] = useState<string | null>(null);
@@ -45,10 +49,9 @@ const HostelDetail: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
+      if (ownerId) {
         const { data: ownerData } = await supabase
-          .from('owners').select('currency').eq('id', user.id).single();
+          .from('owners').select('currency').eq('id', ownerId).single();
         const symbols: { [key: string]: string } = {
           USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$'
         };
@@ -73,7 +76,7 @@ const HostelDetail: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [id, navigate]);
+  }, [id, navigate, ownerId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -180,8 +183,15 @@ const HostelDetail: React.FC = () => {
   if (loading) return <div className="p-12">Loading hostel...</div>;
   if (!hostel) return null;
 
-  const totalBeds = rooms.reduce((acc, room) => acc + (room.beds?.length || 0), 0);
+  const totalBeds  = rooms.reduce((acc, room) => acc + (room.beds?.length || 0), 0);
   const vacantBeds = rooms.reduce((acc, room) => acc + (room.beds?.filter(b => b.status === 'Vacant').length || 0), 0);
+
+  const filteredRooms = rooms.filter(room => {
+    const vacant = room.beds?.filter(b => b.status === 'Vacant').length || 0;
+    if (vacancyFilter === 'Vacant') return vacant > 0;
+    if (vacancyFilter === 'Full')   return vacant === 0 && (room.beds?.length || 0) > 0;
+    return true;
+  });
 
   return (
     <div className="hostel-detail-container">
@@ -219,7 +229,7 @@ const HostelDetail: React.FC = () => {
       </header>
 
       {/* ── Add Room ── */}
-      <section className="add-room-section">
+      {!isStaff && <section className="add-room-section">
         <h2>Add Room</h2>
         <form onSubmit={handleAddRoom} className="add-room-form">
           <div className="unit-input-group">
@@ -248,19 +258,33 @@ const HostelDetail: React.FC = () => {
             Register Room
           </button>
         </form>
-      </section>
+      </section>}
 
       {/* ── Rooms List ── */}
       <div className="rooms-title-row">
         <h2 className="display-small" style={{ fontSize: '1.5rem' }}>Rooms Inventory</h2>
-        <div className="label-small uppercase tracking-widest opacity-50">Tap a room to manage beds</div>
+        <div className="rooms-vacancy-filter">
+          {(['All', 'Vacant', 'Full'] as const).map(f => (
+            <button
+              key={f}
+              className={`vacancy-filter-btn ${vacancyFilter === f ? 'active' : ''}`}
+              onClick={() => setVacancyFilter(f)}
+            >
+              {f === 'All'    && 'All Rooms'}
+              {f === 'Vacant' && <>Has Vacancy <span className="vacancy-count">{rooms.filter(r => (r.beds?.filter(b => b.status === 'Vacant').length || 0) > 0).length}</span></>}
+              {f === 'Full'   && 'Full'}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="rooms-list">
         {rooms.length === 0 ? (
           <div className="empty-state">No rooms registered yet. Add your first room above.</div>
+        ) : filteredRooms.length === 0 ? (
+          <div className="empty-state">No rooms match this filter.</div>
         ) : (
-          rooms.map(room => (
+          filteredRooms.map(room => (
             <div key={room.id} className="room-card">
 
               {/* Room header */}
@@ -271,24 +295,35 @@ const HostelDetail: React.FC = () => {
                   </div>
                   <div className="room-title-group">
                     <h3>Room {room.room_number}</h3>
-                    <p>Floor {room.floor} · {room.beds?.length || 0} beds</p>
+                    <p>Floor {room.floor} · {room.beds?.length || 0} beds
+                      {(() => {
+                        const v = room.beds?.filter(b => b.status === 'Vacant').length || 0;
+                        return v > 0
+                          ? <span className="room-vacant-pill">{v} vacant</span>
+                          : <span className="room-full-pill">Full</span>;
+                      })()}
+                    </p>
                   </div>
                 </div>
                 <div className="room-header-actions">
-                  <button
-                    className={`icon-action-btn ${editingRoomId === room.id ? 'active' : ''}`}
-                    title="Edit room"
-                    onClick={() => editingRoomId === room.id ? setEditingRoomId(null) : startEditRoom(room)}
-                  >
-                    <span className="material-symbols-outlined">{editingRoomId === room.id ? 'close' : 'edit'}</span>
-                  </button>
-                  <button
-                    className={`primary-button ${selectedRoomId === room.id ? 'glass' : ''}`}
-                    style={{ padding: '0.55rem 1.1rem', fontSize: '0.8rem' }}
-                    onClick={() => { setSelectedRoomId(selectedRoomId === room.id ? null : room.id); setEditingRoomId(null); }}
-                  >
-                    {selectedRoomId === room.id ? 'Close' : '+ Add Bed'}
-                  </button>
+                  {!isStaff && (
+                    <>
+                      <button
+                        className={`icon-action-btn ${editingRoomId === room.id ? 'active' : ''}`}
+                        title="Edit room"
+                        onClick={() => editingRoomId === room.id ? setEditingRoomId(null) : startEditRoom(room)}
+                      >
+                        <span className="material-symbols-outlined">{editingRoomId === room.id ? 'close' : 'edit'}</span>
+                      </button>
+                      <button
+                        className={`primary-button ${selectedRoomId === room.id ? 'glass' : ''}`}
+                        style={{ padding: '0.55rem 1.1rem', fontSize: '0.8rem' }}
+                        onClick={() => { setSelectedRoomId(selectedRoomId === room.id ? null : room.id); setEditingRoomId(null); }}
+                      >
+                        {selectedRoomId === room.id ? 'Close' : '+ Add Bed'}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -411,9 +446,11 @@ const HostelDetail: React.FC = () => {
                             </td>
                             <td style={{ opacity: 0.45, fontSize: '0.8rem' }}>Not Allotted</td>
                             <td>
-                              <button className="icon-action-btn" title="Edit bed" onClick={() => startEditBed(bed)}>
-                                <span className="material-symbols-outlined">edit</span>
-                              </button>
+                              {!isStaff && (
+                                <button className="icon-action-btn" title="Edit bed" onClick={() => startEditBed(bed)}>
+                                  <span className="material-symbols-outlined">edit</span>
+                                </button>
+                              )}
                             </td>
                           </tr>
                         )
@@ -443,9 +480,11 @@ const HostelDetail: React.FC = () => {
                       </div>
                       <div className="bed-card-right">
                         <span className={`status-badge status-${bed.status.toLowerCase()}`}>{bed.status}</span>
-                        <button className="icon-action-btn" title="Edit bed" onClick={() => startEditBed(bed)}>
-                          <span className="material-symbols-outlined">edit</span>
-                        </button>
+                        {!isStaff && (
+                          <button className="icon-action-btn" title="Edit bed" onClick={() => startEditBed(bed)}>
+                            <span className="material-symbols-outlined">edit</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))

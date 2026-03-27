@@ -2,8 +2,8 @@
 
 :root {
   /* Colors — Light Mode */
-  --primary: #3525cd;
-  --primary-container: #4f46e5;
+  --primary: #00875a;
+  --primary-container: #e8faf2;
   --on-primary: #ffffff;
 
   --surface: #f4f6fc;
@@ -48,9 +48,9 @@
 
 /* ── Dark Mode Overrides ── */
 [data-theme="dark"] {
-  --primary: #9189f8;
-  --primary-container: #7c73f5;
-  --on-primary: #0d0a2e;
+  --primary: #00e38a;
+  --primary-container: #001d0d;
+  --on-primary: #003d22;
 
   --surface: #0c1018;
   --surface-container-low: #141925;

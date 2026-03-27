@@ -24,6 +24,9 @@ const Settings: React.FC = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [staffEmails, setStaffEmails] = useState<{ id: string; staff_email: string }[]>([]);
+  const [newStaffEmail, setNewStaffEmail] = useState('');
+  const [staffLoading, setStaffLoading] = useState(false);
 
   const [profile, setProfile] = useState({
     full_name: '',
@@ -51,6 +54,13 @@ const Settings: React.FC = () => {
           email: data.email || '',
           currency: data.currency || 'USD'
         });
+
+        // Fetch staff members
+        const { data: staffData } = await supabase
+          .from('staff')
+          .select('id, staff_email')
+          .eq('owner_id', user.id);
+        setStaffEmails(staffData || []);
       } catch (error) {
         console.error('Error fetching profile:', error);
       } finally {
@@ -108,6 +118,24 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleAddStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStaffEmail.trim()) return;
+    setStaffLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from('staff').insert({ owner_id: user!.id, staff_email: newStaffEmail.trim().toLowerCase() });
+    if (!error) {
+      setStaffEmails(prev => [...prev, { id: Date.now().toString(), staff_email: newStaffEmail.trim().toLowerCase() }]);
+      setNewStaffEmail('');
+    }
+    setStaffLoading(false);
+  };
+
+  const handleRemoveStaff = async (id: string) => {
+    await supabase.from('staff').delete().eq('id', id);
+    setStaffEmails(prev => prev.filter(s => s.id !== id));
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -159,6 +187,48 @@ const Settings: React.FC = () => {
           {message.text}
         </div>
       )}
+
+      {/* Staff Access */}
+      <div className="settings-card">
+        <h2 className="settings-section-title">Staff Access</h2>
+        <p className="settings-description">Staff members can view all your data but cannot make changes.</p>
+
+        <form onSubmit={handleAddStaff} className="settings-row" style={{ alignItems: 'flex-end', gap: '0.75rem' }}>
+          <div style={{ flex: 1 }}>
+            <label className="settings-label">Add Staff Email</label>
+            <input
+              type="email"
+              className="settings-input"
+              placeholder="staff@example.com"
+              value={newStaffEmail}
+              onChange={e => setNewStaffEmail(e.target.value)}
+              required
+            />
+          </div>
+          <button type="submit" className="primary-button" disabled={staffLoading} style={{ padding: '0.65rem 1.25rem' }}>
+            {staffLoading ? 'Adding...' : 'Add'}
+          </button>
+        </form>
+
+        {staffEmails.length > 0 && (
+          <div style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {staffEmails.map(s => (
+              <div key={s.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'var(--surface-container-low)', borderRadius: '0.75rem', border: '1px solid var(--outline-variant)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', color: 'var(--primary)' }}>badge</span>
+                  <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>{s.staff_email}</span>
+                </div>
+                <button
+                  onClick={() => handleRemoveStaff(s.id)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--error)', display: 'flex', alignItems: 'center', padding: '0.25rem' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>remove_circle</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="settings-card">
         <form onSubmit={handleSave} className="auth-form">
@@ -233,10 +303,9 @@ const Settings: React.FC = () => {
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                   tabIndex={0}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setIsDropdownOpen(!isDropdownOpen);
-                    }
+                    if (e.key === ' ') { e.preventDefault(); setIsDropdownOpen(v => !v); }
+                    if (e.key === 'Enter') { if (isDropdownOpen) { e.preventDefault(); setIsDropdownOpen(false); } }
+                    if (e.key === 'Escape' || e.key === 'Tab') setIsDropdownOpen(false);
                   }}
                 >
                   <div className="flex items-center gap-3">

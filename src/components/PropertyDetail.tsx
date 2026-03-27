@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useDialog } from '../hooks/useDialog';
+import { useOwner } from '../context/OwnerContext';
 import '../styles/Units.css';
 import '../styles/Properties.css';
 
@@ -88,6 +89,7 @@ const PropertyDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { showAlert, showConfirm, DialogMount } = useDialog();
+  const { ownerId, isStaff } = useOwner();
   const addDropdownRef = useRef<HTMLDivElement>(null);
   const [property, setProperty] = useState<Property | null>(null);
   const [units, setUnits] = useState<Unit[]>([]);
@@ -117,9 +119,8 @@ const PropertyDetail: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: ownerData } = await supabase.from('owners').select('currency').eq('id', user.id).single();
+      if (ownerId) {
+        const { data: ownerData } = await supabase.from('owners').select('currency').eq('id', ownerId).single();
         if (ownerData) setCurrency(ownerData.currency || 'USD');
       }
       const { data: propData, error: propError } = await supabase.from('properties').select('*').eq('id', id).single();
@@ -135,7 +136,7 @@ const PropertyDetail: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [id, navigate]);
+  }, [id, navigate, ownerId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -259,7 +260,7 @@ const PropertyDetail: React.FC = () => {
         </button>
 
         {/* Property header — view or edit */}
-        {editingProperty ? (
+        {!isStaff && editingProperty ? (
           <form onSubmit={handleEditProperty} className="add-unit-bar shadow-ambient" style={{ marginBottom: 0 }}>
             <div className="unit-input-group">
               <label>Property Name</label>
@@ -289,9 +290,11 @@ const PropertyDetail: React.FC = () => {
                 <span className="property-type-tag" style={{ position: 'static', marginLeft: '0.5rem' }}>{property.type}</span>
               </p>
             </div>
-            <button className="icon-action-btn" title="Edit property" onClick={startEditProperty}>
-              <span className="material-symbols-outlined">edit</span>
-            </button>
+            {!isStaff && (
+              <button className="icon-action-btn" title="Edit property" onClick={startEditProperty}>
+                <span className="material-symbols-outlined">edit</span>
+              </button>
+            )}
           </div>
         )}
       </header>
@@ -303,7 +306,7 @@ const PropertyDetail: React.FC = () => {
         </div>
 
         {/* Add unit form */}
-        <form onSubmit={handleAddUnit} className="add-unit-bar shadow-ambient">
+        {!isStaff && <form onSubmit={handleAddUnit} className="add-unit-bar shadow-ambient">
           <div className="unit-input-group">
             <label>Unit #</label>
             <input type="text" className="unit-mini-input" placeholder="e.g. A-101" value={newUnit.unit_number} onChange={e => setNewUnit({ ...newUnit, unit_number: e.target.value })} required />
@@ -350,10 +353,10 @@ const PropertyDetail: React.FC = () => {
             <input type="number" className="unit-mini-input" value={newUnit.base_rent} onChange={e => setNewUnit({ ...newUnit, base_rent: parseFloat(e.target.value) || 0 })} required />
           </div>
           <button type="submit" className="primary-button" style={{ padding: '0.6rem 1.5rem' }}>Add Unit</button>
-        </form>
+        </form>}
 
-        {/* Units table */}
-        <div className="units-table-container">
+        {/* Units table — desktop */}
+        <div className="units-table-container desktop-only">
           <table className="units-table">
             <thead>
               <tr>
@@ -376,62 +379,96 @@ const PropertyDetail: React.FC = () => {
               ) : (
                 units.map(unit =>
                   editingUnitId === unit.id ? (
-                    /* ── Edit row ── */
                     <tr key={unit.id} style={{ background: 'var(--surface-container-high)' }}>
-                      <td>
-                        <input type="text" className="unit-mini-input" value={editUnitData.unit_number} onChange={e => setEditUnitData(d => ({ ...d, unit_number: e.target.value }))} style={{ width: '100%' }} />
-                      </td>
-                      <td>
-                        <input type="number" className="unit-mini-input" value={editUnitData.floor} onChange={e => setEditUnitData(d => ({ ...d, floor: parseInt(e.target.value) || 0 }))} style={{ width: '5rem' }} />
-                      </td>
-                      <td>
-                        <TypeDropdown value={editUnitData.type} options={unitTypes} onChange={v => setEditUnitData(d => ({ ...d, type: v }))} />
-                      </td>
-                      <td>
-                        <TypeDropdown value={editUnitData.status} options={['Vacant', 'Occupied', 'Maintenance']} onChange={v => setEditUnitData(d => ({ ...d, status: v as Unit['status'] }))} />
-                      </td>
-                      <td>
-                        <input type="number" className="unit-mini-input" value={editUnitData.base_rent} onChange={e => setEditUnitData(d => ({ ...d, base_rent: parseFloat(e.target.value) || 0 }))} style={{ width: '7rem' }} />
-                      </td>
-                      <td>
-                        <input type="number" className="unit-mini-input" value={editUnitData.area_sqft} onChange={e => setEditUnitData(d => ({ ...d, area_sqft: parseInt(e.target.value) || 0 }))} style={{ width: '6rem' }} />
-                      </td>
+                      <td><input type="text" className="unit-mini-input" value={editUnitData.unit_number} onChange={e => setEditUnitData(d => ({ ...d, unit_number: e.target.value }))} style={{ width: '100%' }} /></td>
+                      <td><input type="number" className="unit-mini-input" value={editUnitData.floor} onChange={e => setEditUnitData(d => ({ ...d, floor: parseInt(e.target.value) || 0 }))} style={{ width: '5rem' }} /></td>
+                      <td><TypeDropdown value={editUnitData.type} options={unitTypes} onChange={v => setEditUnitData(d => ({ ...d, type: v }))} /></td>
+                      <td><TypeDropdown value={editUnitData.status} options={['Vacant', 'Occupied', 'Maintenance']} onChange={v => setEditUnitData(d => ({ ...d, status: v as Unit['status'] }))} /></td>
+                      <td><input type="number" className="unit-mini-input" value={editUnitData.base_rent} onChange={e => setEditUnitData(d => ({ ...d, base_rent: parseFloat(e.target.value) || 0 }))} style={{ width: '7rem' }} /></td>
+                      <td><input type="number" className="unit-mini-input" value={editUnitData.area_sqft} onChange={e => setEditUnitData(d => ({ ...d, area_sqft: parseInt(e.target.value) || 0 }))} style={{ width: '6rem' }} /></td>
                       <td>
                         <div className="bed-row-actions">
-                          <button className="icon-action-btn active" title="Save" onClick={handleEditUnit}>
-                            <span className="material-symbols-outlined">check</span>
-                          </button>
-                          <button className="icon-action-btn" title="Cancel" onClick={() => setEditingUnitId(null)}>
-                            <span className="material-symbols-outlined">close</span>
-                          </button>
-                          <button className="icon-action-btn danger" title="Delete unit" onClick={() => handleDeleteUnit(unit)}>
-                            <span className="material-symbols-outlined">delete</span>
-                          </button>
+                          <button className="icon-action-btn active" title="Save" onClick={handleEditUnit}><span className="material-symbols-outlined">check</span></button>
+                          <button className="icon-action-btn" title="Cancel" onClick={() => setEditingUnitId(null)}><span className="material-symbols-outlined">close</span></button>
+                          <button className="icon-action-btn danger" title="Delete" onClick={() => handleDeleteUnit(unit)}><span className="material-symbols-outlined">delete</span></button>
                         </div>
                       </td>
                     </tr>
                   ) : (
-                    /* ── View row ── */
                     <tr key={unit.id}>
                       <td style={{ fontWeight: 800 }}>{unit.unit_number}</td>
                       <td>{unit.floor}</td>
                       <td>{unit.type}</td>
-                      <td>
-                        <span className={`status-badge status-${unit.status.toLowerCase()}`}>{unit.status}</span>
-                      </td>
+                      <td><span className={`status-badge status-${unit.status.toLowerCase()}`}>{unit.status}</span></td>
                       <td style={{ fontWeight: 700 }}>{sym}{unit.base_rent.toLocaleString()}</td>
                       <td>{unit.area_sqft || '—'}</td>
-                      <td>
-                        <button className="icon-action-btn" title="Edit unit" onClick={() => startEditUnit(unit)}>
-                          <span className="material-symbols-outlined">edit</span>
-                        </button>
-                      </td>
+                      <td>{!isStaff && <button className="icon-action-btn" title="Edit unit" onClick={() => startEditUnit(unit)}><span className="material-symbols-outlined">edit</span></button>}</td>
                     </tr>
                   )
                 )
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Unit cards — mobile */}
+        <div className="mobile-only unit-cards-list">
+          {units.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.4, fontSize: '0.875rem' }}>
+              No units added yet.
+            </div>
+          ) : (
+            units.map(unit => (
+              <div key={unit.id} className="unit-mobile-card">
+                {editingUnitId === unit.id ? (
+                  <div className="unit-card-edit-form">
+                    <div className="unit-card-edit-row">
+                      <div className="unit-input-group"><label>Unit #</label><input type="text" className="unit-mini-input" value={editUnitData.unit_number} onChange={e => setEditUnitData(d => ({ ...d, unit_number: e.target.value }))} /></div>
+                      <div className="unit-input-group"><label>Floor</label><input type="number" className="unit-mini-input" value={editUnitData.floor} onChange={e => setEditUnitData(d => ({ ...d, floor: parseInt(e.target.value) || 0 }))} /></div>
+                    </div>
+                    <div className="unit-card-edit-row">
+                      <div className="unit-input-group"><label>Type</label><TypeDropdown value={editUnitData.type} options={unitTypes} onChange={v => setEditUnitData(d => ({ ...d, type: v }))} /></div>
+                      <div className="unit-input-group"><label>Status</label><TypeDropdown value={editUnitData.status} options={['Vacant', 'Occupied', 'Maintenance']} onChange={v => setEditUnitData(d => ({ ...d, status: v as Unit['status'] }))} /></div>
+                    </div>
+                    <div className="unit-card-edit-row">
+                      <div className="unit-input-group"><label>Rent ({sym})</label><input type="number" className="unit-mini-input" value={editUnitData.base_rent} onChange={e => setEditUnitData(d => ({ ...d, base_rent: parseFloat(e.target.value) || 0 }))} /></div>
+                      <div className="unit-input-group"><label>Area (sqft)</label><input type="number" className="unit-mini-input" value={editUnitData.area_sqft} onChange={e => setEditUnitData(d => ({ ...d, area_sqft: parseInt(e.target.value) || 0 }))} /></div>
+                    </div>
+                    <div className="unit-card-edit-actions">
+                      <button className="icon-action-btn active" onClick={handleEditUnit}><span className="material-symbols-outlined">check</span></button>
+                      <button className="icon-action-btn" onClick={() => setEditingUnitId(null)}><span className="material-symbols-outlined">close</span></button>
+                      <button className="icon-action-btn danger" onClick={() => handleDeleteUnit(unit)}><span className="material-symbols-outlined">delete</span></button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="unit-card-header">
+                      <div>
+                        <span className="unit-card-number">{unit.unit_number}</span>
+                        <span className="unit-card-meta">Floor {unit.floor} · {unit.type}</span>
+                      </div>
+                      <div className="unit-card-header-right">
+                        <span className={`status-badge status-${unit.status.toLowerCase()}`}>{unit.status}</span>
+                        {!isStaff && <button className="icon-action-btn" onClick={() => startEditUnit(unit)}><span className="material-symbols-outlined">edit</span></button>}
+                      </div>
+                    </div>
+                    <div className="unit-card-body">
+                      <div className="unit-card-field">
+                        <span className="unit-card-label">Monthly Rent</span>
+                        <span className="unit-card-value">{sym}{unit.base_rent.toLocaleString()}</span>
+                      </div>
+                      {unit.area_sqft ? (
+                        <div className="unit-card-field">
+                          <span className="unit-card-label">Area</span>
+                          <span className="unit-card-value">{unit.area_sqft} sqft</span>
+                        </div>
+                      ) : null}
+                    </div>
+                  </>
+                )}
+              </div>
+            ))
+          )}
         </div>
       </section>
     </div>

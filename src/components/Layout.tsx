@@ -88,8 +88,8 @@ const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boolean) => 
           {!isCollapsed && <span>Sign Out</span>}
         </button>
         {!isCollapsed && (
-          <div className="px-6 py-4 opacity-30 text-[0.65rem] font-mono">
-            Build: {new Date(__BUILD_TIME__).toLocaleString()}
+          <div style={{ padding: '0.25rem 1.5rem 0.75rem', fontSize: '0.6rem', opacity: 0.3, color: 'var(--on-surface-variant)', fontFamily: 'monospace' }}>
+            v{new Date(__BUILD_TIME__).toLocaleDateString()}
           </div>
         )}
       </div>
@@ -104,8 +104,12 @@ const MobileTopBar: React.FC = () => {
         <LogoMark size="sm" />
         <span className="logo-name">Lobby</span>
       </div>
-      <Link to="/settings" className="nav-item p-2" title="Settings">
-        <span className="material-symbols-outlined">settings</span>
+      <Link
+        to="/settings"
+        title="Settings"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: '50%', color: 'var(--on-surface-variant)', textDecoration: 'none', flexShrink: 0 }}
+      >
+        <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>settings</span>
       </Link>
     </header>
   );
@@ -136,8 +140,8 @@ const MobileBottomNav: React.FC = () => {
               <span className="material-symbols-outlined">payments</span>
               <span>Payments</span>
             </Link>
-            <div className="px-6 py-4 opacity-30 text-[0.6rem] font-mono text-center mt-4">
-              Build: {new Date(__BUILD_TIME__).toLocaleString()}
+            <div style={{ padding: '0.5rem 1.5rem', fontSize: '0.6rem', opacity: 0.3, color: 'var(--on-surface-variant)', fontFamily: 'monospace', textAlign: 'center' }}>
+              v{new Date(__BUILD_TIME__).toLocaleDateString()}
             </div>
           </div>
         </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useDialog } from '../hooks/useDialog';
+import { useOwner } from '../context/OwnerContext';
 import '../styles/Properties.css';
 import '../styles/Units.css';
 import '../styles/Leases.css';
@@ -16,6 +17,7 @@ interface Customer {
 
 const Customers: React.FC = () => {
   const { showAlert, showConfirm, DialogMount } = useDialog();
+  const { isStaff } = useOwner();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading]     = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -109,9 +111,11 @@ const Customers: React.FC = () => {
             <h1 className="display-small mb-1">Customers</h1>
             <p className="text-on-surface-variant">Manage your tenants and clients.</p>
           </div>
-          <Link to="/customers/new" className="primary-button desktop-only">
-            + Add Customer
-          </Link>
+          {!isStaff && (
+            <Link to="/customers/new" className="primary-button desktop-only">
+              + Add Customer
+            </Link>
+          )}
         </header>
 
         <div className="search-bar-row">
@@ -124,9 +128,11 @@ const Customers: React.FC = () => {
               onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
-          <Link to="/customers/new" className="primary-button mobile-only" style={{ padding: '0.75rem 1rem', minWidth: 'auto' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>add</span>
-          </Link>
+          {!isStaff && (
+            <Link to="/customers/new" className="primary-button mobile-only" style={{ padding: '0.75rem 1rem', minWidth: 'auto' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>add</span>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -172,14 +178,16 @@ const Customers: React.FC = () => {
                       <span className="status-badge status-occupied">Active</span>
                     </td>
                     <td>
-                      <div className="row-actions">
-                        <button className="icon-action-btn" title="Edit" onClick={() => openEdit(customer)}>
-                          <span className="material-symbols-outlined">edit</span>
-                        </button>
-                        <button className="icon-action-btn danger" title="Delete" onClick={() => handleDelete(customer)}>
-                          <span className="material-symbols-outlined">delete</span>
-                        </button>
-                      </div>
+                      {!isStaff && (
+                        <div className="row-actions">
+                          <button className="icon-action-btn" title="Edit" onClick={() => openEdit(customer)}>
+                            <span className="material-symbols-outlined">edit</span>
+                          </button>
+                          <button className="icon-action-btn danger" title="Delete" onClick={() => handleDelete(customer)}>
+                            <span className="material-symbols-outlined">delete</span>
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -199,14 +207,16 @@ const Customers: React.FC = () => {
                     <h3>{customer.full_name}</h3>
                     <span className="status-badge status-occupied" style={{ fontSize: '0.6rem', padding: '0.25rem 0.5rem' }}>Active</span>
                   </div>
-                  <div className="customer-card-actions">
-                    <button className="icon-action-btn" onClick={() => openEdit(customer)}>
-                      <span className="material-symbols-outlined">edit</span>
-                    </button>
-                    <button className="icon-action-btn danger" onClick={() => handleDelete(customer)}>
-                      <span className="material-symbols-outlined">delete</span>
-                    </button>
-                  </div>
+                  {!isStaff && (
+                    <div className="customer-card-actions">
+                      <button className="icon-action-btn" onClick={() => openEdit(customer)}>
+                        <span className="material-symbols-outlined">edit</span>
+                      </button>
+                      <button className="icon-action-btn danger" onClick={() => handleDelete(customer)}>
+                        <span className="material-symbols-outlined">delete</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="customer-card-body">
                   <div className="info-row">

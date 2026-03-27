@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useDialog } from '../hooks/useDialog';
+import { useOwner } from '../context/OwnerContext';
 import '../styles/Properties.css';
 
 const propertyTypes = ['Residential', 'Commercial', 'Industrial', 'Mixed'];
@@ -17,6 +18,7 @@ interface Property {
 const Properties: React.FC = () => {
   const navigate = useNavigate();
   const { showAlert, showConfirm, DialogMount } = useDialog();
+  const { isStaff } = useOwner();
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -104,9 +106,11 @@ const Properties: React.FC = () => {
           <h1 className="display-small mb-2">Properties</h1>
           <p className="text-on-surface-variant">Manage your real estate portfolio.</p>
         </div>
-        <Link to="/properties/new" className="primary-button">
-          + Add Property
-        </Link>
+        {!isStaff && (
+          <Link to="/properties/new" className="primary-button">
+            + Add Property
+          </Link>
+        )}
       </header>
 
       {properties.length === 0 ? (
@@ -126,14 +130,16 @@ const Properties: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
                   <div className="property-type-badge">{property.type}</div>
-                  <div className="property-actions-compact" onClick={e => e.stopPropagation()}>
-                    <button className="prop-action-btn" title="Edit property" onClick={e => openEdit(e, property)}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>edit</span>
-                    </button>
-                    <button className="prop-action-btn danger" title="Delete property" onClick={e => handleDelete(e, property)}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>delete</span>
-                    </button>
-                  </div>
+                  {!isStaff && (
+                    <div className="property-actions-compact" onClick={e => e.stopPropagation()}>
+                      <button className="prop-action-btn" title="Edit property" onClick={e => openEdit(e, property)}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>edit</span>
+                      </button>
+                      <button className="prop-action-btn danger" title="Delete property" onClick={e => handleDelete(e, property)}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>delete</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 

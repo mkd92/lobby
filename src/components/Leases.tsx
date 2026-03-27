@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useDialog } from '../hooks/useDialog';
+import { useOwner } from '../context/OwnerContext';
 import '../styles/Units.css';
 import '../styles/Leases.css';
 
@@ -115,10 +116,11 @@ const CustomSelect: React.FC<{
   const toggle = () => { if (!disabled) setOpen(o => !o); };
 
   const handleKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') { 
-      if (!open) { e.preventDefault(); toggle(); }
+    if (e.key === ' ') { e.preventDefault(); toggle(); }
+    if (e.key === 'Enter') {
+      if (open) { e.preventDefault(); setOpen(false); } // close; let next Enter bubble to submit
     }
-    if (e.key === 'Escape') setOpen(false);
+    if (e.key === 'Escape' || e.key === 'Tab') setOpen(false);
     if (open && !searchable) {
       const idx = options.findIndex(o => o.value === value);
       if (e.key === 'ArrowDown') { e.preventDefault(); onChange(options[(idx + 1) % options.length]?.value ?? value); }
@@ -185,6 +187,7 @@ const CustomSelect: React.FC<{
 // ── Main component ─────────────────────────────────────────────────────
 const Leases: React.FC = () => {
   const { showAlert, showConfirm, DialogMount } = useDialog();
+  const { ownerId, isStaff } = useOwner();
   const [leases, setLeases]       = useState<Lease[]>([]);
   const [loading, setLoading]     = useState(true);
   const [filter, setFilter]       = useState<FilterTab>('All');
@@ -247,12 +250,11 @@ const Leases: React.FC = () => {
   }, []);
 
   const fetchCurrency = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data } = await supabase.from('owners').select('currency').eq('id', user.id).single();
+    if (!ownerId) return;
+    const { data } = await supabase.from('owners').select('currency').eq('id', ownerId).single();
     const symbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
     setCurrencySymbol(symbols[data?.currency || 'USD'] || '$');
-  }, []);
+  }, [ownerId]);
 
   useEffect(() => { fetchLeases(); fetchCurrency(); }, [fetchLeases, fetchCurrency]);
 
@@ -554,9 +556,11 @@ const Leases: React.FC = () => {
           <h1 className="display-medium mb-2">Leases</h1>
           <p className="text-on-surface-variant">Manage property and hostel lease agreements</p>
         </div>
-        <button className="primary-button" onClick={openCreate}>
-          + New Lease
-        </button>
+        {!isStaff && (
+          <button className="primary-button" onClick={openCreate}>
+            + New Lease
+          </button>
+        )}
       </div>
 
       {/* Stats */}

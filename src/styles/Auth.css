@@ -85,7 +85,7 @@
   outline: none;
   border-color: var(--primary);
   background-color: var(--surface-container-lowest);
-  box-shadow: 0 0 0 4px rgba(53, 37, 205, 0.1);
+  box-shadow: 0 0 0 4px rgba(0, 135, 90, 0.1);
 }
 
 .auth-button {

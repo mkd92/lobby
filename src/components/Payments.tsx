@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useDialog } from '../hooks/useDialog';
+import { useOwner } from '../context/OwnerContext';
 import '../styles/Units.css';
 import '../styles/Leases.css';
 import '../styles/Payments.css';
@@ -13,7 +14,7 @@ interface Payment {
   payment_date: string;
   month_for: string;
   payment_method: string | null;
-  status: 'Paid' | 'Pending' | 'Partial';
+  status: 'Paid' | 'Pending';
   leases: {
     rent_amount: number;
     tenants: { full_name: string };
@@ -22,10 +23,10 @@ interface Payment {
   };
 }
 
-type FilterTab = 'All' | 'Paid' | 'Pending' | 'Partial';
+type FilterTab = 'All' | 'Paid' | 'Pending';
 
 const METHODS = ['Cash', 'Bank Transfer', 'Online', 'Check'];
-const STATUSES = ['Paid', 'Pending', 'Partial'];
+const STATUSES = ['Paid', 'Pending'];
 
 // ── CustomSelect ───────────────────────────────────────────────────────
 interface SelectOpt { value: string; label: string; sub?: string; }
@@ -55,8 +56,9 @@ const CustomSelect: React.FC<{
         onClick={() => !disabled && setOpen(o => !o)}
         tabIndex={disabled ? -1 : 0}
         onKeyDown={e => {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); !disabled && setOpen(o => !o); }
-          if (e.key === 'Escape') setOpen(false);
+          if (e.key === ' ') { e.preventDefault(); !disabled && setOpen(o => !o); }
+          if (e.key === 'Enter') { if (open) { e.preventDefault(); setOpen(false); } }
+          if (e.key === 'Escape' || e.key === 'Tab') setOpen(false);
         }}
       >
         <span style={{ color: selected ? 'var(--on-surface)' : 'var(--on-surface-variant)', opacity: selected ? 1 : 0.5 }}>
@@ -89,23 +91,24 @@ const CustomSelect: React.FC<{
 // ── Main component ─────────────────────────────────────────────────────
 const Payments: React.FC = () => {
   const { showAlert, showConfirm, DialogMount } = useDialog();
+  const { ownerId, isStaff } = useOwner();
   const [payments, setPayments]   = useState<Payment[]>([]);
   const [loading, setLoading]     = useState(true);
   const [filter, setFilter]       = useState<FilterTab>('All');
+  const [search, setSearch]       = useState('');
   const [currencySymbol, setCurrencySymbol] = useState('₹');
 
   // Modal state
-  const [showModal, setShowModal]         = useState(false);
+  const [showModal, setShowModal]           = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
-  // 'log' = quick log-payment modal for pending rows, 'edit' = full edit modal
-  const [modalMode, setModalMode]         = useState<'log' | 'edit'>('log');
-  const [saving, setSaving]               = useState(false);
+  const [modalMode, setModalMode]           = useState<'log' | 'edit'>('log');
+  const [saving, setSaving]                 = useState(false);
   const [form, setForm] = useState({
     amount: '',
     payment_date: new Date().toISOString().split('T')[0],
     month_for: '',
     payment_method: 'Cash',
-    status: 'Paid' as Payment['status'],
+    status: 'Paid' as 'Paid' | 'Pending',
   });
 
   // ── Fetch ──────────────────────────────────────────────────────────
@@ -137,18 +140,15 @@ const Payments: React.FC = () => {
   }, []);
 
   const fetchCurrency = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data } = await supabase.from('owners').select('currency').eq('id', user.id).single();
+    if (!ownerId) return;
+    const { data } = await supabase.from('owners').select('currency').eq('id', ownerId).single();
     const symbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
     setCurrencySymbol(symbols[data?.currency || 'USD'] || '$');
-  }, []);
+  }, [ownerId]);
 
   useEffect(() => { fetchPayments(); fetchCurrency(); }, [fetchPayments, fetchCurrency]);
 
   // ── Open modals ────────────────────────────────────────────────────
-
-  // Log payment: pre-fills from the pending row, status defaults to Paid
   const openLogPayment = (payment: Payment) => {
     setEditingPayment(payment);
     setModalMode('log');
@@ -162,7 +162,6 @@ const Payments: React.FC = () => {
     setShowModal(true);
   };
 
-  // Full edit: load all existing fields
   const openEdit = (payment: Payment) => {
     setEditingPayment(payment);
     setModalMode('edit');
@@ -183,18 +182,44 @@ const Payments: React.FC = () => {
     e.preventDefault();
     if (!editingPayment) return;
 
+    const paidAmount = parseFloat(form.amount) || 0;
+    if (paidAmount <= 0) { showAlert('Please enter a valid amount.'); return; }
+
     setSaving(true);
     try {
-      const payload = {
-        amount:         parseFloat(form.amount) || 0,
-        payment_date:   form.payment_date,
-        month_for:      form.month_for,
-        payment_method: form.payment_method || null,
-        status:         form.status,
-      };
+      if (modalMode === 'log') {
+        const remainder = Math.round((editingPayment.amount - paidAmount) * 100) / 100;
 
-      const { error } = await supabase.from('payments').update(payload).eq('id', editingPayment.id);
-      if (error) throw error;
+        // Mark this payment as Paid with the amount entered
+        const { error } = await supabase.from('payments').update({
+          amount:         paidAmount,
+          payment_date:   form.payment_date,
+          payment_method: form.payment_method || null,
+          status:         'Paid',
+        }).eq('id', editingPayment.id);
+        if (error) throw error;
+
+        // If partial, create a new Pending for the remainder
+        if (remainder > 0) {
+          const { error: err2 } = await supabase.from('payments').insert({
+            lease_id:     editingPayment.lease_id,
+            amount:       remainder,
+            payment_date: editingPayment.payment_date,
+            month_for:    editingPayment.month_for,
+            status:       'Pending',
+          });
+          if (err2) throw err2;
+        }
+      } else {
+        const { error } = await supabase.from('payments').update({
+          amount:         paidAmount,
+          payment_date:   form.payment_date,
+          month_for:      form.month_for,
+          payment_method: form.payment_method || null,
+          status:         form.status,
+        }).eq('id', editingPayment.id);
+        if (error) throw error;
+      }
 
       closeModal();
       fetchPayments();
@@ -215,10 +240,8 @@ const Payments: React.FC = () => {
   };
 
   // ── Derived ────────────────────────────────────────────────────────
-  const filtered = payments.filter(p => filter === 'All' || p.status === filter);
   const totalCollected = payments.filter(p => p.status === 'Paid').reduce((s, p) => s + p.amount, 0);
   const totalPending   = payments.filter(p => p.status === 'Pending').reduce((s, p) => s + p.amount, 0);
-  const totalPartial   = payments.filter(p => p.status === 'Partial').reduce((s, p) => s + p.amount, 0);
 
   const fmt      = (d: string) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   const initials = (name: string) => name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
@@ -229,6 +252,19 @@ const Payments: React.FC = () => {
     return '—';
   };
 
+  const filtered = payments
+    .filter(p => filter === 'All' || p.status === filter)
+    .filter(p => {
+      if (!search.trim()) return true;
+      const q = search.toLowerCase();
+      return (
+        p.leases?.tenants?.full_name?.toLowerCase().includes(q) ||
+        locationLabel(p).toLowerCase().includes(q) ||
+        p.month_for?.toLowerCase().includes(q) ||
+        (p.payment_method || '').toLowerCase().includes(q)
+      );
+    });
+
   const methodOptions: SelectOpt[] = METHODS.map(m => ({ value: m, label: m }));
   const statusOptions: SelectOpt[] = STATUSES.map(s => ({ value: s, label: s }));
 
@@ -236,6 +272,7 @@ const Payments: React.FC = () => {
   return (
     <div className="payments-page">
       {DialogMount}
+
       {/* Header */}
       <div className="flex justify-between items-start mb-10">
         <div>
@@ -258,71 +295,151 @@ const Payments: React.FC = () => {
           <div className="stat-label">Pending</div>
           <div className="stat-value amber">{currencySymbol}{totalPending.toLocaleString()}</div>
         </div>
-        <div className="lease-stat-card">
-          <div className="stat-label">Partial</div>
-          <div className="stat-value" style={{ color: '#e65100' }}>{currencySymbol}{totalPartial.toLocaleString()}</div>
-        </div>
+      </div>
+
+      {/* Search */}
+      <div className="payments-search-wrap">
+        <span className="material-symbols-outlined payments-search-icon">search</span>
+        <input
+          className="payments-search-input"
+          type="text"
+          placeholder="Search by tenant, property, month…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        {search && (
+          <button className="payments-search-clear" onClick={() => setSearch('')} aria-label="Clear search">
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        )}
       </div>
 
       {/* Filter */}
       <div className="lease-filter-bar">
         <div className="filter-tabs">
-          {(['All', 'Paid', 'Pending', 'Partial'] as FilterTab[]).map(tab => (
+          {(['All', 'Paid', 'Pending'] as FilterTab[]).map(tab => (
             <button key={tab} className={`filter-tab ${filter === tab ? 'active' : ''}`} onClick={() => setFilter(tab)}>{tab}</button>
           ))}
         </div>
         <span className="label-small opacity-50">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
       </div>
 
-      {/* Table */}
-      <div className="leases-table-wrap">
-        {loading ? (
-          <div style={{ padding: '4rem', textAlign: 'center', opacity: 0.5 }}>Loading payments…</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ padding: '4rem', textAlign: 'center', opacity: 0.4 }}>
-            No {filter !== 'All' ? filter.toLowerCase() + ' ' : ''}payments found.
-          </div>
-        ) : (
-          <table className="leases-table">
-            <thead>
-              <tr>
-                <th>Tenant</th>
-                <th>Property / Hostel</th>
-                <th>Month For</th>
-                <th>Date</th>
-                <th>Amount</th>
-                <th>Method</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(p => (
-                <tr key={p.id}>
-                  <td>
-                    <div className="tenant-cell">
-                      <div className="tenant-avatar">{initials(p.leases?.tenants?.full_name || '?')}</div>
-                      <div className="tenant-name">{p.leases?.tenants?.full_name || '—'}</div>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="location-name" style={{ fontSize: '0.875rem' }}>{locationLabel(p)}</div>
-                  </td>
-                  <td style={{ fontWeight: 600 }}>{p.month_for}</td>
-                  <td style={{ fontSize: '0.8rem', color: 'var(--on-surface-variant)' }}>{fmt(p.payment_date)}</td>
-                  <td className="rent-amount">{currencySymbol}{Number(p.amount).toLocaleString()}</td>
-                  <td style={{ fontSize: '0.8rem' }}>{p.payment_method || '—'}</td>
-                  <td>
-                    <span className={`status-badge payment-status-${p.status.toLowerCase()}`}>{p.status}</span>
-                  </td>
-                  <td>
-                    <div className="row-actions">
-                      {p.status === 'Pending' && (
-                        <button className="log-payment-btn" title="Mark as Paid" onClick={() => openLogPayment(p)}>
-                          <span className="material-symbols-outlined">payments</span>
-                          Mark as Paid
-                        </button>
+      {loading ? (
+        <div style={{ padding: '4rem', textAlign: 'center', opacity: 0.5 }}>Loading payments…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ padding: '4rem', textAlign: 'center', opacity: 0.4 }}>
+          {search ? `No results for "${search}"` : `No ${filter !== 'All' ? filter.toLowerCase() + ' ' : ''}payments found.`}
+        </div>
+      ) : (
+        <>
+          {/* Desktop Table */}
+          <div className="leases-table-wrap payments-desktop-table">
+            <table className="leases-table">
+              <thead>
+                <tr>
+                  <th>Tenant</th>
+                  <th>Property / Hostel</th>
+                  <th>Month For</th>
+                  <th>Date</th>
+                  <th>Amount</th>
+                  <th>Method</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(p => (
+                  <tr key={p.id}>
+                    <td>
+                      <div className="tenant-cell">
+                        <div className="tenant-avatar">{initials(p.leases?.tenants?.full_name || '?')}</div>
+                        <div className="tenant-name">{p.leases?.tenants?.full_name || '—'}</div>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="location-name" style={{ fontSize: '0.875rem' }}>{locationLabel(p)}</div>
+                    </td>
+                    <td style={{ fontWeight: 600 }}>{p.month_for}</td>
+                    <td style={{ fontSize: '0.8rem', color: 'var(--on-surface-variant)' }}>{fmt(p.payment_date)}</td>
+                    <td className="rent-amount">{currencySymbol}{Number(p.amount).toLocaleString()}</td>
+                    <td style={{ fontSize: '0.8rem' }}>{p.payment_method || '—'}</td>
+                    <td>
+                      <span className={`status-badge payment-status-${p.status.toLowerCase()}`}>{p.status}</span>
+                    </td>
+                    <td>
+                      {!isStaff && (
+                        <div className="row-actions">
+                          {p.status === 'Pending' && (
+                            <button className="log-payment-btn" title="Mark as Paid" onClick={() => openLogPayment(p)}>
+                              <span className="material-symbols-outlined">payments</span>
+                              Mark as Paid
+                            </button>
+                          )}
+                          <button className="icon-action-btn" title="Edit" onClick={() => openEdit(p)}>
+                            <span className="material-symbols-outlined">edit</span>
+                          </button>
+                          <button className="icon-action-btn danger" title="Delete" onClick={() => handleDelete(p.id)}>
+                            <span className="material-symbols-outlined">delete</span>
+                          </button>
+                        </div>
                       )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Cards */}
+          <div className="payment-cards-list payments-mobile-cards">
+            {filtered.map(p => (
+              <div key={p.id} className="payment-mobile-card">
+                {/* Card Header: avatar + name + status */}
+                <div className="payment-card-header">
+                  <div className="tenant-cell">
+                    <div className="tenant-avatar">{initials(p.leases?.tenants?.full_name || '?')}</div>
+                    <div>
+                      <div className="tenant-name">{p.leases?.tenants?.full_name || '—'}</div>
+                      <div className="payment-card-location">{locationLabel(p)}</div>
+                    </div>
+                  </div>
+                  <span className={`status-badge payment-status-${p.status.toLowerCase()}`}>{p.status}</span>
+                </div>
+
+                {/* Card Body: month, amount, date, method */}
+                <div className="payment-card-body">
+                  <div className="payment-card-row">
+                    <div className="payment-card-field">
+                      <span className="payment-card-label">Month</span>
+                      <span className="payment-card-value">{p.month_for}</span>
+                    </div>
+                    <div className="payment-card-field">
+                      <span className="payment-card-label">Amount</span>
+                      <span className="payment-card-value payment-card-amount">{currencySymbol}{Number(p.amount).toLocaleString()}</span>
+                    </div>
+                  </div>
+                  <div className="payment-card-row">
+                    <div className="payment-card-field">
+                      <span className="payment-card-label">Date</span>
+                      <span className="payment-card-value">{fmt(p.payment_date)}</span>
+                    </div>
+                    <div className="payment-card-field">
+                      <span className="payment-card-label">Method</span>
+                      <span className="payment-card-value">{p.payment_method || '—'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card Footer: actions */}
+                {!isStaff && (
+                  <div className="payment-card-footer">
+                    {p.status === 'Pending' && (
+                      <button className="log-payment-btn payment-card-mark-paid" onClick={() => openLogPayment(p)}>
+                        <span className="material-symbols-outlined">payments</span>
+                        Mark as Paid
+                      </button>
+                    )}
+                    <div className="payment-card-icon-actions">
                       <button className="icon-action-btn" title="Edit" onClick={() => openEdit(p)}>
                         <span className="material-symbols-outlined">edit</span>
                       </button>
@@ -330,13 +447,13 @@ const Payments: React.FC = () => {
                         <span className="material-symbols-outlined">delete</span>
                       </button>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* ── Modal ── */}
       {showModal && editingPayment && (
@@ -359,7 +476,7 @@ const Payments: React.FC = () => {
 
                 <div className="form-row cols-2">
                   <div className="form-group">
-                    <label>Amount ({currencySymbol}) *</label>
+                    <label>Amount Paid ({currencySymbol}) *</label>
                     <input
                       type="number"
                       className="form-input"
@@ -368,6 +485,17 @@ const Payments: React.FC = () => {
                       onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
                       min={0} step="0.01"
                     />
+                    {modalMode === 'log' && (() => {
+                      const paid = parseFloat(form.amount) || 0;
+                      const remainder = Math.round((editingPayment.amount - paid) * 100) / 100;
+                      if (remainder > 0 && paid > 0) return (
+                        <span className="payment-partial-hint">
+                          <span className="material-symbols-outlined" style={{ fontSize: '0.85rem' }}>info</span>
+                          {currencySymbol}{remainder.toLocaleString()} remaining — a new pending payment will be created
+                        </span>
+                      );
+                      return null;
+                    })()}
                   </div>
                   <div className="form-group">
                     <label>Payment Date *</label>
@@ -383,7 +511,7 @@ const Payments: React.FC = () => {
                   {modalMode === 'edit' && (
                     <div className="form-group">
                       <label>Status *</label>
-                      <CustomSelect options={statusOptions} value={form.status} onChange={v => setForm(f => ({ ...f, status: v as Payment['status'] }))} />
+                      <CustomSelect options={statusOptions} value={form.status} onChange={v => setForm(f => ({ ...f, status: v as 'Paid' | 'Pending' }))} />
                     </div>
                   )}
                 </div>

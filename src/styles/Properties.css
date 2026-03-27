@@ -63,7 +63,7 @@
 .property-card:hover {
   transform: translateY(-4px);
   border-color: var(--primary);
-  box-shadow: 0 12px 30px rgba(53, 37, 205, 0.1);
+  box-shadow: 0 12px 30px rgba(0, 135, 90, 0.1);
 }
 
 .property-header-compact {
@@ -285,7 +285,7 @@
 .custom-select-trigger.open {
   border-color: var(--primary);
   background-color: var(--surface-container-lowest);
-  box-shadow: 0 0 0 4px rgba(53, 37, 205, 0.1);
+  box-shadow: 0 0 0 4px rgba(0, 135, 90, 0.1);
 }
 
 .custom-options {
@@ -327,7 +327,7 @@
 }
 
 .custom-option.selected {
-  background-color: rgba(53, 37, 205, 0.08);
+  background-color: rgba(0, 135, 90, 0.08);
   color: var(--primary);
   font-weight: 700;
 }

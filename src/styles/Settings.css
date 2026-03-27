@@ -92,7 +92,7 @@
 }
 
 .theme-toggle-switch:hover {
-  box-shadow: 0 0 0 4px rgba(53, 37, 205, 0.12);
+  box-shadow: 0 0 0 4px rgba(0, 135, 90, 0.12);
 }
 
 .theme-toggle-switch.active {
@@ -105,7 +105,7 @@
 }
 
 [data-theme="dark"] .theme-toggle-switch.active:hover {
-  box-shadow: 0 0 0 4px rgba(145, 137, 248, 0.2);
+  box-shadow: 0 0 0 4px rgba(0, 227, 138, 0.2);
 }
 
 .theme-toggle-thumb {

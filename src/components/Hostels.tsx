@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import { useOwner } from '../context/OwnerContext';
 import '../styles/Properties.css';
 
 const Hostels: React.FC = () => {
+  const { isStaff } = useOwner();
   const [hostels, setHostels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -39,10 +41,12 @@ const Hostels: React.FC = () => {
           <h1 className="display-small">Hostels</h1>
           <p className="text-on-surface-variant">Manage your shared accommodation facilities.</p>
         </div>
-        <Link to="/hostels/new" className="primary-button">
-          <span className="material-symbols-outlined">add</span>
-          New Hostel
-        </Link>
+        {!isStaff && (
+          <Link to="/hostels/new" className="primary-button">
+            <span className="material-symbols-outlined">add</span>
+            New Hostel
+          </Link>
+        )}
       </header>
 
       {hostels.length === 0 ? (

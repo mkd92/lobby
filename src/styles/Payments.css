@@ -4,14 +4,78 @@
   max-width: 1300px;
 }
 
-/* Inline log-payment button on pending rows */
+/* ── Search ── */
+.payments-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.payments-search-icon {
+  position: absolute;
+  left: 1rem;
+  font-size: 1.15rem;
+  color: var(--on-surface-variant);
+  pointer-events: none;
+}
+
+.payments-search-input {
+  width: 100%;
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 2rem;
+  padding: 0.75rem 3rem;
+  font-family: var(--font-main);
+  font-size: 0.9rem;
+  color: var(--on-surface);
+  transition: var(--transition-fast);
+  box-sizing: border-box;
+}
+
+.payments-search-input::placeholder {
+  color: var(--on-surface-variant);
+  opacity: 0.5;
+}
+
+.payments-search-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--surface-container-lowest);
+  box-shadow: 0 0 0 4px rgba(0, 135, 90, 0.08);
+}
+
+.payments-search-clear {
+  position: absolute;
+  right: 0.75rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--on-surface-variant);
+  display: flex;
+  align-items: center;
+  padding: 0.25rem;
+  border-radius: 50%;
+  transition: var(--transition-fast);
+}
+
+.payments-search-clear:hover {
+  background: var(--surface-container-low);
+  color: var(--on-surface);
+}
+
+.payments-search-clear .material-symbols-outlined {
+  font-size: 1rem;
+}
+
+/* ── Inline log-payment button ── */
 .log-payment-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  background: rgba(53, 37, 205, 0.08);
+  background: rgba(0, 135, 90, 0.08);
   color: var(--primary);
-  border: 1px solid rgba(53, 37, 205, 0.2);
+  border: 1px solid rgba(0, 135, 90, 0.2);
   padding: 0.35rem 0.75rem;
   border-radius: 0.5rem;
   font-size: 0.7rem;
@@ -33,7 +97,7 @@
   border-color: var(--primary);
 }
 
-/* Payment-specific status badges */
+/* ── Payment status badges ── */
 .payment-status-paid {
   background: var(--color-success-bg);
   color: var(--color-success);
@@ -44,7 +108,129 @@
   color: var(--color-warning);
 }
 
-.payment-status-partial {
-  background: var(--color-partial-bg);
-  color: var(--color-partial);
+.payment-partial-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-warning);
+  margin-top: 0.35rem;
+  line-height: 1.4;
+}
+
+/* ── Mobile Payment Cards ── */
+.payment-cards-list {
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+/* ── Desktop / Mobile visibility ── */
+.payments-desktop-table {
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  /* override leases-table-wrap overflow:hidden */
+  overflow: auto;
+}
+
+.payments-mobile-cards { display: none; }
+
+.payment-mobile-card {
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 1.5rem;
+  padding: 1.25rem;
+  box-shadow: var(--shadow-ambient);
+}
+
+.payment-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--surface-container-low);
+  gap: 0.75rem;
+}
+
+.payment-card-location {
+  font-size: 0.75rem;
+  color: var(--on-surface-variant);
+  margin-top: 0.15rem;
+}
+
+.payment-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.payment-card-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.payment-card-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.payment-card-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--on-surface-variant);
+  opacity: 0.65;
+}
+
+.payment-card-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.payment-card-amount {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--on-surface);
+}
+
+.payment-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--surface-container-low);
+  gap: 0.5rem;
+}
+
+.payment-card-mark-paid {
+  flex: 1;
+  justify-content: center;
+  padding: 0.55rem 1rem;
+  font-size: 0.75rem;
+}
+
+.payment-card-icon-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+  .payments-desktop-table { display: none; }
+  .payments-mobile-cards  { display: flex; }
+  .payment-cards-list     { display: flex; }
+}
+
+@media (max-width: 768px) {
+  .payments-search-input {
+    font-size: 1rem; /* prevents iOS zoom */
+  }
 }

@@ -2,12 +2,18 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { ThemeProvider } from './context/ThemeContext'
+import { OwnerProvider } from './context/OwnerContext'
 import './index.css'
 import App from './App.tsx'
 import { registerSW } from 'virtual:pwa-register'
 
 // Expose so Settings page can trigger updates
 declare global { interface Window { __updateSW?: (reloadPage?: boolean) => Promise<void> } }
+
+// Lock to portrait on mobile PWA
+if (screen?.orientation && typeof (screen.orientation as any).lock === 'function') {
+  (screen.orientation as any).lock('portrait').catch(() => {/* not supported in all contexts */});
+}
 
 const updateSW = registerSW({
   immediate: true,
@@ -36,7 +42,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <ThemeProvider>
-        <App />
+        <OwnerProvider>
+          <App />
+        </OwnerProvider>
       </ThemeProvider>
     </BrowserRouter>
   </StrictMode>,
