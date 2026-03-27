@@ -45,8 +45,8 @@ const Lobby: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Wait until OwnerContext has resolved before fetching
-    if (ownerLoading || !ownerId) return;
+    if (ownerLoading) return; // still resolving — wait
+    if (!ownerId) { setLoading(false); return; } // resolved but no user
 
     const fetchDashboardStats = async () => {
       try {
