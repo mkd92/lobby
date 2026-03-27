@@ -1,36 +1,42 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
 import '../styles/Properties.css';
 
 const Hostels: React.FC = () => {
-  const { isStaff } = useOwner();
+  const { ownerId, isStaff } = useOwner();
   const [hostels, setHostels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchHostels = useCallback(async () => {
+    if (!ownerId) return;
     try {
-      const { data, error } = await supabase
-        .from('hostels')
-        .select(`
-          *,
-          rooms:rooms(count)
-        `)
-        .order('created_at', { ascending: false });
+      const [hostelSnap, roomSnap] = await Promise.all([
+        getDocs(query(collection(db, 'hostels'), where('owner_id', '==', ownerId))),
+        getDocs(query(collection(db, 'rooms'), where('owner_id', '==', ownerId))),
+      ]);
 
-      if (error) throw error;
-      setHostels(data || []);
+      const roomCounts: Record<string, number> = {};
+      roomSnap.docs.forEach(d => {
+        const hid = d.data().hostel_id;
+        if (hid) roomCounts[hid] = (roomCounts[hid] || 0) + 1;
+      });
+
+      const list = hostelSnap.docs
+        .map(d => ({ id: d.id, ...d.data(), roomCount: roomCounts[d.id] || 0 }))
+        .sort((a: any, b: any) => a.name.localeCompare(b.name));
+
+      setHostels(list);
     } catch (error) {
       console.error('Error fetching hostels:', error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [ownerId]);
 
-  useEffect(() => {
-    fetchHostels();
-  }, [fetchHostels]);
+  useEffect(() => { fetchHostels(); }, [fetchHostels]);
 
   if (loading) return <div className="p-12">Loading hostels...</div>;
 
@@ -51,28 +57,17 @@ const Hostels: React.FC = () => {
 
       {hostels.length === 0 ? (
         <div className="empty-state">
-          <span className="material-symbols-outlined text-6xl opacity-20 mb-4" style={{ fontSize: '4rem' }}>
-            hotel
-          </span>
+          <span className="material-symbols-outlined text-6xl opacity-20 mb-4" style={{ fontSize: '4rem' }}>hotel</span>
           <h2 className="mb-2">No hostels yet</h2>
           <p className="text-on-surface-variant mb-8">Start by registering your first hostel facility.</p>
-          <Link to="/hostels/new" className="primary-button" style={{ textDecoration: 'none' }}>
-            Create First Hostel
-          </Link>
+          <Link to="/hostels/new" className="primary-button" style={{ textDecoration: 'none' }}>Create First Hostel</Link>
         </div>
       ) : (
         <div className="properties-grid">
           {hostels.map((hostel) => (
-            <Link 
-              key={hostel.id} 
-              to={`/hostels/${hostel.id}`}
-              className="property-card"
-              style={{ textDecoration: 'none' }}
-            >
+            <Link key={hostel.id} to={`/hostels/${hostel.id}`} className="property-card" style={{ textDecoration: 'none' }}>
               <div className="property-image" style={{ background: 'var(--primary-container)', color: 'white' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '3rem', opacity: 0.8 }}>
-                  hotel
-                </span>
+                <span className="material-symbols-outlined" style={{ fontSize: '3rem', opacity: 0.8 }}>hotel</span>
               </div>
               <div className="property-info">
                 <h3 className="property-name">{hostel.name}</h3>
@@ -83,7 +78,7 @@ const Hostels: React.FC = () => {
                 <div className="property-stats">
                   <div className="stat-item">
                     <div className="stat-label">Rooms</div>
-                    <div className="stat-value">{hostel.rooms?.[0]?.count || 0}</div>
+                    <div className="stat-value">{hostel.roomCount || 0}</div>
                   </div>
                   <div className="stat-item">
                     <div className="stat-label">Facility</div>

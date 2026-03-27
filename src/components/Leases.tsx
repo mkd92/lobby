@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '../supabaseClient';
+import {
+  collection, query, where, getDocs, doc, getDoc,
+  addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp,
+} from 'firebase/firestore';
+import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import '../styles/Units.css';
@@ -8,25 +12,28 @@ import '../styles/Leases.css';
 // ── Types ──────────────────────────────────────────────────────────────
 interface Tenant    { id: string; full_name: string; email: string; phone: string; }
 interface Property  { id: string; name: string; }
-interface Unit      { id: string; unit_number: string; type: string; base_rent: number; status: string; }
+interface Unit      { id: string; unit_number: string; type: string; base_rent: number; status: string; property_id: string; }
 interface Hostel    { id: string; name: string; }
 interface Room      { id: string; room_number: string; floor: number; beds?: Bed[]; }
-interface Bed       { id: string; bed_number: string; price: number; status: string; }
+interface Bed       { id: string; bed_number: string; price: number; status: string; room_id: string; hostel_id: string; }
 
 interface Lease {
   id: string;
   unit_id: string | null;
   bed_id: string | null;
   tenant_id: string;
+  tenant_name: string;
+  unit_number: string | null;
+  property_name: string | null;
+  bed_number: string | null;
+  room_number: string | null;
+  hostel_name: string | null;
   rent_amount: number;
   security_deposit: number | null;
   start_date: string;
   end_date: string | null;
   status: 'Active' | 'Expired' | 'Terminated';
   notes: string | null;
-  tenants: Tenant;
-  units: { unit_number: string; type: string; properties: { name: string } } | null;
-  beds: { bed_number: string; price: number; rooms: { room_number: string; hostels: { name: string } } } | null;
 }
 
 type LeaseType = 'property' | 'hostel';
@@ -101,8 +108,8 @@ const CustomSelect: React.FC<{
   }, [open, searchable]);
 
   const selected = options.find(o => o.value === value);
-  const filteredOptions = options.filter(o => 
-    o.label.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredOptions = options.filter(o =>
+    o.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (o.sub && o.sub.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
@@ -118,7 +125,7 @@ const CustomSelect: React.FC<{
   const handleKey = (e: React.KeyboardEvent) => {
     if (e.key === ' ') { e.preventDefault(); toggle(); }
     if (e.key === 'Enter') {
-      if (open) { e.preventDefault(); setOpen(false); } // close; let next Enter bubble to submit
+      if (open) { e.preventDefault(); setOpen(false); }
     }
     if (e.key === 'Escape' || e.key === 'Tab') setOpen(false);
     if (open && !searchable) {
@@ -220,33 +227,58 @@ const Leases: React.FC = () => {
 
   // ── Fetch ──────────────────────────────────────────────────────────
   const fetchLeases = useCallback(async () => {
+    if (!ownerId) return;
     setLoading(true);
     try {
       // Fire-and-forget auto-expire — don't block data loading
-      const today = new Date().toISOString().split('T')[0];
-      void supabase.from('leases').update({ status: 'Expired' }).eq('status', 'Active').lt('end_date', today).not('end_date', 'is', null);
+      void (async () => {
+        const today = new Date().toISOString().split('T')[0];
+        const activeSnap = await getDocs(query(
+          collection(db, 'leases'),
+          where('owner_id', '==', ownerId),
+          where('status', '==', 'Active')
+        ));
+        const batch = writeBatch(db);
+        let hasExpired = false;
+        for (const leaseDoc of activeSnap.docs) {
+          const lease = leaseDoc.data();
+          if (lease.end_date && lease.end_date < today) {
+            batch.update(leaseDoc.ref, { status: 'Expired' });
+            hasExpired = true;
+          }
+        }
+        if (hasExpired) await batch.commit();
+      })();
 
-      const { data, error } = await supabase
-        .from('leases')
-        .select(`*, tenants (id, full_name, email, phone), units (unit_number, type, base_rent, properties (name)), beds (bed_number, price, rooms (room_number, hostels (name)))`)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      setLeases((data as unknown as Lease[]) || []);
+      const snap = await getDocs(query(
+        collection(db, 'leases'),
+        where('owner_id', '==', ownerId)
+      ));
+
+      const data: Lease[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as Lease));
+      // Sort by created_at descending (newest first)
+      data.sort((a: any, b: any) => {
+        const ta = a.created_at?.seconds ?? 0;
+        const tb = b.created_at?.seconds ?? 0;
+        return tb - ta;
+      });
+      setLeases(data);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [ownerId]);
 
   const fetchCurrency = useCallback(async () => {
     if (!ownerId) return;
-    const { data } = await supabase.from('owners').select('currency').eq('id', ownerId).single();
+    const ownerDoc = await getDoc(doc(db, 'owners', ownerId));
+    const data = ownerDoc.data();
     const symbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
     setCurrencySymbol(symbols[data?.currency || 'USD'] || '$');
   }, [ownerId]);
 
-  // Run both concurrently — fetchLeases uses RLS, fetchCurrency needs ownerId
+  // Run both concurrently
   useEffect(() => { fetchLeases(); fetchCurrency(); }, [fetchLeases, fetchCurrency]);
 
   // Auto-calculate first month rent whenever rent or start date changes
@@ -271,58 +303,85 @@ const Leases: React.FC = () => {
 
   // ── Form reference data ────────────────────────────────────────────
   const loadFormData = async () => {
-    const [{ data: t }, { data: p }, { data: h }] = await Promise.all([
-      supabase.from('tenants').select('id, full_name, email, phone').order('full_name'),
-      supabase.from('properties').select('id, name').order('name'),
-      supabase.from('hostels').select('id, name').order('name'),
+    if (!ownerId) return;
+    const [tSnap, pSnap, hSnap] = await Promise.all([
+      getDocs(query(collection(db, 'tenants'), where('owner_id', '==', ownerId))),
+      getDocs(query(collection(db, 'properties'), where('owner_id', '==', ownerId))),
+      getDocs(query(collection(db, 'hostels'), where('owner_id', '==', ownerId))),
     ]);
-    setTenants((t as Tenant[]) || []);
-    setProperties((p as Property[]) || []);
-    setHostels((h as Hostel[]) || []);
+    const tData = tSnap.docs.map(d => ({ id: d.id, ...d.data() } as Tenant))
+      .sort((a, b) => a.full_name.localeCompare(b.full_name));
+    const pData = pSnap.docs.map(d => ({ id: d.id, ...d.data() } as Property))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const hData = hSnap.docs.map(d => ({ id: d.id, ...d.data() } as Hostel))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    setTenants(tData);
+    setProperties(pData);
+    setHostels(hData);
   };
 
   const loadUnits = async (propertyId: string) => {
-    const { data } = await supabase.from('units').select('id, unit_number, type, base_rent, status').eq('property_id', propertyId).order('unit_number');
-    let filtered = (data as Unit[]) || [];
+    const snap = await getDocs(query(
+      collection(db, 'units'),
+      where('property_id', '==', propertyId)
+    ));
+    let data = snap.docs.map(d => ({ id: d.id, ...d.data() } as Unit))
+      .sort((a, b) => a.unit_number.localeCompare(b.unit_number));
     if (!editingLease) {
-      filtered = filtered.filter(u => u.status === 'Vacant');
+      data = data.filter(u => u.status === 'Vacant');
     } else {
       // In edit mode, show Vacant units PLUS the currently leased unit
-      filtered = filtered.filter(u => u.status === 'Vacant' || u.id === editingLease.unit_id);
+      data = data.filter(u => u.status === 'Vacant' || u.id === editingLease.unit_id);
     }
-    setUnits(filtered);
+    setUnits(data);
   };
 
   const loadRooms = async (hostelId: string) => {
-    const { data } = await supabase
-      .from('rooms')
-      .select('id, room_number, floor, beds(id, status)')
-      .eq('hostel_id', hostelId)
-      .order('room_number');
-    
-    let filtered = (data as unknown as Room[]) || [];
+    const [roomsSnap, bedsSnap] = await Promise.all([
+      getDocs(query(collection(db, 'rooms'), where('hostel_id', '==', hostelId))),
+      getDocs(query(collection(db, 'beds'), where('hostel_id', '==', hostelId))),
+    ]);
+
+    const allBeds = bedsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Bed));
+    // Group beds by room_id
+    const bedsByRoom: Record<string, Bed[]> = {};
+    for (const bed of allBeds) {
+      if (!bedsByRoom[bed.room_id]) bedsByRoom[bed.room_id] = [];
+      bedsByRoom[bed.room_id].push(bed);
+    }
+
+    let data = roomsSnap.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      beds: bedsByRoom[d.id] || [],
+    } as Room)).sort((a, b) => String(a.room_number).localeCompare(String(b.room_number)));
+
     if (!editingLease) {
       // Show only rooms that have at least one vacant bed
-      filtered = filtered.filter(r => r.beds?.some(b => b.status === 'Vacant'));
+      data = data.filter(r => r.beds?.some(b => b.status === 'Vacant'));
     } else {
       // In edit mode, show rooms with vacant beds PLUS the room that has the currently leased bed
-      filtered = filtered.filter(r => 
+      data = data.filter(r =>
         r.beds?.some(b => b.status === 'Vacant' || b.id === editingLease.bed_id)
       );
     }
-    setRooms(filtered);
+    setRooms(data);
   };
 
   const loadBeds = async (roomId: string) => {
-    const { data } = await supabase.from('beds').select('id, bed_number, price, status').eq('room_id', roomId).order('bed_number');
-    let filtered = (data as Bed[]) || [];
+    const snap = await getDocs(query(
+      collection(db, 'beds'),
+      where('room_id', '==', roomId)
+    ));
+    let data = snap.docs.map(d => ({ id: d.id, ...d.data() } as Bed))
+      .sort((a, b) => a.bed_number.localeCompare(b.bed_number));
     if (!editingLease) {
-      filtered = filtered.filter(b => b.status === 'Vacant');
+      data = data.filter(b => b.status === 'Vacant');
     } else {
       // In edit mode, show Vacant beds PLUS the currently leased bed
-      filtered = filtered.filter(b => b.status === 'Vacant' || b.id === editingLease.bed_id);
+      data = data.filter(b => b.status === 'Vacant' || b.id === editingLease.bed_id);
     }
-    setBeds(filtered);
+    setBeds(data);
   };
 
   // ── Open modal ─────────────────────────────────────────────────────
@@ -355,22 +414,27 @@ const Leases: React.FC = () => {
       status:           lease.status,
       notes:            lease.notes || '',
     });
-    
-    // Set cascade selection IDs
+
+    // Set cascade selection IDs — fetch from Firestore since data is flat (no joins)
     if (lease.unit_id) {
-      const { data: unitData } = await supabase.from('units').select('property_id').eq('id', lease.unit_id).single();
-      if (unitData) {
+      const unitDoc = await getDoc(doc(db, 'units', lease.unit_id));
+      if (unitDoc.exists()) {
+        const unitData = unitDoc.data();
         setSelectedPropertyId(unitData.property_id);
         loadUnits(unitData.property_id);
       }
     } else if (lease.bed_id) {
-      const { data: bedData } = await supabase.from('beds').select('rooms(id, hostel_id)').eq('id', lease.bed_id).single();
-      if (bedData) {
-        const room = (bedData.rooms as any);
-        setSelectedHostelId(room.hostel_id);
-        setSelectedRoomId(room.id);
-        loadRooms(room.hostel_id);
-        loadBeds(room.id);
+      const bedDoc = await getDoc(doc(db, 'beds', lease.bed_id));
+      if (bedDoc.exists()) {
+        const bedData = bedDoc.data() as Bed;
+        const roomDoc = await getDoc(doc(db, 'rooms', bedData.room_id));
+        if (roomDoc.exists()) {
+          const roomData = roomDoc.data();
+          setSelectedHostelId(roomData.hostel_id);
+          setSelectedRoomId(bedData.room_id);
+          loadRooms(roomData.hostel_id);
+          loadBeds(bedData.room_id);
+        }
       }
     }
 
@@ -438,61 +502,148 @@ const Leases: React.FC = () => {
 
     setSaving(true);
     try {
-      const payload = {
-        tenant_id:        form.tenant_id,
-        unit_id:          leaseType === 'property' ? form.unit_id : null,
-        bed_id:           leaseType === 'hostel'   ? form.bed_id  : null,
-        rent_amount:      parseFloat(form.rent_amount)      || 0,
-        security_deposit: parseFloat(form.security_deposit) || null,
-        start_date:       form.start_date,
-        end_date:         form.end_date || null,
-        status:           form.status,
-        notes:            form.notes || null,
-      };
+      const selectedTenant    = tenants.find(t => t.id === form.tenant_id);
+      const selectedUnit      = units.find(u => u.id === form.unit_id);
+      const selectedProperty  = properties.find(p => p.id === selectedPropertyId);
+      const selectedBed       = beds.find(b => b.id === form.bed_id);
+      const selectedRoom      = rooms.find(r => r.id === selectedRoomId);
+      const selectedHostel    = hostels.find(h => h.id === selectedHostelId);
 
       if (editingLease) {
-        const { error } = await supabase.from('leases').update(payload).eq('id', editingLease.id);
-        if (error) throw error;
-      } else {
-        // Insert lease and get the new id back
-        const { data: newLease, error } = await supabase
-          .from('leases')
-          .insert([payload])
-          .select('id')
-          .single();
-        if (error) throw error;
+        // ── Update existing lease ──
+        const updatedFields: Record<string, any> = {
+          tenant_id:        form.tenant_id,
+          tenant_name:      selectedTenant?.full_name || editingLease.tenant_name,
+          rent_amount:      parseFloat(form.rent_amount) || 0,
+          security_deposit: parseFloat(form.security_deposit) || null,
+          start_date:       form.start_date,
+          end_date:         form.end_date || null,
+          status:           form.status,
+          notes:            form.notes || null,
+        };
 
-        // Build pending payment records
+        if (leaseType === 'property') {
+          updatedFields.unit_id      = form.unit_id || null;
+          updatedFields.unit_number  = selectedUnit?.unit_number || editingLease.unit_number || null;
+          updatedFields.property_id  = selectedPropertyId || null;
+          updatedFields.property_name = selectedProperty?.name || editingLease.property_name || null;
+          updatedFields.bed_id       = null;
+          updatedFields.bed_number   = null;
+          updatedFields.room_id      = null;
+          updatedFields.room_number  = null;
+          updatedFields.hostel_id    = null;
+          updatedFields.hostel_name  = null;
+        } else {
+          updatedFields.bed_id       = form.bed_id || null;
+          updatedFields.bed_number   = selectedBed?.bed_number || editingLease.bed_number || null;
+          updatedFields.room_id      = selectedRoomId || null;
+          updatedFields.room_number  = selectedRoom?.room_number || editingLease.room_number || null;
+          updatedFields.hostel_id    = selectedHostelId || null;
+          updatedFields.hostel_name  = selectedHostel?.name || editingLease.hostel_name || null;
+          updatedFields.unit_id      = null;
+          updatedFields.unit_number  = null;
+          updatedFields.property_id  = null;
+          updatedFields.property_name = null;
+        }
+
+        await updateDoc(doc(db, 'leases', editingLease.id), updatedFields);
+      } else {
+        // ── Create new lease ──
+        let leaseData: any = {
+          owner_id:         ownerId,
+          tenant_id:        form.tenant_id,
+          tenant_name:      selectedTenant?.full_name || '',
+          rent_amount:      parseFloat(form.rent_amount),
+          security_deposit: form.security_deposit ? parseFloat(form.security_deposit) : null,
+          start_date:       form.start_date,
+          end_date:         form.end_date || null,
+          status:           form.status,
+          notes:            form.notes || null,
+          created_at:       serverTimestamp(),
+        };
+
+        if (leaseType === 'property' && selectedUnit) {
+          leaseData = {
+            ...leaseData,
+            unit_id:      selectedUnit.id,
+            unit_number:  selectedUnit.unit_number,
+            property_id:  selectedUnit.property_id,
+            property_name: selectedProperty?.name || '',
+            bed_id:       null,
+            bed_number:   null,
+            room_id:      null,
+            room_number:  null,
+            hostel_id:    null,
+            hostel_name:  null,
+          };
+          // Mark unit as Occupied
+          await updateDoc(doc(db, 'units', selectedUnit.id), { status: 'Occupied' });
+        } else if (leaseType === 'hostel' && selectedBed) {
+          leaseData = {
+            ...leaseData,
+            bed_id:       selectedBed.id,
+            bed_number:   selectedBed.bed_number,
+            room_id:      selectedRoom?.id || null,
+            room_number:  selectedRoom?.room_number || null,
+            hostel_id:    selectedHostel?.id || null,
+            hostel_name:  selectedHostel?.name || null,
+            unit_id:      null,
+            unit_number:  null,
+            property_id:  null,
+            property_name: null,
+          };
+          // Mark bed as Occupied
+          await updateDoc(doc(db, 'beds', selectedBed.id), { status: 'Occupied' });
+        }
+
+        const leaseRef = await addDoc(collection(db, 'leases'), leaseData);
+
+        // ── Create initial payments ──
         // Parse date parts directly to avoid UTC-to-local timezone shift
         const [sy, sm] = form.start_date.split('-').map(Number);
         const monthLabel = new Date(sy, sm - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-        const pendingPayments: object[] = [];
+        const today = new Date().toISOString().split('T')[0];
 
         const firstRent = parseFloat(form.first_month_rent);
         if (firstRent > 0) {
-          pendingPayments.push({
-            lease_id:       newLease.id,
+          await addDoc(collection(db, 'payments'), {
+            owner_id:       ownerId,
+            lease_id:       leaseRef.id,
+            tenant_name:    leaseData.tenant_name,
+            unit_number:    leaseData.unit_number || null,
+            property_name:  leaseData.property_name || null,
+            bed_number:     leaseData.bed_number || null,
+            room_number:    leaseData.room_number || null,
+            hostel_name:    leaseData.hostel_name || null,
+            rent_amount:    leaseData.rent_amount,
             amount:         firstRent,
-            payment_date:   form.start_date,
+            payment_date:   today,
             month_for:      monthLabel,
+            payment_method: null,
             status:         'Pending',
+            created_at:     serverTimestamp(),
           });
         }
 
         const deposit = parseFloat(form.security_deposit);
         if (deposit > 0) {
-          pendingPayments.push({
-            lease_id:       newLease.id,
+          await addDoc(collection(db, 'payments'), {
+            owner_id:       ownerId,
+            lease_id:       leaseRef.id,
+            tenant_name:    leaseData.tenant_name,
+            unit_number:    leaseData.unit_number || null,
+            property_name:  leaseData.property_name || null,
+            bed_number:     leaseData.bed_number || null,
+            room_number:    leaseData.room_number || null,
+            hostel_name:    leaseData.hostel_name || null,
+            rent_amount:    leaseData.rent_amount,
             amount:         deposit,
-            payment_date:   form.start_date,
+            payment_date:   today,
             month_for:      'Security Deposit',
+            payment_method: null,
             status:         'Pending',
+            created_at:     serverTimestamp(),
           });
-        }
-
-        if (pendingPayments.length > 0) {
-          const { error: pErr } = await supabase.from('payments').insert(pendingPayments);
-          if (pErr) throw pErr;
         }
       }
 
@@ -508,9 +659,12 @@ const Leases: React.FC = () => {
   const handleDelete = async (id: string) => {
     const ok = await showConfirm('Delete this lease? This cannot be undone.', { danger: true });
     if (!ok) return;
-    const { error } = await supabase.from('leases').delete().eq('id', id);
-    if (error) return showAlert(error.message);
-    fetchLeases();
+    try {
+      await deleteDoc(doc(db, 'leases', id));
+      fetchLeases();
+    } catch (err) {
+      showAlert((err as Error).message);
+    }
   };
 
   // ── Derived ────────────────────────────────────────────────────────
@@ -600,18 +754,17 @@ const Leases: React.FC = () => {
                 <tbody>
                   {filtered.map(lease => {
                     const isHostel  = !!lease.bed_id;
-                    const propName  = isHostel ? lease.beds?.rooms?.hostels?.name : lease.units?.properties?.name;
+                    const propName  = isHostel ? lease.hostel_name : lease.property_name;
                     const unitLabel = isHostel
-                      ? `Room ${lease.beds?.rooms?.room_number} · ${lease.beds?.bed_number}`
-                      : `${lease.units?.unit_number} · ${lease.units?.type}`;
+                      ? `Room ${lease.room_number} · ${lease.bed_number}`
+                      : `${lease.unit_number}`;
                     return (
                       <tr key={lease.id}>
                         <td>
                           <div className="tenant-cell">
-                            <div className="tenant-avatar">{initials(lease.tenants?.full_name || '?')}</div>
+                            <div className="tenant-avatar">{initials(lease.tenant_name || '?')}</div>
                             <div>
-                              <div className="tenant-name">{lease.tenants?.full_name}</div>
-                              <div className="tenant-email">{lease.tenants?.email}</div>
+                              <div className="tenant-name">{lease.tenant_name}</div>
                             </div>
                           </div>
                         </td>
@@ -655,17 +808,17 @@ const Leases: React.FC = () => {
             <div className="mobile-only lease-cards-list">
               {filtered.map(lease => {
                 const isHostel  = !!lease.bed_id;
-                const propName  = isHostel ? lease.beds?.rooms?.hostels?.name : lease.units?.properties?.name;
+                const propName  = isHostel ? lease.hostel_name : lease.property_name;
                 const unitLabel = isHostel
-                  ? `Room ${lease.beds?.rooms?.room_number} · ${lease.beds?.bed_number}`
-                  : `${lease.units?.unit_number} · ${lease.units?.type}`;
+                  ? `Room ${lease.room_number} · ${lease.bed_number}`
+                  : `${lease.unit_number}`;
                 return (
                   <div key={lease.id} className="lease-mobile-card">
                     <div className="lease-card-header">
                       <div className="tenant-info">
-                        <div className="tenant-avatar">{initials(lease.tenants?.full_name || '?')}</div>
+                        <div className="tenant-avatar">{initials(lease.tenant_name || '?')}</div>
                         <div>
-                          <div className="tenant-name">{lease.tenants?.full_name}</div>
+                          <div className="tenant-name">{lease.tenant_name}</div>
                           <span className={`status-badge status-${lease.status.toLowerCase()}`} style={{ fontSize: '0.6rem' }}>{lease.status}</span>
                         </div>
                       </div>
@@ -678,7 +831,7 @@ const Leases: React.FC = () => {
                         </button>
                       </div>
                     </div>
-                    
+
                     <div className="lease-card-details">
                       <div className="detail-item">
                         <span className="material-symbols-outlined">{isHostel ? 'hotel' : 'domain'}</span>

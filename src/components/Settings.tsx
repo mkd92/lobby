@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { signOut } from 'firebase/auth';
+import { collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { auth, db } from '../firebaseClient';
+import { useOwner } from '../context/OwnerContext';
 import { useTheme } from '../context/ThemeContext';
 import '../styles/Auth.css';
 import '../styles/Properties.css';
@@ -21,6 +24,7 @@ type UpdateStatus = 'idle' | 'checking' | 'up-to-date' | 'updating' | 'error';
 const Settings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const { ownerId, user } = useOwner();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -39,30 +43,23 @@ const Settings: React.FC = () => {
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   useEffect(() => {
+    if (!ownerId) return;
+
     const fetchProfile = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const { data, error } = await supabase
-          .from('owners')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-
-        if (error) throw error;
-        setProfile({
-          full_name: data.full_name || '',
-          email: data.email || '',
-          currency: data.currency || 'USD'
-        });
+        const ownerSnap = await getDoc(doc(db, 'owners', ownerId));
+        if (ownerSnap.exists()) {
+          const data = ownerSnap.data();
+          setProfile({
+            full_name: data.full_name || '',
+            email: data.email || user?.email || '',
+            currency: data.currency || 'USD',
+          });
+        }
 
         // Fetch staff members
-        const { data: staffData } = await supabase
-          .from('staff')
-          .select('id, staff_email')
-          .eq('owner_id', user.id);
-        setStaffEmails(staffData || []);
+        const staffSnap = await getDocs(query(collection(db, 'staff'), where('owner_id', '==', ownerId)));
+        setStaffEmails(staffSnap.docs.map(d => ({ id: d.id, staff_email: d.data().staff_email })));
       } catch (error) {
         console.error('Error fetching profile:', error);
       } finally {
@@ -71,7 +68,7 @@ const Settings: React.FC = () => {
     };
 
     fetchProfile();
-  }, []);
+  }, [ownerId, user]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -122,40 +119,35 @@ const Settings: React.FC = () => {
 
   const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStaffEmail.trim()) return;
+    if (!newStaffEmail.trim() || !ownerId) return;
     setStaffLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from('staff').insert({ owner_id: user!.id, staff_email: newStaffEmail.trim().toLowerCase() });
-    if (!error) {
-      setStaffEmails(prev => [...prev, { id: Date.now().toString(), staff_email: newStaffEmail.trim().toLowerCase() }]);
+    try {
+      const email = newStaffEmail.trim().toLowerCase();
+      const docRef = await addDoc(collection(db, 'staff'), { owner_id: ownerId, staff_email: email });
+      setStaffEmails(prev => [...prev, { id: docRef.id, staff_email: email }]);
       setNewStaffEmail('');
+    } catch (error) {
+      console.error('Error adding staff:', error);
     }
     setStaffLoading(false);
   };
 
   const handleRemoveStaff = async (id: string) => {
-    await supabase.from('staff').delete().eq('id', id);
+    await deleteDoc(doc(db, 'staff', id));
     setStaffEmails(prev => prev.filter(s => s.id !== id));
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!ownerId) return;
     setSaving(true);
     setMessage(null);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
-
-      const { error } = await supabase
-        .from('owners')
-        .update({
-          full_name: profile.full_name,
-          currency: profile.currency
-        })
-        .eq('id', user.id);
-
-      if (error) throw error;
+      await updateDoc(doc(db, 'owners', ownerId), {
+        full_name: profile.full_name,
+        currency: profile.currency,
+      });
       setMessage({ type: 'success', text: 'Settings updated successfully!' });
     } catch (error) {
       setMessage({ type: 'error', text: (error as Error).message });
@@ -396,7 +388,7 @@ const Settings: React.FC = () => {
         <button
           className="primary-button"
           style={{ background: 'var(--error)', marginTop: '1rem' }}
-          onClick={async () => { await supabase.auth.signOut(); navigate('/login'); }}
+          onClick={async () => { await signOut(auth); navigate('/login'); }}
         >
           <span className="material-symbols-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle', marginRight: '0.35rem' }}>logout</span>
           Sign Out

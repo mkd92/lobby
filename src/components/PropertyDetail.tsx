@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import '../styles/Units.css';
@@ -119,15 +120,22 @@ const PropertyDetail: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     try {
-      const [propRes, unitRes, ownerRes] = await Promise.all([
-        supabase.from('properties').select('*').eq('id', id).single(),
-        supabase.from('units').select('*').eq('property_id', id).order('unit_number', { ascending: true }),
-        ownerId ? supabase.from('owners').select('currency').eq('id', ownerId).single() : Promise.resolve(null),
+      const [propSnap, unitsSnap, ownerSnap] = await Promise.all([
+        getDoc(doc(db, 'properties', id!)),
+        getDocs(query(collection(db, 'units'), where('property_id', '==', id))),
+        ownerId ? getDoc(doc(db, 'owners', ownerId)) : Promise.resolve(null),
       ]);
-      if (propRes.error) throw propRes.error;
-      setProperty(propRes.data);
-      setUnits(unitRes.data || []);
-      if (ownerRes?.data) setCurrency(ownerRes.data.currency || 'USD');
+
+      if (!propSnap.exists()) throw new Error('Property not found');
+      setProperty({ id: propSnap.id, ...propSnap.data() } as Property);
+
+      const fetchedUnits: Unit[] = unitsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Unit));
+      fetchedUnits.sort((a, b) => a.unit_number.localeCompare(b.unit_number));
+      setUnits(fetchedUnits);
+
+      if (ownerSnap && ownerSnap.exists()) {
+        setCurrency(ownerSnap.data().currency || 'USD');
+      }
     } catch (error) {
       console.error('Error fetching property details:', error);
       navigate('/properties');
@@ -142,8 +150,13 @@ const PropertyDetail: React.FC = () => {
   const handleAddUnit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from('units').insert([{ ...newUnit, property_id: id }]);
-      if (error) throw error;
+      await addDoc(collection(db, 'units'), {
+        ...newUnit,
+        property_id: id,
+        owner_id: ownerId,
+        status: 'Vacant',
+        created_at: serverTimestamp(),
+      });
       setNewUnit({ unit_number: '', floor: 0, type: 'Studio', base_rent: 0, area_sqft: 0 });
       fetchData();
     } catch (error) {
@@ -161,8 +174,7 @@ const PropertyDetail: React.FC = () => {
     e.preventDefault();
     if (!editingUnitId) return;
     try {
-      const { error } = await supabase.from('units').update(editUnitData).eq('id', editingUnitId);
-      if (error) throw error;
+      await updateDoc(doc(db, 'units', editingUnitId), editUnitData);
       setEditingUnitId(null);
       fetchData();
     } catch (error) {
@@ -172,21 +184,18 @@ const PropertyDetail: React.FC = () => {
 
   // ── Delete unit ─────────────────────────────────────────────────────
   const handleDeleteUnit = async (unit: Unit) => {
-    const { data: activeLeases } = await supabase
-      .from('leases')
-      .select('id')
-      .eq('unit_id', unit.id)
-      .eq('status', 'Active');
+    const activeLeasesSnap = await getDocs(
+      query(collection(db, 'leases'), where('unit_id', '==', unit.id), where('status', '==', 'Active'))
+    );
 
-    if (activeLeases && activeLeases.length > 0) {
+    if (!activeLeasesSnap.empty) {
       await showAlert('Cannot delete — this unit has an active lease.\nDelete the lease first, then delete the unit.');
       return;
     }
     const ok = await showConfirm(`Delete unit ${unit.unit_number}? This cannot be undone.`, { danger: true });
     if (!ok) return;
     try {
-      const { error } = await supabase.from('units').delete().eq('id', unit.id);
-      if (error) throw error;
+      await deleteDoc(doc(db, 'units', unit.id));
       setEditingUnitId(null);
       fetchData();
     } catch (error) {
@@ -204,8 +213,7 @@ const PropertyDetail: React.FC = () => {
   const handleEditProperty = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from('properties').update(editPropertyData).eq('id', id);
-      if (error) throw error;
+      await updateDoc(doc(db, 'properties', id!), editPropertyData);
       setEditingProperty(false);
       fetchData();
     } catch (error) {
@@ -217,22 +225,22 @@ const PropertyDetail: React.FC = () => {
   const handleDeleteProperty = async () => {
     const unitIds = units.map(u => u.id);
     if (unitIds.length > 0) {
-      const { data: activeLeases } = await supabase
-        .from('leases')
-        .select('id')
-        .in('unit_id', unitIds)
-        .eq('status', 'Active');
+      const leaseChecks = await Promise.all(
+        unitIds.map(uid =>
+          getDocs(query(collection(db, 'leases'), where('unit_id', '==', uid), where('status', '==', 'Active')))
+        )
+      );
+      const activeLeaseCount = leaseChecks.reduce((sum, snap) => sum + snap.size, 0);
 
-      if (activeLeases && activeLeases.length > 0) {
-        await showAlert(`Cannot delete — ${activeLeases.length} unit(s) in this property have active leases.\nDelete those leases first.`);
+      if (activeLeaseCount > 0) {
+        await showAlert(`Cannot delete — ${activeLeaseCount} unit(s) in this property have active leases.\nDelete those leases first.`);
         return;
       }
     }
     const ok = await showConfirm(`Delete property "${property?.name}" and all its units? This cannot be undone.`, { danger: true });
     if (!ok) return;
     try {
-      const { error } = await supabase.from('properties').delete().eq('id', id);
-      if (error) throw error;
+      await deleteDoc(doc(db, 'properties', id!));
       navigate('/properties');
     } catch (error) {
       showAlert((error as Error).message);

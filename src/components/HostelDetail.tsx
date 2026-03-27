@@ -1,6 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import {
+  doc,
+  getDoc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  collection,
+  query,
+  where,
+  serverTimestamp,
+} from 'firebase/firestore';
+import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import '../styles/Units.css';
@@ -48,17 +60,41 @@ const HostelDetail: React.FC = () => {
   const [editBedData, setEditBedData] = useState({ bed_number: '', price: 0, status: 'Vacant' as Bed['status'] });
 
   const fetchData = useCallback(async () => {
+    if (!id) return;
     try {
       const symbols: { [key: string]: string } = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
-      const [hRes, rRes, ownerRes] = await Promise.all([
-        supabase.from('hostels').select('*').eq('id', id).single(),
-        supabase.from('rooms').select('*, beds (*)').eq('hostel_id', id).order('room_number', { ascending: true }),
-        ownerId ? supabase.from('owners').select('currency').eq('id', ownerId).single() : Promise.resolve(null),
+
+      const [hostelSnap, roomsSnap, bedsSnap, ownerSnap] = await Promise.all([
+        getDoc(doc(db, 'hostels', id)),
+        getDocs(query(collection(db, 'rooms'), where('hostel_id', '==', id))),
+        getDocs(query(collection(db, 'beds'), where('hostel_id', '==', id))),
+        ownerId ? getDoc(doc(db, 'owners', ownerId)) : Promise.resolve(null),
       ]);
-      if (hRes.error) throw hRes.error;
-      setHostel(hRes.data);
-      setRooms(rRes.data || []);
-      if (ownerRes?.data) setCurrencySymbol(symbols[ownerRes.data.currency || 'USD'] || '$');
+
+      if (!hostelSnap.exists()) {
+        navigate('/hostels');
+        return;
+      }
+
+      setHostel({ id: hostelSnap.id, ...hostelSnap.data() } as Hostel);
+
+      const allBeds = bedsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as (Bed & { room_id: string })[];
+
+      const roomsList = roomsSnap.docs
+        .map(d => ({ id: d.id, ...d.data() } as Room & { room_id?: string }))
+        .sort((a, b) => String(a.room_number).localeCompare(String(b.room_number), undefined, { numeric: true }));
+
+      const roomsWithBeds: Room[] = roomsList.map(r => ({
+        ...r,
+        beds: allBeds.filter(b => b.room_id === r.id),
+      }));
+
+      setRooms(roomsWithBeds);
+
+      if (ownerSnap && 'exists' in ownerSnap && ownerSnap.exists()) {
+        const currency = (ownerSnap.data() as { currency?: string })?.currency || 'USD';
+        setCurrencySymbol(symbols[currency] || '$');
+      }
     } catch (error) {
       console.error('Error fetching hostel details:', error);
       navigate('/hostels');
@@ -71,9 +107,15 @@ const HostelDetail: React.FC = () => {
 
   const handleAddRoom = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!id || !ownerId) return;
     try {
-      const { error } = await supabase.from('rooms').insert([{ ...newRoom, hostel_id: id }]);
-      if (error) throw error;
+      await addDoc(collection(db, 'rooms'), {
+        room_number: newRoom.room_number,
+        floor: newRoom.floor,
+        hostel_id: id,
+        owner_id: ownerId,
+        created_at: serverTimestamp(),
+      });
       setNewRoom({ room_number: '', floor: 0 });
       fetchData();
     } catch (error) { showAlert((error as Error).message); }
@@ -87,7 +129,7 @@ const HostelDetail: React.FC = () => {
 
   const handleAddBed = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRoomId) return;
+    if (!selectedRoomId || !id || !ownerId) return;
     const room = rooms.find(r => r.id === selectedRoomId);
     if (!room) return;
     try {
@@ -96,9 +138,12 @@ const HostelDetail: React.FC = () => {
         bed_number: `R${room.room_number} ${getBedLabel(existingCount + i)}`,
         price: newBed.price,
         room_id: selectedRoomId,
+        hostel_id: id,
+        owner_id: ownerId,
+        status: 'Vacant',
+        created_at: serverTimestamp(),
       }));
-      const { error } = await supabase.from('beds').insert(bedsToInsert);
-      if (error) throw error;
+      await Promise.all(bedsToInsert.map(bed => addDoc(collection(db, 'beds'), bed)));
       setNewBed({ count: 1, price: 0 });
       setSelectedRoomId(null);
       fetchData();
@@ -115,8 +160,7 @@ const HostelDetail: React.FC = () => {
     e.preventDefault();
     if (!editingRoomId) return;
     try {
-      const { error } = await supabase.from('rooms').update(editRoomData).eq('id', editingRoomId);
-      if (error) throw error;
+      await updateDoc(doc(db, 'rooms', editingRoomId), editRoomData);
       setEditingRoomId(null);
       fetchData();
     } catch (error) { showAlert((error as Error).message); }
@@ -131,8 +175,7 @@ const HostelDetail: React.FC = () => {
     const ok = await showConfirm('Delete this room and all its beds?', { danger: true });
     if (!ok) return;
     try {
-      const { error } = await supabase.from('rooms').delete().eq('id', room.id);
-      if (error) throw error;
+      await deleteDoc(doc(db, 'rooms', room.id));
       setEditingRoomId(null);
       fetchData();
     } catch (error) { showAlert((error as Error).message); }
@@ -147,8 +190,7 @@ const HostelDetail: React.FC = () => {
     e.preventDefault();
     if (!editingBedId) return;
     try {
-      const { error } = await supabase.from('beds').update(editBedData).eq('id', editingBedId);
-      if (error) throw error;
+      await updateDoc(doc(db, 'beds', editingBedId), editBedData);
       setEditingBedId(null);
       fetchData();
     } catch (error) { showAlert((error as Error).message); }
@@ -162,8 +204,7 @@ const HostelDetail: React.FC = () => {
     const ok = await showConfirm('Delete this bed?', { danger: true });
     if (!ok) return;
     try {
-      const { error } = await supabase.from('beds').delete().eq('id', bed.id);
-      if (error) throw error;
+      await deleteDoc(doc(db, 'beds', bed.id));
       setEditingBedId(null);
       fetchData();
     } catch (error) { showAlert((error as Error).message); }

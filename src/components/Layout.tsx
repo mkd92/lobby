@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { signOut } from 'firebase/auth';
+import { auth } from '../firebaseClient';
 import '../styles/Lobby.css';
 
 const LogoMark: React.FC<{ size?: 'sm' | 'md' | 'lg' }> = ({ size = 'md' }) => (
@@ -16,7 +17,7 @@ const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boolean) => 
   const isActive = (path: string) => location.pathname === path;
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await signOut(auth);
     navigate('/login');
   };
 
@@ -124,12 +125,10 @@ const MobileBottomNav: React.FC = () => {
 
   const isMoreActive = isActive('/customers') || isActive('/payments');
 
-  // Close the sheet when navigating
   React.useEffect(() => { setMoreOpen(false); }, [location.pathname]);
 
   return (
     <>
-      {/* More sheet */}
       {moreOpen && (
         <div className="more-sheet-overlay" onClick={() => setMoreOpen(false)}>
           <div className="more-sheet" onClick={e => e.stopPropagation()}>

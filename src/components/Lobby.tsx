@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import {
+  doc,
+  getDoc,
+  getDocs,
+  collection,
+  query,
+  where,
+} from 'firebase/firestore';
+import { db } from '../firebaseClient';
 import { AreaChart, Area, ResponsiveContainer, Tooltip, PieChart, Pie, Cell } from 'recharts';
 import { useOwner } from '../context/OwnerContext';
 import '../styles/Lobby.css';
@@ -70,59 +78,65 @@ const Lobby: React.FC = () => {
         }
 
         // All 5 fetches in parallel — currency included
-        const [ownerRes, unitsRes, bedsRes, unitLeasesRes, bedLeasesRes] = await Promise.all([
-          supabase.from('owners').select('currency').eq('id', ownerId).single(),
-          supabase.from('units').select('id, status, properties!inner(owner_id)').eq('properties.owner_id', ownerId),
-          supabase.from('beds').select('id, status, rooms!inner(hostels!inner(owner_id))').eq('rooms.hostels.owner_id', ownerId),
-          supabase.from('leases').select('id, end_date, status, units!inner(properties!inner(owner_id))').eq('units.properties.owner_id', ownerId).not('unit_id', 'is', null),
-          supabase.from('leases').select('id, end_date, status, beds!inner(rooms!inner(hostels!inner(owner_id)))').eq('beds.rooms.hostels.owner_id', ownerId).not('bed_id', 'is', null),
+        const [ownerSnap, unitsSnap, bedsSnap, leasesSnap, paymentsSnap] = await Promise.all([
+          getDoc(doc(db, 'owners', ownerId)),
+          getDocs(query(collection(db, 'units'), where('owner_id', '==', ownerId))),
+          getDocs(query(collection(db, 'beds'), where('owner_id', '==', ownerId))),
+          getDocs(query(collection(db, 'leases'), where('owner_id', '==', ownerId))),
+          getDocs(query(collection(db, 'payments'), where('owner_id', '==', ownerId))),
         ]);
 
-        const symbol = currencySymbols[ownerRes.data?.currency || 'USD'] || '$';
-        const units = unitsRes.data || [];
-        const beds = bedsRes.data || [];
-        const totalUnits = units.length;
-        const vacantUnits = (units as any[]).filter(u => u.status === 'Vacant').length;
-        const totalBeds = beds.length;
-        const vacantBeds = (beds as any[]).filter(b => b.status === 'Vacant').length;
+        const currency = (ownerSnap.data() as { currency?: string })?.currency || 'USD';
+        const symbol = currencySymbols[currency] || '$';
 
-        const allLeases = [...(unitLeasesRes.data || []), ...(bedLeasesRes.data || [])];
-        const leaseIds = allLeases.map((l: any) => l.id);
+        const units = unitsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as { id: string; status: string }[];
+        const beds  = bedsSnap.docs.map(d => ({ id: d.id, ...d.data() }))  as { id: string; status: string }[];
 
-        const expiringCount = allLeases.filter((l: any) =>
+        const totalUnits  = units.length;
+        const vacantUnits = units.filter(u => u.status === 'Vacant').length;
+        const totalBeds   = beds.length;
+        const vacantBeds  = beds.filter(b => b.status === 'Vacant').length;
+
+        const allLeases = leasesSnap.docs.map(d => ({ id: d.id, ...d.data() })) as {
+          id: string;
+          status: string;
+          end_date?: string;
+        }[];
+
+        const expiringCount = allLeases.filter(l =>
           l.status === 'Active' && l.end_date &&
           l.end_date >= todayStr && l.end_date <= thirtyDaysLaterStr
         ).length;
 
         let monthlyRevenue = 0;
-        let annualRevenue = 0;
-        let overdueAmount = 0;
+        let annualRevenue  = 0;
+        let overdueAmount  = 0;
         const revenueByMonth: Record<string, number> = {};
         last6.forEach(m => { revenueByMonth[m.label] = 0; });
 
-        if (leaseIds.length > 0) {
-          const { data: payments } = await supabase
-            .from('payments')
-            .select('amount, status, month_for, payment_date')
-            .in('lease_id', leaseIds);
+        const payments = paymentsSnap.docs.map(d => d.data()) as {
+          amount: number;
+          status: string;
+          month_for: string;
+          payment_date: string;
+        }[];
 
-          payments?.forEach((p: any) => {
-            const amount = Number(p.amount);
-            if (p.status === 'Paid' && p.month_for === currentMonth) monthlyRevenue += amount;
-            if (p.status === 'Paid' && p.payment_date >= yearStart && p.payment_date <= yearEnd) annualRevenue += amount;
-            if (p.status === 'Pending' || p.status === 'Partial') overdueAmount += amount;
-            if (p.status === 'Paid' && revenueByMonth[p.month_for] !== undefined) {
-              revenueByMonth[p.month_for] += amount;
-            }
-          });
-        }
+        payments.forEach(p => {
+          const amount = Number(p.amount);
+          if (p.status === 'Paid' && p.month_for === currentMonth) monthlyRevenue += amount;
+          if (p.status === 'Paid' && p.payment_date >= yearStart && p.payment_date <= yearEnd) annualRevenue += amount;
+          if (p.status === 'Pending' || p.status === 'Partial') overdueAmount += amount;
+          if (p.status === 'Paid' && revenueByMonth[p.month_for] !== undefined) {
+            revenueByMonth[p.month_for] += amount;
+          }
+        });
 
         setRevenueChart(last6.map(m => ({ month: m.short, revenue: revenueByMonth[m.label] || 0 })));
         setStats({
           monthlyRevenue: formatCurrency(monthlyRevenue, symbol),
-          overdueAmount: formatCurrency(overdueAmount, symbol),
+          overdueAmount:  formatCurrency(overdueAmount, symbol),
           leaseExpirations: String(expiringCount),
-          annualRevenue: formatCurrency(annualRevenue, symbol),
+          annualRevenue:  formatCurrency(annualRevenue, symbol),
           totalUnits,
           vacantUnits,
           totalBeds,

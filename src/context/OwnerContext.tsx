@@ -1,38 +1,39 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import type { Session } from '@supabase/supabase-js';
-import { supabase } from '../supabaseClient';
+import type { User } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
+import { collection, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../firebaseClient';
 
 interface OwnerContextType {
-  session: Session | null;
+  user: User | null;
   ownerId: string | null;
   isStaff: boolean;
   ownerLoading: boolean;
 }
 
 const OwnerContext = createContext<OwnerContextType>({
-  session: null, ownerId: null, isStaff: false, ownerLoading: true,
+  user: null, ownerId: null, isStaff: false, ownerLoading: true,
 });
 
 export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // undefined = not yet received from Supabase (waiting for INITIAL_SESSION)
-  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [user, setUser] = useState<User | null | undefined>(undefined);
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [isStaff, setIsStaff] = useState(false);
   const [ownerLoading, setOwnerLoading] = useState(true);
 
-  // Synchronous-only listener — no async work inside, avoids Web Lock deadlock
+  // Sync auth state synchronously
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
+    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
     });
-    return () => subscription.unsubscribe();
+    return unsub;
   }, []);
 
-  // Resolve owner separately, outside the auth lock
+  // Resolve owner outside auth listener to avoid lock issues
   useEffect(() => {
-    if (session === undefined) return; // waiting for INITIAL_SESSION
+    if (user === undefined) return;
 
-    if (!session?.user) {
+    if (!user) {
       setOwnerId(null);
       setIsStaff(false);
       setOwnerLoading(false);
@@ -43,17 +44,27 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const resolveOwner = async () => {
       try {
-        const { data: staffRecord } = await supabase
-          .from('staff')
-          .select('owner_id')
-          .eq('staff_email', session.user.email)
-          .maybeSingle();
+        // Check if this user is a staff member
+        const staffSnap = await getDocs(
+          query(collection(db, 'staff'), where('staff_email', '==', user.email))
+        );
 
-        if (staffRecord?.owner_id) {
-          setOwnerId(staffRecord.owner_id);
+        if (!staffSnap.empty) {
+          const staffData = staffSnap.docs[0].data();
+          setOwnerId(staffData.owner_id);
           setIsStaff(true);
         } else {
-          setOwnerId(session.user!.id);
+          // Owner — ensure owner doc exists
+          const ownerRef = doc(db, 'owners', user.uid);
+          const ownerSnap = await getDoc(ownerRef);
+          if (!ownerSnap.exists()) {
+            await setDoc(ownerRef, {
+              full_name: user.displayName || '',
+              email: user.email || '',
+              currency: 'USD',
+            });
+          }
+          setOwnerId(user.uid);
           setIsStaff(false);
         }
       } catch (error) {
@@ -64,10 +75,10 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     resolveOwner();
-  }, [session]);
+  }, [user]);
 
   return (
-    <OwnerContext.Provider value={{ session: session ?? null, ownerId, isStaff, ownerLoading }}>
+    <OwnerContext.Provider value={{ user: user ?? null, ownerId, isStaff, ownerLoading }}>
       {children}
     </OwnerContext.Provider>
   );

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { collection, query, where, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import '../styles/Properties.css';
@@ -12,49 +13,42 @@ interface Customer {
   full_name: string;
   email: string;
   phone: string;
-  created_at: string;
+  created_at: any;
 }
 
 const Customers: React.FC = () => {
   const { showAlert, showConfirm, DialogMount } = useDialog();
-  const { isStaff } = useOwner();
+  const { ownerId, isStaff } = useOwner();
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Edit modal
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [editForm, setEditForm] = useState({ full_name: '', email: '', phone: '' });
-  const [saving, setSaving]     = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const fetchCustomers = useCallback(async () => {
+    if (!ownerId) return;
     try {
-      const { data, error } = await supabase
-        .from('tenants')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      setCustomers(data || []);
+      const snap = await getDocs(query(collection(db, 'tenants'), where('owner_id', '==', ownerId)));
+      const list: Customer[] = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as Customer))
+        .sort((a, b) => a.full_name.localeCompare(b.full_name));
+      setCustomers(list);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [ownerId]);
 
   useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
 
-  // ── Search & Filter ─────────────────────────────────────────────────
   const filteredCustomers = customers.filter(c => {
-    const query = searchQuery.toLowerCase();
-    return (
-      c.full_name.toLowerCase().includes(query) ||
-      (c.email && c.email.toLowerCase().includes(query)) ||
-      (c.phone && c.phone.includes(query))
-    );
+    const q = searchQuery.toLowerCase();
+    return c.full_name.toLowerCase().includes(q) || (c.email && c.email.toLowerCase().includes(q)) || (c.phone && c.phone.includes(q));
   });
 
-  // ── Edit ────────────────────────────────────────────────────────────
   const openEdit = (c: Customer) => {
     setEditingCustomer(c);
     setEditForm({ full_name: c.full_name, email: c.email || '', phone: c.phone || '' });
@@ -65,11 +59,7 @@ const Customers: React.FC = () => {
     if (!editingCustomer) return;
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('tenants')
-        .update({ full_name: editForm.full_name, email: editForm.email, phone: editForm.phone })
-        .eq('id', editingCustomer.id);
-      if (error) throw error;
+      await updateDoc(doc(db, 'tenants', editingCustomer.id), editForm);
       setEditingCustomer(null);
       fetchCustomers();
     } catch (err) {
@@ -79,25 +69,28 @@ const Customers: React.FC = () => {
     }
   };
 
-  // ── Delete ──────────────────────────────────────────────────────────
   const handleDelete = async (customer: Customer) => {
-    const { data: activeLeases } = await supabase
-      .from('leases')
-      .select('id')
-      .eq('tenant_id', customer.id)
-      .eq('status', 'Active');
-
-    if (activeLeases && activeLeases.length > 0) {
-      await showAlert(`Cannot delete — ${customer.full_name} has ${activeLeases.length} active lease(s).\nTerminate or expire their leases first.`);
+    const activeSnap = await getDocs(
+      query(collection(db, 'leases'), where('tenant_id', '==', customer.id), where('status', '==', 'Active'))
+    );
+    if (!activeSnap.empty) {
+      await showAlert(`Cannot delete — ${customer.full_name} has ${activeSnap.size} active lease(s).\nTerminate or expire their leases first.`);
       return;
     }
-
     const ok = await showConfirm(`Delete ${customer.full_name}? This cannot be undone.`, { danger: true });
     if (!ok) return;
+    try {
+      await deleteDoc(doc(db, 'tenants', customer.id));
+      fetchCustomers();
+    } catch (err) {
+      showAlert((err as Error).message);
+    }
+  };
 
-    const { error } = await supabase.from('tenants').delete().eq('id', customer.id);
-    if (error) return showAlert(error.message);
-    fetchCustomers();
+  const fmtDate = (ts: any) => {
+    if (!ts) return '—';
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
   if (loading) return <div className="p-12">Loading customers...</div>;
@@ -111,22 +104,13 @@ const Customers: React.FC = () => {
             <h1 className="display-small mb-1">Customers</h1>
             <p className="text-on-surface-variant">Manage your tenants and clients.</p>
           </div>
-          {!isStaff && (
-            <Link to="/customers/new" className="primary-button desktop-only">
-              + Add Customer
-            </Link>
-          )}
+          {!isStaff && <Link to="/customers/new" className="primary-button desktop-only">+ Add Customer</Link>}
         </header>
 
         <div className="search-bar-row">
           <div className="search-field">
             <span className="material-symbols-outlined">search</span>
-            <input
-              type="text"
-              placeholder="Search people..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
+            <input type="text" placeholder="Search people..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
           </div>
           {!isStaff && (
             <Link to="/customers/new" className="primary-button mobile-only" style={{ padding: '0.75rem 1rem', minWidth: 'auto' }}>
@@ -152,18 +136,10 @@ const Customers: React.FC = () => {
         </div>
       ) : (
         <>
-          {/* Desktop Table View */}
           <div className="units-table-container desktop-only">
             <table className="units-table">
               <thead>
-                <tr>
-                  <th>Full Name</th>
-                  <th>Email</th>
-                  <th>Phone</th>
-                  <th>Joined</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
+                <tr><th>Full Name</th><th>Email</th><th>Phone</th><th>Joined</th><th>Status</th><th></th></tr>
               </thead>
               <tbody>
                 {filteredCustomers.map(customer => (
@@ -171,21 +147,13 @@ const Customers: React.FC = () => {
                     <td style={{ fontWeight: 800 }}>{customer.full_name}</td>
                     <td>{customer.email || '—'}</td>
                     <td>{customer.phone || '—'}</td>
-                    <td style={{ fontSize: '0.8rem', color: 'var(--on-surface-variant)' }}>
-                      {new Date(customer.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </td>
-                    <td>
-                      <span className="status-badge status-occupied">Active</span>
-                    </td>
+                    <td style={{ fontSize: '0.8rem', color: 'var(--on-surface-variant)' }}>{fmtDate(customer.created_at)}</td>
+                    <td><span className="status-badge status-occupied">Active</span></td>
                     <td>
                       {!isStaff && (
                         <div className="row-actions">
-                          <button className="icon-action-btn" title="Edit" onClick={() => openEdit(customer)}>
-                            <span className="material-symbols-outlined">edit</span>
-                          </button>
-                          <button className="icon-action-btn danger" title="Delete" onClick={() => handleDelete(customer)}>
-                            <span className="material-symbols-outlined">delete</span>
-                          </button>
+                          <button className="icon-action-btn" title="Edit" onClick={() => openEdit(customer)}><span className="material-symbols-outlined">edit</span></button>
+                          <button className="icon-action-btn danger" title="Delete" onClick={() => handleDelete(customer)}><span className="material-symbols-outlined">delete</span></button>
                         </div>
                       )}
                     </td>
@@ -195,42 +163,26 @@ const Customers: React.FC = () => {
             </table>
           </div>
 
-          {/* Mobile Card View */}
           <div className="mobile-only customer-cards-list">
             {filteredCustomers.map(customer => (
               <div key={customer.id} className="customer-mobile-card">
                 <div className="customer-card-header">
-                  <div className="customer-avatar">
-                    {customer.full_name.charAt(0)}
-                  </div>
+                  <div className="customer-avatar">{customer.full_name.charAt(0)}</div>
                   <div className="customer-main-info">
                     <h3>{customer.full_name}</h3>
                     <span className="status-badge status-occupied" style={{ fontSize: '0.6rem', padding: '0.25rem 0.5rem' }}>Active</span>
                   </div>
                   {!isStaff && (
                     <div className="customer-card-actions">
-                      <button className="icon-action-btn" onClick={() => openEdit(customer)}>
-                        <span className="material-symbols-outlined">edit</span>
-                      </button>
-                      <button className="icon-action-btn danger" onClick={() => handleDelete(customer)}>
-                        <span className="material-symbols-outlined">delete</span>
-                      </button>
+                      <button className="icon-action-btn" onClick={() => openEdit(customer)}><span className="material-symbols-outlined">edit</span></button>
+                      <button className="icon-action-btn danger" onClick={() => handleDelete(customer)}><span className="material-symbols-outlined">delete</span></button>
                     </div>
                   )}
                 </div>
                 <div className="customer-card-body">
-                  <div className="info-row">
-                    <span className="material-symbols-outlined">call</span>
-                    <span>{customer.phone || 'No phone'}</span>
-                  </div>
-                  <div className="info-row">
-                    <span className="material-symbols-outlined">mail</span>
-                    <span>{customer.email || 'No email'}</span>
-                  </div>
-                  <div className="info-row">
-                    <span className="material-symbols-outlined">calendar_today</span>
-                    <span>Joined: {new Date(customer.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                  </div>
+                  <div className="info-row"><span className="material-symbols-outlined">call</span><span>{customer.phone || 'No phone'}</span></div>
+                  <div className="info-row"><span className="material-symbols-outlined">mail</span><span>{customer.email || 'No email'}</span></div>
+                  <div className="info-row"><span className="material-symbols-outlined">calendar_today</span><span>Joined: {fmtDate(customer.created_at)}</span></div>
                 </div>
               </div>
             ))}
@@ -238,61 +190,33 @@ const Customers: React.FC = () => {
         </>
       )}
 
-      {/* ── Edit Modal ── */}
       {editingCustomer && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setEditingCustomer(null)}>
           <div className="lease-modal" style={{ maxWidth: '480px' }}>
             <div className="lease-modal-header">
-              <div>
-                <h2>Edit Customer</h2>
-                <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '0.25rem' }}>Update tenant details</p>
-              </div>
-              <button className="icon-action-btn" onClick={() => setEditingCustomer(null)}>
-                <span className="material-symbols-outlined">close</span>
-              </button>
+              <div><h2>Edit Customer</h2><p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '0.25rem' }}>Update tenant details</p></div>
+              <button className="icon-action-btn" onClick={() => setEditingCustomer(null)}><span className="material-symbols-outlined">close</span></button>
             </div>
-
             <form onSubmit={handleEditSave}>
               <div className="lease-modal-body">
                 <div className="form-group">
                   <label>Full Name *</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={editForm.full_name}
-                    onChange={e => setEditForm(f => ({ ...f, full_name: e.target.value }))}
-                    required
-                  />
+                  <input type="text" className="form-input" value={editForm.full_name} onChange={e => setEditForm(f => ({ ...f, full_name: e.target.value }))} required />
                 </div>
                 <div className="form-row cols-2">
                   <div className="form-group">
                     <label>Email</label>
-                    <input
-                      type="email"
-                      className="form-input"
-                      placeholder="john@example.com"
-                      value={editForm.email}
-                      onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))}
-                    />
+                    <input type="email" className="form-input" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
                   </div>
                   <div className="form-group">
                     <label>Phone</label>
-                    <input
-                      type="tel"
-                      className="form-input"
-                      placeholder="+1 (555) 000-0000"
-                      value={editForm.phone}
-                      onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
-                    />
+                    <input type="tel" className="form-input" value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
                   </div>
                 </div>
               </div>
-
               <div className="lease-modal-footer">
                 <button type="button" className="primary-button glass" onClick={() => setEditingCustomer(null)}>Cancel</button>
-                <button type="submit" className="primary-button" disabled={saving}>
-                  {saving ? 'Saving…' : 'Save Changes'}
-                </button>
+                <button type="submit" className="primary-button" disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</button>
               </div>
             </form>
           </div>

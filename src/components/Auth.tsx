@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { supabase } from '../supabaseClient';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  updateProfile,
+} from 'firebase/auth';
+import { auth } from '../firebaseClient';
 import '../styles/Auth.css';
 import '../styles/Lobby.css';
 
@@ -10,11 +17,9 @@ const LogoMark: React.FC = () => (
   </div>
 );
 
-interface AuthProps {
-  onAuthSuccess?: () => void;
-}
+const googleProvider = new GoogleAuthProvider();
 
-const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
+const Auth: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,28 +34,16 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
 
     try {
       if (isLogin) {
-        const { error: loginError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (loginError) throw loginError;
+        await signInWithEmailAndPassword(auth, email, password);
       } else {
-        const { error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-            },
-          },
-        });
-        if (signUpError) throw signUpError;
-        alert('Check your email for the confirmation link!');
+        const { user } = await createUserWithEmailAndPassword(auth, email, password);
+        if (fullName) {
+          await updateProfile(user, { displayName: fullName });
+        }
+        alert('Account created! You are now signed in.');
       }
-      if (onAuthSuccess) onAuthSuccess();
     } catch (err) {
-      const error = err as Error;
-      setError(error.message || 'An error occurred during authentication.');
+      setError((err as Error).message || 'An error occurred during authentication.');
     } finally {
       setLoading(false);
     }
@@ -60,16 +53,9 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     setLoading(true);
     setError(null);
     try {
-      const { error: googleError } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin,
-        },
-      });
-      if (googleError) throw googleError;
+      await signInWithPopup(auth, googleProvider);
     } catch (err) {
-      const error = err as Error;
-      setError(error.message || 'An error occurred during Google authentication.');
+      setError((err as Error).message || 'An error occurred during Google authentication.');
     } finally {
       setLoading(false);
     }
@@ -85,13 +71,13 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           </div>
           <h2 className="display-small">{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
           <p className="text-on-surface-variant">
-            {isLogin ? 'Enter your credentials to access your dashboard.' : 'Join Kinetic Architect to manage your portfolio.'}
+            {isLogin ? 'Enter your credentials to access your dashboard.' : 'Join Lobby to manage your portfolio.'}
           </p>
         </div>
 
-        <button 
-          type="button" 
-          className="google-button mb-6" 
+        <button
+          type="button"
+          className="google-button mb-6"
           onClick={handleGoogleLogin}
           disabled={loading}
         >

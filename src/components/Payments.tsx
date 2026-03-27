@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '../supabaseClient';
+import {
+  collection, query, where, getDocs, doc, getDoc,
+  addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp,
+} from 'firebase/firestore';
+import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import '../styles/Units.css';
@@ -10,17 +14,19 @@ import '../styles/Payments.css';
 interface Payment {
   id: string;
   lease_id: string;
+  owner_id: string;
+  tenant_name: string;
+  unit_number: string | null;
+  property_name: string | null;
+  bed_number: string | null;
+  room_number: string | null;
+  hostel_name: string | null;
+  rent_amount: number;
   amount: number;
   payment_date: string;
   month_for: string;
   payment_method: string | null;
   status: 'Paid' | 'Pending';
-  leases: {
-    rent_amount: number;
-    tenants: { full_name: string };
-    units: { unit_number: string; properties: { name: string } } | null;
-    beds: { bed_number: string; rooms: { room_number: string; hostels: { name: string } } } | null;
-  };
 }
 
 type FilterTab = 'All' | 'Paid' | 'Pending';
@@ -111,34 +117,87 @@ const Payments: React.FC = () => {
     status: 'Paid' as 'Paid' | 'Pending',
   });
 
+  // ── Generate monthly payments (replaces Supabase RPC) ──────────────
+  const generateMonthlyPayments = async () => {
+    if (!ownerId) return;
+    const today = new Date();
+    const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    const leasesSnap = await getDocs(query(
+      collection(db, 'leases'),
+      where('owner_id', '==', ownerId),
+      where('status', '==', 'Active')
+    ));
+
+    const batch = writeBatch(db);
+    let hasChanges = false;
+
+    for (const leaseDoc of leasesSnap.docs) {
+      const lease = leaseDoc.data();
+      const existingSnap = await getDocs(query(
+        collection(db, 'payments'),
+        where('lease_id', '==', leaseDoc.id),
+        where('month_for', '==', currentMonth)
+      ));
+      if (existingSnap.empty) {
+        const newRef = doc(collection(db, 'payments'));
+        batch.set(newRef, {
+          owner_id: ownerId,
+          lease_id: leaseDoc.id,
+          tenant_name: lease.tenant_name || '',
+          unit_number: lease.unit_number || null,
+          property_name: lease.property_name || null,
+          bed_number: lease.bed_number || null,
+          room_number: lease.room_number || null,
+          hostel_name: lease.hostel_name || null,
+          rent_amount: lease.rent_amount,
+          amount: lease.rent_amount,
+          payment_date: today.toISOString().split('T')[0],
+          month_for: currentMonth,
+          payment_method: null,
+          status: 'Pending',
+          created_at: serverTimestamp(),
+        });
+        hasChanges = true;
+      }
+    }
+    if (hasChanges) await batch.commit();
+  };
+
   // ── Fetch ──────────────────────────────────────────────────────────
   const fetchPayments = useCallback(async () => {
+    if (!ownerId) return;
     setLoading(true);
     try {
-      // Fire-and-forget RPC — don't block data loading
-      void supabase.rpc('generate_monthly_rent_payments');
+      // Fire-and-forget monthly generation — don't block data loading
+      void generateMonthlyPayments();
 
-      const { data, error } = await supabase
-        .from('payments')
-        .select(`*, leases (rent_amount, tenants (full_name), units (unit_number, properties (name)), beds (bed_number, rooms (room_number, hostels (name))))`)
-        .order('payment_date', { ascending: false });
-      if (error) throw error;
-      setPayments((data as unknown as Payment[]) || []);
+      const snap = await getDocs(query(
+        collection(db, 'payments'),
+        where('owner_id', '==', ownerId)
+      ));
+
+      const data: Payment[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as Payment));
+      // Sort by payment_date descending
+      data.sort((a, b) => (b.payment_date || '').localeCompare(a.payment_date || ''));
+      setPayments(data);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownerId]);
 
   const fetchCurrency = useCallback(async () => {
     if (!ownerId) return;
-    const { data } = await supabase.from('owners').select('currency').eq('id', ownerId).single();
+    const ownerDoc = await getDoc(doc(db, 'owners', ownerId));
+    const data = ownerDoc.data();
     const symbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
     setCurrencySymbol(symbols[data?.currency || 'USD'] || '$');
   }, [ownerId]);
 
-  // Run both concurrently — fetchPayments uses RLS, fetchCurrency needs ownerId
+  // Run both concurrently
   useEffect(() => { fetchPayments(); fetchCurrency(); }, [fetchPayments, fetchCurrency]);
 
   // ── Open modals ────────────────────────────────────────────────────
@@ -184,34 +243,41 @@ const Payments: React.FC = () => {
         const remainder = Math.round((editingPayment.amount - paidAmount) * 100) / 100;
 
         // Mark this payment as Paid with the amount entered
-        const { error } = await supabase.from('payments').update({
+        await updateDoc(doc(db, 'payments', editingPayment.id), {
           amount:         paidAmount,
           payment_date:   form.payment_date,
           payment_method: form.payment_method || null,
           status:         'Paid',
-        }).eq('id', editingPayment.id);
-        if (error) throw error;
+        });
 
         // If partial, create a new Pending for the remainder
         if (remainder > 0) {
-          const { error: err2 } = await supabase.from('payments').insert({
-            lease_id:     editingPayment.lease_id,
-            amount:       remainder,
-            payment_date: editingPayment.payment_date,
-            month_for:    editingPayment.month_for,
-            status:       'Pending',
+          await addDoc(collection(db, 'payments'), {
+            owner_id:       editingPayment.owner_id,
+            lease_id:       editingPayment.lease_id,
+            tenant_name:    editingPayment.tenant_name,
+            unit_number:    editingPayment.unit_number || null,
+            property_name:  editingPayment.property_name || null,
+            bed_number:     editingPayment.bed_number || null,
+            room_number:    editingPayment.room_number || null,
+            hostel_name:    editingPayment.hostel_name || null,
+            rent_amount:    editingPayment.rent_amount,
+            amount:         remainder,
+            payment_date:   editingPayment.payment_date,
+            month_for:      editingPayment.month_for,
+            payment_method: null,
+            status:         'Pending',
+            created_at:     serverTimestamp(),
           });
-          if (err2) throw err2;
         }
       } else {
-        const { error } = await supabase.from('payments').update({
+        await updateDoc(doc(db, 'payments', editingPayment.id), {
           amount:         paidAmount,
           payment_date:   form.payment_date,
           month_for:      form.month_for,
           payment_method: form.payment_method || null,
           status:         form.status,
-        }).eq('id', editingPayment.id);
-        if (error) throw error;
+        });
       }
 
       closeModal();
@@ -227,9 +293,12 @@ const Payments: React.FC = () => {
   const handleDelete = async (id: string) => {
     const ok = await showConfirm('Delete this payment record?', { danger: true });
     if (!ok) return;
-    const { error } = await supabase.from('payments').delete().eq('id', id);
-    if (error) return showAlert(error.message);
-    fetchPayments();
+    try {
+      await deleteDoc(doc(db, 'payments', id));
+      fetchPayments();
+    } catch (err) {
+      showAlert((err as Error).message);
+    }
   };
 
   // ── Derived ────────────────────────────────────────────────────────
@@ -240,8 +309,8 @@ const Payments: React.FC = () => {
   const initials = (name: string) => name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 
   const locationLabel = (p: Payment) => {
-    if (p.leases?.units) return `${p.leases.units.properties?.name} · Unit ${p.leases.units.unit_number}`;
-    if (p.leases?.beds)  return `${p.leases.beds.rooms?.hostels?.name} · ${p.leases.beds.bed_number}`;
+    if (p.property_name && p.unit_number) return `${p.property_name} · Unit ${p.unit_number}`;
+    if (p.hostel_name && p.bed_number)    return `${p.hostel_name} · ${p.bed_number}`;
     return '—';
   };
 
@@ -251,7 +320,7 @@ const Payments: React.FC = () => {
       if (!search.trim()) return true;
       const q = search.toLowerCase();
       return (
-        p.leases?.tenants?.full_name?.toLowerCase().includes(q) ||
+        p.tenant_name?.toLowerCase().includes(q) ||
         locationLabel(p).toLowerCase().includes(q) ||
         p.month_for?.toLowerCase().includes(q) ||
         (p.payment_method || '').toLowerCase().includes(q)
@@ -345,8 +414,8 @@ const Payments: React.FC = () => {
                   <tr key={p.id}>
                     <td>
                       <div className="tenant-cell">
-                        <div className="tenant-avatar">{initials(p.leases?.tenants?.full_name || '?')}</div>
-                        <div className="tenant-name">{p.leases?.tenants?.full_name || '—'}</div>
+                        <div className="tenant-avatar">{initials(p.tenant_name || '?')}</div>
+                        <div className="tenant-name">{p.tenant_name || '—'}</div>
                       </div>
                     </td>
                     <td>
@@ -390,9 +459,9 @@ const Payments: React.FC = () => {
                 {/* Card Header: avatar + name + status */}
                 <div className="payment-card-header">
                   <div className="tenant-cell">
-                    <div className="tenant-avatar">{initials(p.leases?.tenants?.full_name || '?')}</div>
+                    <div className="tenant-avatar">{initials(p.tenant_name || '?')}</div>
                     <div>
-                      <div className="tenant-name">{p.leases?.tenants?.full_name || '—'}</div>
+                      <div className="tenant-name">{p.tenant_name || '—'}</div>
                       <div className="payment-card-location">{locationLabel(p)}</div>
                     </div>
                   </div>
@@ -456,7 +525,7 @@ const Payments: React.FC = () => {
               <div>
                 <h2>{modalMode === 'log' ? 'Log Payment' : 'Edit Payment'}</h2>
                 <p style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '0.25rem' }}>
-                  {editingPayment.leases?.tenants?.full_name} · {locationLabel(editingPayment)} · {editingPayment.month_for}
+                  {editingPayment.tenant_name} · {locationLabel(editingPayment)} · {editingPayment.month_for}
                 </p>
               </div>
               <button className="icon-action-btn" onClick={closeModal}>

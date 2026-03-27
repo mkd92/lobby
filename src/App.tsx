@@ -17,13 +17,13 @@ import Leases from './components/Leases';
 import './App.css';
 
 function App() {
-  const { session, ownerLoading } = useOwner();
+  const { user, ownerLoading } = useOwner();
 
   if (ownerLoading) {
     return <div className="h-screen flex items-center justify-center bg-surface">Loading...</div>;
   }
 
-  if (!session) {
+  if (!user) {
     return (
       <Routes>
         <Route path="/login" element={<Auth />} />

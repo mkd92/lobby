@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { collection, query, where, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import '../styles/Properties.css';
@@ -12,36 +13,46 @@ interface Property {
   name: string;
   address: string;
   type: string;
-  units?: [{ count: number }];
+  unitCount?: number;
 }
 
 const Properties: React.FC = () => {
   const navigate = useNavigate();
   const { showAlert, showConfirm, DialogMount } = useDialog();
-  const { isStaff } = useOwner();
+  const { ownerId, isStaff } = useOwner();
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Edit modal
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [editData, setEditData] = useState({ name: '', address: '', type: '' });
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const fetchProperties = useCallback(async () => {
+    if (!ownerId) return;
     try {
-      const { data, error } = await supabase
-        .from('properties')
-        .select('*, units:units(count)')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      setProperties(data || []);
+      const [propSnap, unitSnap] = await Promise.all([
+        getDocs(query(collection(db, 'properties'), where('owner_id', '==', ownerId))),
+        getDocs(query(collection(db, 'units'), where('owner_id', '==', ownerId))),
+      ]);
+
+      const unitCounts: Record<string, number> = {};
+      unitSnap.docs.forEach(d => {
+        const pid = d.data().property_id;
+        if (pid) unitCounts[pid] = (unitCounts[pid] || 0) + 1;
+      });
+
+      const props: Property[] = propSnap.docs
+        .map(d => ({ id: d.id, ...d.data(), unitCount: unitCounts[d.id] || 0 } as Property))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      setProperties(props);
     } catch (error) {
       console.error('Error fetching properties:', error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [ownerId]);
 
   useEffect(() => { fetchProperties(); }, [fetchProperties]);
 
@@ -58,8 +69,7 @@ const Properties: React.FC = () => {
     if (!editingProperty) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('properties').update(editData).eq('id', editingProperty.id);
-      if (error) throw error;
+      await updateDoc(doc(db, 'properties', editingProperty.id), editData);
       setEditingProperty(null);
       fetchProperties();
     } catch (err) {
@@ -73,14 +83,12 @@ const Properties: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
 
-    const { data: occupiedUnits } = await supabase
-      .from('units')
-      .select('id')
-      .eq('property_id', property.id)
-      .eq('status', 'Occupied');
+    const unitSnap = await getDocs(
+      query(collection(db, 'units'), where('property_id', '==', property.id), where('status', '==', 'Occupied'))
+    );
 
-    if (occupiedUnits && occupiedUnits.length > 0) {
-      await showAlert(`Cannot delete — ${occupiedUnits.length} unit(s) are currently occupied.\nPlease terminate all active leases first.`);
+    if (!unitSnap.empty) {
+      await showAlert(`Cannot delete — ${unitSnap.size} unit(s) are currently occupied.\nPlease terminate all active leases first.`);
       return;
     }
 
@@ -88,8 +96,7 @@ const Properties: React.FC = () => {
     if (!ok) return;
 
     try {
-      const { error } = await supabase.from('properties').delete().eq('id', property.id);
-      if (error) throw error;
+      await deleteDoc(doc(db, 'properties', property.id));
       fetchProperties();
     } catch (err) {
       showAlert((err as Error).message);
@@ -107,9 +114,7 @@ const Properties: React.FC = () => {
           <p className="text-on-surface-variant">Manage your real estate portfolio.</p>
         </div>
         {!isStaff && (
-          <Link to="/properties/new" className="primary-button">
-            + Add Property
-          </Link>
+          <Link to="/properties/new" className="primary-button">+ Add Property</Link>
         )}
       </header>
 
@@ -152,7 +157,7 @@ const Properties: React.FC = () => {
                 <div className="property-stats">
                   <div className="stat-item">
                     <div className="stat-label">Units</div>
-                    <div className="stat-value">{property.units?.[0]?.count || 0}</div>
+                    <div className="stat-value">{property.unitCount || 0}</div>
                   </div>
                   <div className="stat-item">
                     <div className="stat-label">Status</div>
@@ -165,7 +170,6 @@ const Properties: React.FC = () => {
         </div>
       )}
 
-      {/* ── Edit Modal ── */}
       {editingProperty && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setEditingProperty(null)}>
           <div className="modal-content" style={{ borderRadius: '2rem' }}>
