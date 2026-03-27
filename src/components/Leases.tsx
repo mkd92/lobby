@@ -470,8 +470,9 @@ const Leases: React.FC = () => {
         if (error) throw error;
 
         // Build pending payment records
-        const d = new Date(form.start_date);
-        const monthLabel = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        // Parse date parts directly to avoid UTC-to-local timezone shift
+        const [sy, sm] = form.start_date.split('-').map(Number);
+        const monthLabel = new Date(sy, sm - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
         const pendingPayments: object[] = [];
 
         const firstRent = parseFloat(form.first_month_rent);

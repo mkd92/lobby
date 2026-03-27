@@ -6,6 +6,9 @@ import './index.css'
 import App from './App.tsx'
 import { registerSW } from 'virtual:pwa-register'
 
+// Expose so Settings page can trigger updates
+declare global { interface Window { __updateSW?: (reloadPage?: boolean) => Promise<void> } }
+
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
@@ -26,6 +29,8 @@ const updateSW = registerSW({
     }
   }
 })
+
+window.__updateSW = updateSW
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

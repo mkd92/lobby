@@ -11,20 +11,29 @@ const DataPulse: React.FC = () => (
   <span className="data-pulse"></span>
 );
 
-const MetricCard: React.FC<{ label: string; value: string; trend?: string }> = ({ label, value, trend }) => (
+const MetricCard: React.FC<{ label: string; value: string; trend?: string; sub?: string }> = ({ label, value, trend, sub }) => (
   <div className="metric-card">
     <div className="label-small uppercase tracking-widest opacity-50 mb-2">{label}</div>
     <div className="display-medium font-black tracking-tight">{value}</div>
+    {sub && <div className="metric-sub">{sub}</div>}
     {trend && <div className="metric-trend">{trend}</div>}
   </div>
 );
 
+const formatCurrency = (amount: number, symbol: string): string => {
+  if (amount >= 1_000_000) return `${symbol}${(amount / 1_000_000).toFixed(1)}M`;
+  if (amount >= 1_000) return `${symbol}${(amount / 1_000).toFixed(1)}k`;
+  return `${symbol}${amount.toFixed(0)}`;
+};
+
 const Lobby: React.FC = () => {
   const [stats, setStats] = useState({
-    occupancyRate: '0%',
-    monthlyRevenue: '$0',
-    activeMaintenance: '0',
-    pendingLeases: '0'
+    monthlyRevenue: '—',
+    overdueAmount: '—',
+    leaseExpirations: '—',
+    annualRevenue: '—',
+    totalUnits: '—',
+    vacantUnits: '—',
   });
   const [loading, setLoading] = useState(true);
 
@@ -34,46 +43,90 @@ const Lobby: React.FC = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Fetch owner's currency
+        // Currency preference
         const { data: ownerData } = await supabase
           .from('owners')
           .select('currency')
           .eq('id', user.id)
           .single();
-        
         const symbol = currencySymbols[ownerData?.currency || 'USD'] || '$';
 
-        // 1. Get all units for properties owned by this user
-        // Using relationship mapping: units -> properties (owner_id)
+        const today = new Date();
+        const currentYear = today.getFullYear();
+        const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
+        const todayStr = today.toISOString().split('T')[0];
+        const thirtyDaysLater = new Date(today);
+        thirtyDaysLater.setDate(today.getDate() + 30);
+        const thirtyDaysLaterStr = thirtyDaysLater.toISOString().split('T')[0];
+        const yearStart = `${currentYear}-01-01`;
+        const yearEnd = `${currentYear}-12-31`;
+
+        // 1. Total units and vacant count
         const { data: units } = await supabase
           .from('units')
           .select('id, status, properties!inner(owner_id)')
           .eq('properties.owner_id', user.id);
 
         const totalUnits = units?.length || 0;
-        const occupiedUnits = (units as any[])?.filter(u => u.status === 'Occupied').length || 0;
-        const occupancy = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0;
+        const vacantUnits = (units as any[])?.filter(u => u.status === 'Vacant').length || 0;
 
-        // 2. Get monthly revenue from payments this month
-        const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-        const { data: payments } = await supabase
-          .from('payments')
-          .select('amount')
-          .eq('month_for', currentMonth);
-        
-        const revenue = payments?.reduce((acc, curr) => acc + Number(curr.amount), 0) || 0;
+        // 2. All leases for this owner — unit leases
+        const { data: unitLeases } = await supabase
+          .from('leases')
+          .select('id, end_date, status, units!inner(properties!inner(owner_id))')
+          .eq('units.properties.owner_id', user.id)
+          .not('unit_id', 'is', null);
 
-        // 3. Get active maintenance
-        const { count: maintenanceCount } = await supabase
-          .from('maintenance_requests')
-          .select('*', { count: 'exact', head: true })
-          .neq('status', 'Resolved');
+        // All leases for this owner — bed (hostel) leases
+        const { data: bedLeases } = await supabase
+          .from('leases')
+          .select('id, end_date, status, beds!inner(rooms!inner(hostels!inner(owner_id)))')
+          .eq('beds.rooms.hostels.owner_id', user.id)
+          .not('bed_id', 'is', null);
+
+        const allLeases = [...(unitLeases || []), ...(bedLeases || [])];
+        const leaseIds = allLeases.map((l: any) => l.id);
+
+        // Upcoming lease expirations — active leases ending within 30 days
+        const expiringCount = allLeases.filter((l: any) =>
+          l.status === 'Active' &&
+          l.end_date &&
+          l.end_date >= todayStr &&
+          l.end_date <= thirtyDaysLaterStr
+        ).length;
+
+        // 3. Payments for this owner's leases
+        let monthlyRevenue = 0;
+        let annualRevenue = 0;
+        let overdueAmount = 0;
+
+        if (leaseIds.length > 0) {
+          const { data: payments } = await supabase
+            .from('payments')
+            .select('amount, status, month_for, payment_date')
+            .in('lease_id', leaseIds);
+
+          payments?.forEach((p: any) => {
+            const amount = Number(p.amount);
+            if (p.status === 'Paid' && p.month_for === currentMonth) {
+              monthlyRevenue += amount;
+            }
+            if (p.status === 'Paid' && p.payment_date >= yearStart && p.payment_date <= yearEnd) {
+              annualRevenue += amount;
+            }
+            if (p.status === 'Pending' || p.status === 'Partial') {
+              overdueAmount += amount;
+            }
+          });
+        }
 
         setStats({
-          occupancyRate: `${occupancy}%`,
-          monthlyRevenue: `${symbol}${(revenue / 1000).toFixed(1)}k`,
-          activeMaintenance: String(maintenanceCount || 0),
-          pendingLeases: '0' // Placeholder for now
+          monthlyRevenue: formatCurrency(monthlyRevenue, symbol),
+          overdueAmount: formatCurrency(overdueAmount, symbol),
+          leaseExpirations: String(expiringCount),
+          annualRevenue: formatCurrency(annualRevenue, symbol),
+          totalUnits: String(totalUnits),
+          vacantUnits: String(vacantUnits),
         });
       } catch (error) {
         console.error('Error fetching dashboard stats:', error);
@@ -100,12 +153,13 @@ const Lobby: React.FC = () => {
           </Link>
         </div>
       </header>
-      
+
       <section className="metrics-grid">
-        <MetricCard label="Occupancy Rate" value={stats.occupancyRate} trend="+0.4% this month" />
         <MetricCard label="Monthly Revenue" value={stats.monthlyRevenue} trend="Current Month" />
-        <MetricCard label="Active Maintenance" value={stats.activeMaintenance} />
-        <MetricCard label="Pending Leases" value={stats.pendingLeases} />
+        <MetricCard label="Overdue Amount" value={stats.overdueAmount} trend="Unpaid & Partial" />
+        <MetricCard label="Lease Expirations" value={stats.leaseExpirations} trend="Next 30 days" />
+        <MetricCard label="Annual Revenue" value={stats.annualRevenue} trend="Year to Date" />
+        <MetricCard label="Units" value={stats.totalUnits} sub={`${stats.vacantUnits} vacant`} />
       </section>
 
       <section className="featured-property mt-16">
@@ -121,11 +175,11 @@ const Lobby: React.FC = () => {
             <h3 className="font-bold">Rent Collection</h3>
             <p className="opacity-70">Track payments & arrears</p>
           </Link>
-          <div className="property-banner glass p-8 rounded-3xl relative overflow-hidden">
-            <span className="material-symbols-outlined mb-4" style={{ fontSize: '2.5rem' }}>engineering</span>
-            <h3 className="font-bold">Maintenance</h3>
-            <p className="opacity-70">Track repair requests</p>
-          </div>
+          <Link to="/leases" className="property-banner glass p-8 rounded-3xl relative overflow-hidden block" style={{ textDecoration: 'none' }}>
+            <span className="material-symbols-outlined mb-4" style={{ fontSize: '2.5rem' }}>description</span>
+            <h3 className="font-bold">Leases</h3>
+            <p className="opacity-70">Manage active leases</p>
+          </Link>
         </div>
       </section>
     </>

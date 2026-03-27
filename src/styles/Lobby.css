@@ -547,6 +547,14 @@
   opacity: 1;
 }
 
+.metric-sub {
+  margin-top: 0.5rem;
+  font-size: var(--font-label-small);
+  font-weight: 600;
+  color: var(--on-surface-variant);
+  opacity: 0.7;
+}
+
 .metric-trend {
   margin-top: 0.875rem;
   font-size: var(--font-label-small);

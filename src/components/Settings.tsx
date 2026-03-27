@@ -15,11 +15,14 @@ const currencies = [
   { code: 'AUD', symbol: '$', name: 'Australian Dollar' },
 ];
 
+type UpdateStatus = 'idle' | 'checking' | 'up-to-date' | 'updating' | 'error';
+
 const Settings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const [profile, setProfile] = useState({
@@ -67,6 +70,43 @@ const Settings: React.FC = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleCheckUpdate = async () => {
+    setUpdateStatus('checking');
+    try {
+      const reg = await navigator.serviceWorker?.getRegistration();
+      if (!reg) {
+        window.location.reload();
+        return;
+      }
+      await reg.update();
+      if (reg.waiting) {
+        setUpdateStatus('updating');
+        window.__updateSW?.(true);
+        return;
+      }
+      // Listen briefly in case SW is still installing
+      const onUpdateFound = () => {
+        const sw = reg.installing;
+        if (!sw) return;
+        sw.addEventListener('statechange', () => {
+          if (sw.state === 'installed' && reg.waiting) {
+            setUpdateStatus('updating');
+            window.__updateSW?.(true);
+          }
+        });
+      };
+      reg.addEventListener('updatefound', onUpdateFound);
+      setTimeout(() => {
+        reg.removeEventListener('updatefound', onUpdateFound);
+        setUpdateStatus('up-to-date');
+        setTimeout(() => setUpdateStatus('idle'), 3000);
+      }, 3000);
+    } catch {
+      setUpdateStatus('error');
+      setTimeout(() => setUpdateStatus('idle'), 3000);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -231,6 +271,38 @@ const Settings: React.FC = () => {
                 )}
               </div>
               <p className="text-xs mt-2 opacity-50">This will update all financial displays across the platform.</p>
+            </div>
+          </section>
+
+          {/* App Updates */}
+          <section className="settings-section">
+            <h2 className="settings-section-title">
+              <span className="material-symbols-outlined">system_update</span>
+              App Updates
+            </h2>
+            <div className="settings-toggle-row">
+              <div className="settings-toggle-info">
+                <div className="settings-toggle-label">Check for Updates</div>
+                <div className="settings-toggle-desc">
+                  {updateStatus === 'idle' && 'Fetch the latest version deployed on Vercel.'}
+                  {updateStatus === 'checking' && 'Checking for a new version...'}
+                  {updateStatus === 'up-to-date' && 'You\'re on the latest version.'}
+                  {updateStatus === 'updating' && 'Applying update and reloading...'}
+                  {updateStatus === 'error' && 'Could not check for updates. Try again.'}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={handleCheckUpdate}
+                disabled={updateStatus === 'checking' || updateStatus === 'updating'}
+                style={{ minWidth: '7rem', flexShrink: 0 }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', verticalAlign: 'middle', marginRight: '0.3rem' }}>
+                  {updateStatus === 'up-to-date' ? 'check_circle' : updateStatus === 'error' ? 'error' : 'refresh'}
+                </span>
+                {updateStatus === 'checking' ? 'Checking...' : updateStatus === 'updating' ? 'Updating...' : 'Refresh'}
+              </button>
             </div>
           </section>
 
