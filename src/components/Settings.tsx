@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
-import { collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { auth, db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
@@ -62,7 +62,11 @@ const Settings: React.FC = () => {
         };
       }
 
-      const staffEmails = staffSnap.docs.map(d => ({ id: d.id, staff_email: d.data().staff_email }));
+      const staffEmails = staffSnap.docs.map(d => ({
+        id: d.id,
+        staff_email: d.data().staff_email as string,
+        status: (d.data().status as string) || 'pending',
+      }));
 
       return { profile: profileData, staffEmails };
     },
@@ -129,9 +133,22 @@ const Settings: React.FC = () => {
     setStaffLoading(true);
     try {
       const email = newStaffEmail.trim().toLowerCase();
-      await addDoc(collection(db, 'staff'), { owner_id: ownerId, staff_email: email });
+      await addDoc(collection(db, 'staff'), {
+        owner_id: ownerId,
+        staff_email: email,
+        status: 'pending',
+        invited_at: serverTimestamp(),
+      });
       setNewStaffEmail('');
       queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
+
+      // Open mailto invite
+      const appUrl = window.location.origin;
+      const subject = encodeURIComponent('You have been invited as a staff member');
+      const body = encodeURIComponent(
+        `Hi,\n\nYou have been invited to access a property management account on Lobby as a read-only staff member.\n\nSimply sign up or log in at the link below using this email address (${email}):\n${appUrl}\n\nYou will automatically have read-only access once you log in.\n\nThanks`
+      );
+      window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
     } catch (error) {
       console.error('Error adding staff:', error);
     }
@@ -217,7 +234,22 @@ const Settings: React.FC = () => {
               <div key={s.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'var(--surface-container-low)', borderRadius: '0.75rem', border: '1px solid var(--outline-variant)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', color: 'var(--primary)' }}>badge</span>
-                  <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>{s.staff_email}</span>
+                  <div>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>{s.staff_email}</span>
+                    <span style={{
+                      marginLeft: '0.6rem',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      padding: '0.15rem 0.5rem',
+                      borderRadius: '99px',
+                      background: s.status === 'active' ? 'var(--primary-container)' : 'var(--surface-container-high)',
+                      color: s.status === 'active' ? 'var(--on-primary-container)' : 'var(--on-surface-variant)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                    }}>
+                      {s.status === 'active' ? 'Active' : 'Pending'}
+                    </span>
+                  </div>
                 </div>
                 <button
                   onClick={() => handleRemoveStaff(s.id)}
@@ -305,9 +337,15 @@ const Settings: React.FC = () => {
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                   tabIndex={0}
                   onKeyDown={(e) => {
-                    if (e.key === ' ') { e.preventDefault(); setIsDropdownOpen(v => !v); }
-                    if (e.key === 'Enter') { if (isDropdownOpen) { e.preventDefault(); setIsDropdownOpen(false); } }
-                    if (e.key === 'Escape' || e.key === 'Tab') setIsDropdownOpen(false);
+                    if (!isDropdownOpen) {
+                      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setIsDropdownOpen(true); }
+                      return;
+                    }
+                    if (e.key === 'Escape' || e.key === 'Tab') { setIsDropdownOpen(false); return; }
+                    const idx = currencies.findIndex(c => c.code === profile.currency);
+                    if (e.key === 'ArrowDown') { e.preventDefault(); setProfile(p => ({ ...p, currency: currencies[(idx + 1) % currencies.length].code })); }
+                    if (e.key === 'ArrowUp')   { e.preventDefault(); setProfile(p => ({ ...p, currency: currencies[(idx - 1 + currencies.length) % currencies.length].code })); }
+                    if (e.key === 'Enter')     { e.preventDefault(); setIsDropdownOpen(false); }
                   }}
                 >
                   <div className="flex items-center gap-3">

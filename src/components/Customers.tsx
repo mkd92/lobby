@@ -4,6 +4,7 @@ import { collection, query, where, getDocs, doc, updateDoc, deleteDoc } from 'fi
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import '../styles/Properties.css';
 import '../styles/Units.css';
@@ -26,6 +27,8 @@ const Customers: React.FC = () => {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [editForm, setEditForm] = useState({ full_name: '', email: '', phone: '' });
   const [saving, setSaving] = useState(false);
+
+  useEscapeKey(() => setEditingCustomer(null), !!editingCustomer);
 
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ['customers', ownerId],

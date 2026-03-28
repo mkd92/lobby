@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   collection, query, where, getDocs, doc, getDoc,
-  addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp,
+  addDoc, updateDoc, writeBatch, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import '../styles/Units.css';
 import '../styles/Leases.css';
 
@@ -89,8 +90,10 @@ const CustomSelect: React.FC<{
 }> = ({ options, value, onChange, placeholder = 'Select…', disabled = false, prefilled = false, searchable = false }) => {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [highlightedIdx, setHighlightedIdx] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const optionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -101,12 +104,26 @@ const CustomSelect: React.FC<{
   }, []);
 
   useEffect(() => {
-    if (open && searchable) {
-      setTimeout(() => searchInputRef.current?.focus(), 50);
+    if (open) {
+      if (searchable) setTimeout(() => searchInputRef.current?.focus(), 50);
+      const currentIdx = filteredOptions.findIndex(o => o.value === value);
+      setHighlightedIdx(currentIdx >= 0 ? currentIdx : 0);
     } else {
       setSearchTerm('');
+      setHighlightedIdx(-1);
     }
-  }, [open, searchable]);
+  }, [open]);
+
+  // Reset highlight when search changes
+  useEffect(() => { setHighlightedIdx(0); }, [searchTerm]);
+
+  // Scroll highlighted option into view
+  useEffect(() => {
+    if (optionsRef.current && highlightedIdx >= 0) {
+      const el = optionsRef.current.querySelectorAll<HTMLElement>('.custom-option')[highlightedIdx];
+      el?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [highlightedIdx]);
 
   const selected = options.find(o => o.value === value);
   const filteredOptions = options.filter(o =>
@@ -123,17 +140,31 @@ const CustomSelect: React.FC<{
 
   const toggle = () => { if (!disabled) setOpen(o => !o); };
 
+  const selectHighlighted = () => {
+    if (highlightedIdx >= 0 && filteredOptions[highlightedIdx]) {
+      onChange(filteredOptions[highlightedIdx].value);
+      setOpen(false);
+    }
+  };
+
   const handleKey = (e: React.KeyboardEvent) => {
-    if (e.key === ' ') { e.preventDefault(); toggle(); }
-    if (e.key === 'Enter') {
-      if (open) { e.preventDefault(); setOpen(false); }
+    if (!open) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault(); setOpen(true);
+      }
+      return;
     }
-    if (e.key === 'Escape' || e.key === 'Tab') setOpen(false);
-    if (open && !searchable) {
-      const idx = options.findIndex(o => o.value === value);
-      if (e.key === 'ArrowDown') { e.preventDefault(); onChange(options[(idx + 1) % options.length]?.value ?? value); }
-      if (e.key === 'ArrowUp')   { e.preventDefault(); onChange(options[(idx - 1 + options.length) % options.length]?.value ?? value); }
-    }
+    if (e.key === 'Escape' || e.key === 'Tab') { setOpen(false); return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHighlightedIdx(i => Math.min(i + 1, filteredOptions.length - 1)); }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); setHighlightedIdx(i => Math.max(i - 1, 0)); }
+    if (e.key === 'Enter')     { e.preventDefault(); selectHighlighted(); }
+  };
+
+  const handleSearchKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHighlightedIdx(i => Math.min(i + 1, filteredOptions.length - 1)); }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); setHighlightedIdx(i => Math.max(i - 1, 0)); }
+    if (e.key === 'Enter')     { e.preventDefault(); selectHighlighted(); }
+    if (e.key === 'Escape')    { setOpen(false); }
   };
 
   return (
@@ -153,7 +184,7 @@ const CustomSelect: React.FC<{
       </div>
 
       {open && !disabled && (
-        <div className="custom-options">
+        <div className="custom-options" ref={optionsRef}>
           {searchable && (
             <div className="custom-select-search-wrap">
               <input
@@ -164,16 +195,17 @@ const CustomSelect: React.FC<{
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 onClick={e => e.stopPropagation()}
+                onKeyDown={handleSearchKey}
               />
             </div>
           )}
           {filteredOptions.length === 0 ? (
             <div className="custom-option-empty">No options found</div>
           ) : (
-            filteredOptions.map(opt => (
+            filteredOptions.map((opt, idx) => (
               <div
                 key={opt.value}
-                className={`custom-option ${value === opt.value ? 'selected' : ''}`}
+                className={`custom-option ${value === opt.value ? 'selected' : ''} ${idx === highlightedIdx ? 'highlighted' : ''}`}
                 onClick={() => { onChange(opt.value); setOpen(false); }}
               >
                 <div>
@@ -447,6 +479,8 @@ const Leases: React.FC = () => {
 
   const closeModal = () => { setShowModal(false); setEditingLease(null); };
 
+  useEscapeKey(closeModal, showModal);
+
   // ── Cascade handlers ───────────────────────────────────────────────
   const onPropertyChange = (propertyId: string) => {
     setSelectedPropertyId(propertyId);
@@ -655,11 +689,17 @@ const Leases: React.FC = () => {
   };
 
   // ── Delete ─────────────────────────────────────────────────────────
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (lease: Lease) => {
     const ok = await showConfirm('Delete this lease? This cannot be undone.', { danger: true });
     if (!ok) return;
     try {
-      await deleteDoc(doc(db, 'leases', id));
+      const batch = writeBatch(db);
+      batch.delete(doc(db, 'leases', lease.id));
+      if (lease.status === 'Active') {
+        if (lease.unit_id) batch.update(doc(db, 'units', lease.unit_id), { status: 'Vacant' });
+        if (lease.bed_id)  batch.update(doc(db, 'beds',  lease.bed_id),  { status: 'Vacant' });
+      }
+      await batch.commit();
       invalidateLeases();
     } catch (err) {
       showAlert((err as Error).message);
@@ -787,14 +827,16 @@ const Leases: React.FC = () => {
                         </td>
                         <td><span className={`status-badge status-${lease.status.toLowerCase()}`}>{lease.status}</span></td>
                         <td>
-                          <div className="row-actions">
-                            <button className="icon-action-btn" title="Edit" onClick={() => openEdit(lease)}>
-                              <span className="material-symbols-outlined">edit</span>
-                            </button>
-                            <button className="icon-action-btn danger" title="Delete" onClick={() => handleDelete(lease.id)}>
-                              <span className="material-symbols-outlined">delete</span>
-                            </button>
-                          </div>
+                          {!isStaff && (
+                            <div className="row-actions">
+                              <button className="icon-action-btn" title="Edit" onClick={() => openEdit(lease)}>
+                                <span className="material-symbols-outlined">edit</span>
+                              </button>
+                              <button className="icon-action-btn danger" title="Delete" onClick={() => handleDelete(lease)}>
+                                <span className="material-symbols-outlined">delete</span>
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -821,14 +863,16 @@ const Leases: React.FC = () => {
                           <span className={`status-badge status-${lease.status.toLowerCase()}`} style={{ fontSize: '0.6rem' }}>{lease.status}</span>
                         </div>
                       </div>
-                      <div className="lease-card-actions">
-                        <button className="icon-action-btn" onClick={() => openEdit(lease)}>
-                          <span className="material-symbols-outlined">edit</span>
-                        </button>
-                        <button className="icon-action-btn danger" onClick={() => handleDelete(lease.id)}>
-                          <span className="material-symbols-outlined">delete</span>
-                        </button>
-                      </div>
+                      {!isStaff && (
+                        <div className="lease-card-actions">
+                          <button className="icon-action-btn" onClick={() => openEdit(lease)}>
+                            <span className="material-symbols-outlined">edit</span>
+                          </button>
+                          <button className="icon-action-btn danger" onClick={() => handleDelete(lease)}>
+                            <span className="material-symbols-outlined">delete</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="lease-card-details">

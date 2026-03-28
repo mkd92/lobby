@@ -1,55 +1,26 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { collection, query, where, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useProperties } from '../hooks/useProperties';
+import type { Property } from '../hooks/useProperties';
 import '../styles/Properties.css';
 
 const propertyTypes = ['Residential', 'Commercial', 'Industrial', 'Mixed'];
 
-interface Property {
-  id: string;
-  name: string;
-  address: string;
-  type: string;
-  unitCount?: number;
-}
-
 const Properties: React.FC = () => {
   const navigate = useNavigate();
   const { showAlert, showConfirm, DialogMount } = useDialog();
-  const { ownerId, isStaff } = useOwner();
-  const queryClient = useQueryClient();
+  const { isStaff } = useOwner();
+  const { properties, isLoading, saveProperty, removeProperty, checkOccupiedUnits } = useProperties();
 
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [editData, setEditData] = useState({ name: '', address: '', type: '' });
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const { data: properties = [], isLoading } = useQuery({
-    queryKey: ['properties', ownerId],
-    enabled: !!ownerId,
-    queryFn: async () => {
-      const [propSnap, unitSnap] = await Promise.all([
-        getDocs(query(collection(db, 'properties'), where('owner_id', '==', ownerId))),
-        getDocs(query(collection(db, 'units'), where('owner_id', '==', ownerId))),
-      ]);
-
-      const unitCounts: Record<string, number> = {};
-      unitSnap.docs.forEach(d => {
-        const pid = d.data().property_id;
-        if (pid) unitCounts[pid] = (unitCounts[pid] || 0) + 1;
-      });
-
-      const props: Property[] = propSnap.docs
-        .map(d => ({ id: d.id, ...d.data(), unitCount: unitCounts[d.id] || 0 } as Property))
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-      return props;
-    },
-  });
+  useEscapeKey(() => setEditingProperty(null), !!editingProperty);
 
   const openEdit = (e: React.MouseEvent, property: Property) => {
     e.preventDefault();
@@ -64,9 +35,8 @@ const Properties: React.FC = () => {
     if (!editingProperty) return;
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'properties', editingProperty.id), editData);
+      await saveProperty(editingProperty.id, editData);
       setEditingProperty(null);
-      queryClient.invalidateQueries({ queryKey: ['properties', ownerId] });
     } catch (err) {
       showAlert((err as Error).message);
     } finally {
@@ -78,12 +48,10 @@ const Properties: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
 
-    const unitSnap = await getDocs(
-      query(collection(db, 'units'), where('property_id', '==', property.id), where('status', '==', 'Occupied'))
-    );
+    const occupiedCount = await checkOccupiedUnits(property.id);
 
-    if (!unitSnap.empty) {
-      await showAlert(`Cannot delete — ${unitSnap.size} unit(s) are currently occupied.\nPlease terminate all active leases first.`);
+    if (occupiedCount > 0) {
+      await showAlert(`Cannot delete — ${occupiedCount} unit(s) are currently occupied.\nPlease terminate all active leases first.`);
       return;
     }
 
@@ -91,8 +59,7 @@ const Properties: React.FC = () => {
     if (!ok) return;
 
     try {
-      await deleteDoc(doc(db, 'properties', property.id));
-      queryClient.invalidateQueries({ queryKey: ['properties', ownerId] });
+      await removeProperty(property.id);
     } catch (err) {
       showAlert((err as Error).message);
     }
@@ -195,7 +162,17 @@ const Properties: React.FC = () => {
                     style={{ padding: '0.7rem 0.9rem', fontSize: '0.9rem' }}
                     onClick={() => setTypeDropdownOpen(o => !o)}
                     tabIndex={0}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTypeDropdownOpen(o => !o); } if (e.key === 'Escape') setTypeDropdownOpen(false); }}
+                    onKeyDown={e => {
+                      if (!typeDropdownOpen) {
+                        if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setTypeDropdownOpen(true); }
+                        return;
+                      }
+                      if (e.key === 'Escape') { setTypeDropdownOpen(false); return; }
+                      const idx = propertyTypes.indexOf(editData.type);
+                      if (e.key === 'ArrowDown') { e.preventDefault(); setEditData(d => ({ ...d, type: propertyTypes[(idx + 1) % propertyTypes.length] })); }
+                      if (e.key === 'ArrowUp')   { e.preventDefault(); setEditData(d => ({ ...d, type: propertyTypes[(idx - 1 + propertyTypes.length) % propertyTypes.length] })); }
+                      if (e.key === 'Enter')     { e.preventDefault(); setTypeDropdownOpen(false); }
+                    }}
                   >
                     {editData.type}
                     <span className="material-symbols-outlined" style={{ transition: '0.2s', transform: typeDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', fontSize: '1.1rem' }}>keyboard_arrow_down</span>

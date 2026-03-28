@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   collection, query, where, getDocs, doc, getDoc,
-  addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp,
+  addDoc, updateDoc, deleteDoc, serverTimestamp,
 } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
+import { useEscapeKey } from '../hooks/useEscapeKey';
+import { generateMonthlyPayments } from '../utils/generateMonthlyPayments';
 import '../styles/Units.css';
 import '../styles/Leases.css';
 import '../styles/Payments.css';
@@ -46,7 +48,9 @@ const CustomSelect: React.FC<{
   disabled?: boolean;
 }> = ({ options, value, onChange, placeholder = 'Select…', disabled = false }) => {
   const [open, setOpen] = useState(false);
+  const [highlightedIdx, setHighlightedIdx] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
+  const optionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
@@ -54,7 +58,30 @@ const CustomSelect: React.FC<{
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
+  useEffect(() => {
+    if (open) {
+      const currentIdx = options.findIndex(o => o.value === value);
+      setHighlightedIdx(currentIdx >= 0 ? currentIdx : 0);
+    } else {
+      setHighlightedIdx(-1);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (optionsRef.current && highlightedIdx >= 0) {
+      const el = optionsRef.current.querySelectorAll<HTMLElement>('.custom-option')[highlightedIdx];
+      el?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [highlightedIdx]);
+
   const selected = options.find(o => o.value === value);
+
+  const selectHighlighted = () => {
+    if (highlightedIdx >= 0 && options[highlightedIdx]) {
+      onChange(options[highlightedIdx].value);
+      setOpen(false);
+    }
+  };
 
   return (
     <div className="custom-select-container" ref={ref}>
@@ -63,9 +90,14 @@ const CustomSelect: React.FC<{
         onClick={() => !disabled && setOpen(o => !o)}
         tabIndex={disabled ? -1 : 0}
         onKeyDown={e => {
-          if (e.key === ' ') { e.preventDefault(); !disabled && setOpen(o => !o); }
-          if (e.key === 'Enter') { if (open) { e.preventDefault(); setOpen(false); } }
-          if (e.key === 'Escape' || e.key === 'Tab') setOpen(false);
+          if (!open) {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === ' ' || e.key === 'Enter') { e.preventDefault(); !disabled && setOpen(true); }
+            return;
+          }
+          if (e.key === 'Escape' || e.key === 'Tab') { setOpen(false); return; }
+          if (e.key === 'ArrowDown') { e.preventDefault(); setHighlightedIdx(i => Math.min(i + 1, options.length - 1)); }
+          if (e.key === 'ArrowUp')   { e.preventDefault(); setHighlightedIdx(i => Math.max(i - 1, 0)); }
+          if (e.key === 'Enter')     { e.preventDefault(); selectHighlighted(); }
         }}
       >
         <span style={{ color: selected ? 'var(--on-surface)' : 'var(--on-surface-variant)', opacity: selected ? 1 : 0.5 }}>
@@ -76,11 +108,11 @@ const CustomSelect: React.FC<{
         </span>
       </div>
       {open && !disabled && (
-        <div className="custom-options">
+        <div className="custom-options" ref={optionsRef}>
           {options.length === 0
             ? <div className="custom-option-empty">No options available</div>
-            : options.map(opt => (
-              <div key={opt.value} className={`custom-option ${value === opt.value ? 'selected' : ''}`} onClick={() => { onChange(opt.value); setOpen(false); }}>
+            : options.map((opt, idx) => (
+              <div key={opt.value} className={`custom-option ${value === opt.value ? 'selected' : ''} ${idx === highlightedIdx ? 'highlighted' : ''}`} onClick={() => { onChange(opt.value); setOpen(false); }}>
                 <div>
                   <div className="custom-option-label">{opt.label}</div>
                   {opt.sub && <div className="custom-option-sub">{opt.sub}</div>}
@@ -117,51 +149,6 @@ const Payments: React.FC = () => {
     status: 'Paid' as 'Paid' | 'Pending',
   });
 
-  // ── Generate monthly payments (replaces Supabase RPC) ──────────────
-  const generateMonthlyPayments = async (ownerIdValue: string) => {
-    const today = new Date();
-    const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
-
-    const leasesSnap = await getDocs(query(
-      collection(db, 'leases'),
-      where('owner_id', '==', ownerIdValue),
-      where('status', '==', 'Active')
-    ));
-
-    const batch = writeBatch(db);
-    let hasChanges = false;
-
-    for (const leaseDoc of leasesSnap.docs) {
-      const lease = leaseDoc.data();
-      const existingSnap = await getDocs(query(
-        collection(db, 'payments'),
-        where('lease_id', '==', leaseDoc.id),
-        where('month_for', '==', currentMonth)
-      ));
-      if (existingSnap.empty) {
-        const newRef = doc(collection(db, 'payments'));
-        batch.set(newRef, {
-          owner_id: ownerIdValue,
-          lease_id: leaseDoc.id,
-          tenant_name: lease.tenant_name || '',
-          unit_number: lease.unit_number || null,
-          property_name: lease.property_name || null,
-          bed_number: lease.bed_number || null,
-          room_number: lease.room_number || null,
-          hostel_name: lease.hostel_name || null,
-          rent_amount: lease.rent_amount,
-          amount: lease.rent_amount,
-          payment_date: today.toISOString().split('T')[0],
-          month_for: currentMonth,
-          payment_method: null,
-          status: 'Pending',
-          created_at: serverTimestamp(),
-        });
-        hasChanges = true;
-      }
-    }
-    if (hasChanges) await batch.commit();
-  };
 
   // ── Queries ────────────────────────────────────────────────────────
   const { data: payments = [], isLoading } = useQuery({
@@ -226,6 +213,8 @@ const Payments: React.FC = () => {
   };
 
   const closeModal = () => { setShowModal(false); setEditingPayment(null); };
+
+  useEscapeKey(closeModal, showModal);
 
   // ── Save ───────────────────────────────────────────────────────────
   const handleSave = async (e: React.FormEvent) => {

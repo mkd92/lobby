@@ -16,8 +16,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import '../styles/Units.css';
 import '../styles/HostelDetail.css';
+import '../styles/Properties.css';
 
 interface Bed {
   id: string;
@@ -181,9 +183,14 @@ const HostelDetail: React.FC = () => {
     } catch (error) { showAlert((error as Error).message); }
   };
 
+  const [bedModalOpen, setBedModalOpen] = useState(false);
+
+  useEscapeKey(() => { setEditingBedId(null); setBedModalOpen(false); }, bedModalOpen);
+
   const startEditBed = (bed: Bed) => {
     setEditingBedId(bed.id);
     setEditBedData({ bed_number: bed.bed_number, price: bed.price, status: bed.status });
+    setBedModalOpen(true);
   };
 
   const handleEditBed = async (e: React.FormEvent) => {
@@ -192,6 +199,7 @@ const HostelDetail: React.FC = () => {
     try {
       await updateDoc(doc(db, 'beds', editingBedId), editBedData);
       setEditingBedId(null);
+      setBedModalOpen(false);
       invalidate();
     } catch (error) { showAlert((error as Error).message); }
   };
@@ -206,6 +214,7 @@ const HostelDetail: React.FC = () => {
     try {
       await deleteDoc(doc(db, 'beds', bed.id));
       setEditingBedId(null);
+      setBedModalOpen(false);
       invalidate();
     } catch (error) { showAlert((error as Error).message); }
   };
@@ -426,64 +435,26 @@ const HostelDetail: React.FC = () => {
                       </tr>
                     ) : (
                       room.beds.map(bed => (
-                        editingBedId === bed.id ? (
-                          <tr key={bed.id} className="bed-edit-row">
-                            <td>
-                              <input type="text" className="unit-mini-input" style={{ width: '100%' }}
-                                value={editBedData.bed_number}
-                                onChange={e => setEditBedData({ ...editBedData, bed_number: e.target.value })} />
-                            </td>
-                            <td>
-                              <input type="number" className="unit-mini-input" style={{ width: '100%' }}
-                                value={editBedData.price}
-                                onChange={e => setEditBedData({ ...editBedData, price: parseFloat(e.target.value) || 0 })} />
-                            </td>
-                            <td>
-                              <select className="unit-mini-input" style={{ width: '100%' }}
-                                value={editBedData.status}
-                                onChange={e => setEditBedData({ ...editBedData, status: e.target.value as Bed['status'] })}>
-                                <option value="Vacant">Vacant</option>
-                                <option value="Occupied">Occupied</option>
-                                <option value="Maintenance">Maintenance</option>
-                              </select>
-                            </td>
-                            <td className="opacity-50">—</td>
-                            <td>
-                              <div className="bed-row-actions">
-                                <button className="icon-action-btn active" title="Save" onClick={handleEditBed}>
-                                  <span className="material-symbols-outlined">check</span>
-                                </button>
-                                <button className="icon-action-btn" title="Cancel" onClick={() => setEditingBedId(null)}>
-                                  <span className="material-symbols-outlined">close</span>
-                                </button>
-                                <button className="icon-action-btn danger" title="Delete" onClick={() => handleDeleteBed(bed)}>
-                                  <span className="material-symbols-outlined">delete</span>
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ) : (
-                          <tr key={bed.id}>
-                            <td>
-                              <div className="flex items-center gap-2">
-                                <span className="material-symbols-outlined opacity-30" style={{ fontSize: '1.1rem' }}>bed</span>
-                                <span className="bed-no">{bed.bed_number}</span>
-                              </div>
-                            </td>
-                            <td className="bed-price">{currencySymbol}{bed.price.toLocaleString()}</td>
-                            <td>
-                              <span className={`status-badge status-${bed.status.toLowerCase()}`}>{bed.status}</span>
-                            </td>
-                            <td style={{ opacity: 0.45, fontSize: '0.8rem' }}>Not Allotted</td>
-                            <td>
-                              {!isStaff && (
-                                <button className="icon-action-btn" title="Edit bed" onClick={() => startEditBed(bed)}>
-                                  <span className="material-symbols-outlined">edit</span>
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        )
+                        <tr key={bed.id}>
+                          <td>
+                            <div className="flex items-center gap-2">
+                              <span className="material-symbols-outlined opacity-30" style={{ fontSize: '1.1rem' }}>bed</span>
+                              <span className="bed-no">{bed.bed_number}</span>
+                            </div>
+                          </td>
+                          <td className="bed-price">{currencySymbol}{bed.price.toLocaleString()}</td>
+                          <td>
+                            <span className={`status-badge status-${bed.status.toLowerCase()}`}>{bed.status}</span>
+                          </td>
+                          <td style={{ opacity: 0.45, fontSize: '0.8rem' }}>Not Allotted</td>
+                          <td>
+                            {!isStaff && (
+                              <button className="icon-action-btn" title="Edit bed" onClick={() => startEditBed(bed)}>
+                                <span className="material-symbols-outlined">edit</span>
+                              </button>
+                            )}
+                          </td>
+                        </tr>
                       ))
                     )}
                   </tbody>
@@ -525,6 +496,58 @@ const HostelDetail: React.FC = () => {
           ))
         )}
       </div>
+
+      {/* ── Edit Bed Modal ── */}
+      {bedModalOpen && editingBedId && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && (setEditingBedId(null), setBedModalOpen(false))}>
+          <div className="modal-content" style={{ borderRadius: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0 }}>Edit Bed</h2>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', opacity: 0.6 }}>{editBedData.bed_number}</p>
+              </div>
+              <button className="icon-action-btn" onClick={() => { setEditingBedId(null); setBedModalOpen(false); }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <form onSubmit={handleEditBed} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div className="unit-input-group">
+                <label>Bed Number</label>
+                <input type="text" className="unit-mini-input" value={editBedData.bed_number}
+                  onChange={e => setEditBedData({ ...editBedData, bed_number: e.target.value })}
+                  required style={{ padding: '0.7rem 0.9rem', borderRadius: '0.75rem' }} />
+              </div>
+              <div className="unit-input-group">
+                <label>Price ({currencySymbol})</label>
+                <input type="number" className="unit-mini-input" value={editBedData.price}
+                  onChange={e => setEditBedData({ ...editBedData, price: parseFloat(e.target.value) || 0 })}
+                  required style={{ padding: '0.7rem 0.9rem', borderRadius: '0.75rem' }} />
+              </div>
+              <div className="unit-input-group">
+                <label>Status</label>
+                <select className="unit-mini-input" value={editBedData.status}
+                  onChange={e => setEditBedData({ ...editBedData, status: e.target.value as Bed['status'] })}
+                  style={{ padding: '0.7rem 0.9rem', borderRadius: '0.75rem' }}>
+                  <option value="Vacant">Vacant</option>
+                  <option value="Occupied">Occupied</option>
+                  <option value="Maintenance">Maintenance</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'space-between', paddingTop: '0.5rem' }}>
+                <button type="button" className="icon-action-btn danger"
+                  onClick={() => handleDeleteBed(rooms.flatMap(r => r.beds).find(b => b.id === editingBedId)!)}>
+                  <span className="material-symbols-outlined">delete</span>
+                </button>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button type="button" className="primary-button glass" style={{ padding: '0.7rem 1.5rem' }}
+                    onClick={() => { setEditingBedId(null); setBedModalOpen(false); }}>Cancel</button>
+                  <button type="submit" className="primary-button" style={{ padding: '0.7rem 2rem' }}>Save</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User } from 'firebase/auth';
-import { onAuthStateChanged } from 'firebase/auth';
-import { collection, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseClient';
+import { generateMonthlyPayments } from '../utils/generateMonthlyPayments';
 
 interface OwnerContextType {
   user: User | null;
@@ -21,7 +22,6 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isStaff, setIsStaff] = useState(false);
   const [ownerLoading, setOwnerLoading] = useState(true);
 
-  // Sync auth state synchronously
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
@@ -29,7 +29,6 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return unsub;
   }, []);
 
-  // Resolve owner outside auth listener to avoid lock issues
   useEffect(() => {
     if (user === undefined) return;
 
@@ -42,51 +41,68 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     setOwnerLoading(true);
 
-    const resolveOwner = async () => {
-      try {
-        const timeout = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Firestore timeout — check that Firestore database is created in Firebase Console')), 10000)
-        );
+    // Real-time listener on the staff collection for this email.
+    // Fires immediately on mount (resolves initial state) and again whenever
+    // the owner adds or revokes this user as staff — no re-login required.
+    const unsubStaff = onSnapshot(
+      query(collection(db, 'staff'), where('staff_email', '==', user.email)),
+      async (staffSnap) => {
+        try {
+          if (!staffSnap.empty) {
+            const staffDoc = staffSnap.docs[0];
+            const staffData = staffDoc.data();
+            const resolvedOwnerId = staffData.owner_id as string;
 
-        await Promise.race([
-          (async () => {
-            // Check if this user is a staff member
-            const staffSnap = await getDocs(
-              query(collection(db, 'staff'), where('staff_email', '==', user.email))
-            );
+            setOwnerId(resolvedOwnerId);
+            setIsStaff(true);
 
-            if (!staffSnap.empty) {
-              const staffData = staffSnap.docs[0].data();
-              setOwnerId(staffData.owner_id);
-              setIsStaff(true);
-            } else {
-              // Owner — ensure owner doc exists
-              const ownerRef = doc(db, 'owners', user.uid);
-              const ownerSnap = await getDoc(ownerRef);
-              if (!ownerSnap.exists()) {
-                await setDoc(ownerRef, {
-                  full_name: user.displayName || '',
-                  email: user.email || '',
-                  currency: 'USD',
-                });
-              }
-              setOwnerId(user.uid);
-              setIsStaff(false);
+            // Auto-activate pending invite on first login
+            if (staffData.status !== 'active') {
+              await updateDoc(doc(db, 'staff', staffDoc.id), { status: 'active' });
             }
-          })(),
-          timeout,
-        ]);
-      } catch (error) {
-        console.error('OwnerContext error:', error);
-        // Fall back to treating user as owner so app doesn't stay frozen
+
+            void generateMonthlyPayments(resolvedOwnerId);
+          } else {
+            // No staff doc — treat as owner
+            const ownerRef = doc(db, 'owners', user.uid);
+            const ownerSnap = await getDoc(ownerRef);
+            if (!ownerSnap.exists()) {
+              await setDoc(ownerRef, {
+                full_name: user.displayName || '',
+                email: user.email || '',
+                currency: 'USD',
+              });
+            }
+
+            // If they were previously resolved as staff and just got revoked, sign out
+            // so stale query caches don't leak the previous owner's data.
+            setIsStaff(prev => {
+              if (prev) {
+                signOut(auth);
+              }
+              return false;
+            });
+
+            setOwnerId(user.uid);
+            void generateMonthlyPayments(user.uid);
+          }
+        } catch (error) {
+          console.error('OwnerContext error:', error);
+          setOwnerId(user.uid);
+          setIsStaff(false);
+        } finally {
+          setOwnerLoading(false);
+        }
+      },
+      (error) => {
+        console.error('OwnerContext snapshot error:', error);
         setOwnerId(user.uid);
         setIsStaff(false);
-      } finally {
         setOwnerLoading(false);
       }
-    };
+    );
 
-    resolveOwner();
+    return () => unsubStaff();
   }, [user]);
 
   return (
