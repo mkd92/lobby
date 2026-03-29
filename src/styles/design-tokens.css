@@ -55,8 +55,37 @@
 
 /* Force dark mode as base for "Vault" obsidian environment */
 [data-theme="light"] {
-  /* For now, we maintain the dark base but could implement a lighter "frosted" variant later.
-     The brief specifies obsidian/Vault which is inherently dark. */
+  --surface: #f8f9fa;
+  --surface-rgb: 248, 249, 250;
+  
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f1f3f5;
+  --surface-container: #e9ecef;
+  --surface-container-high: #dee2e6;
+  --surface-container-highest: #ced4da;
+  --surface-container-highest-rgb: 206, 212, 218;
+
+  --primary: #121416;
+  --on-primary: #ffffff;
+  --primary-container: #e9ecef;
+  --on-primary-container: #121416;
+
+  --secondary: #495057;
+  --secondary-container: #dee2e6;
+  --on-secondary-container: #212529;
+
+  --on-surface: #121416;
+  --on-surface-rgb: 18, 20, 22;
+  --on-surface-variant: #495057;
+  --outline-variant: rgba(0, 0, 0, 0.08);
+
+  --shadow-ambient: 0 32px 64px rgba(0, 0, 0, 0.04);
+  --shadow-elevated: 0 24px 48px rgba(0, 0, 0, 0.08);
+
+  --color-success: #2b8a3e;
+  --color-success-bg: rgba(43, 138, 62, 0.1);
+  --color-warning: #e67700;
+  --color-warning-bg: rgba(230, 119, 0, 0.1);
 }
 
 @theme {

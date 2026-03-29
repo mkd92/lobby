@@ -96,7 +96,7 @@
 }
 
 .sidebar-toggle {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--surface-container-highest);
   border: none;
   color: var(--on-surface-variant);
   width: 32px;
@@ -228,7 +228,7 @@
   right: 0;
   width: 100%;
   z-index: 2000;
-  background: rgba(18, 20, 22, 0.8);
+  background: rgba(var(--surface-rgb), 0.8);
   padding: 0.625rem 1.25rem;
   border-bottom: 1px solid var(--outline-variant);
   align-items: center;
@@ -252,19 +252,24 @@
   transform: translateX(-50%);
   width: calc(100% - 2rem);
   max-width: 440px;
-  background: rgba(40, 42, 44, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--surface);
+  border: 1px solid var(--outline-variant);
   padding: 0.4rem;
   z-index: 2000;
   justify-content: space-around;
   align-items: center;
-  box-shadow: 0 32px 64px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 32px 64px rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(32px);
   -webkit-backdrop-filter: blur(32px);
   border-radius: 2rem;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   height: 64px;
   box-sizing: border-box;
+}
+
+[data-theme="dark"] .mobile-bottom-nav {
+  background: rgba(40, 42, 44, 0.8);
+  box-shadow: 0 32px 64px rgba(0, 0, 0, 0.6);
 }
 
 @media (max-width: 768px) {
@@ -278,7 +283,7 @@
   align-items: center;
   justify-content: center;
   gap: 2px;
-  color: rgba(197, 197, 216, 0.5);
+  color: var(--on-surface-variant);
   text-decoration: none;
   font-size: 0.65rem;
   font-weight: 700;
@@ -288,6 +293,7 @@
   border-radius: 1.5rem;
   z-index: 1;
   padding-bottom: 2px;
+  opacity: 0.5;
 }
 
 .mobile-nav-item .material-symbols-outlined {
@@ -298,6 +304,7 @@
 
 .mobile-nav-item.active {
   color: var(--primary);
+  opacity: 1;
 }
 
 .mobile-nav-item.active .material-symbols-outlined {
@@ -307,13 +314,12 @@
 .mobile-nav-indicator {
   position: absolute;
   inset: 6px 2px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--surface-container-highest);
   border-radius: 1.25rem;
   z-index: -1;
   opacity: 0;
   transform: scale(0.92);
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
 }
 
 .mobile-nav-item.active .mobile-nav-indicator {
@@ -326,7 +332,7 @@
   position: fixed;
   inset: 0;
   z-index: 2100;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(12px);
   animation: overlayIn 0.3s ease;
 }
@@ -336,8 +342,8 @@
   bottom: 6.5rem;
   left: 1.25rem;
   right: 1.25rem;
-  background: rgba(40, 42, 44, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--surface);
+  border: 1px solid var(--outline-variant);
   border-radius: 2rem;
   box-shadow: var(--shadow-elevated);
   padding: 0.75rem;
@@ -346,6 +352,10 @@
   gap: 0.5rem;
   animation: sheetIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   backdrop-filter: blur(24px);
+}
+
+[data-theme="dark"] .more-sheet {
+  background: rgba(40, 42, 44, 0.95);
 }
 
 @media (min-width: 480px) {
@@ -370,12 +380,12 @@
 }
 
 .more-sheet-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--surface-container-low);
   color: var(--primary);
 }
 
 .more-sheet-item.active {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--surface-container-highest);
   color: var(--primary);
 }
 
@@ -391,8 +401,8 @@
 }
 
 .lobby-hero-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: linear-gradient(135deg, rgba(var(--surface-container-highest-rgb), 0.1) 0%, rgba(var(--surface-container-highest-rgb), 0.05) 100%);
+  border: 1px solid var(--outline-variant);
   border-radius: 2.5rem;
   padding: 3rem;
   display: flex;

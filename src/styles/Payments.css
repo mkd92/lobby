@@ -42,7 +42,7 @@
   outline: none;
   border-color: var(--primary);
   background: var(--surface-container-lowest);
-  box-shadow: 0 0 0 4px rgba(0, 135, 90, 0.08);
+  box-shadow: 0 0 0 4px var(--primary-container);
 }
 
 .payments-search-clear {
@@ -73,9 +73,9 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  background: rgba(0, 135, 90, 0.08);
+  background: var(--primary-container);
   color: var(--primary);
-  border: 1px solid rgba(0, 135, 90, 0.2);
+  border: 1px solid var(--outline-variant);
   padding: 0.35rem 0.75rem;
   border-radius: 0.5rem;
   font-size: 0.7rem;

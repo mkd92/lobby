@@ -17,7 +17,7 @@ export const BottomNav: React.FC = () => {
     <>
       {moreOpen && (
         <div className="more-sheet-overlay" onClick={() => setMoreOpen(false)}>
-          <div className="more-sheet glass-panel" onClick={e => e.stopPropagation()} style={{ background: 'rgba(40, 42, 44, 0.95)' }}>
+          <div className="more-sheet glass-panel" onClick={e => e.stopPropagation()}>
             <Link
               to="/customers"
               className={`more-sheet-item ${isActive('/customers') ? 'active' : ''}`}
@@ -35,7 +35,7 @@ export const BottomNav: React.FC = () => {
               <span>Financial Ledger</span>
             </Link>
             {typeof __BUILD_TIME__ !== 'undefined' && (
-              <div style={{ padding: '1rem', fontSize: '0.6rem', opacity: 0.3, color: 'var(--on-surface-variant)', fontFamily: 'monospace', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', marginTop: '0.5rem' }}>
+              <div style={{ padding: '1rem', fontSize: '0.6rem', opacity: 0.3, color: 'var(--on-surface-variant)', fontFamily: 'monospace', textAlign: 'center', borderTop: '1px solid var(--outline-variant)', marginTop: '0.5rem' }}>
                 VAULT v{new Date(__BUILD_TIME__).toLocaleDateString(undefined, { month: 'short', year: '2-digit' })}
               </div>
             )}
@@ -43,38 +43,38 @@ export const BottomNav: React.FC = () => {
         </div>
       )}
 
-      <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[92%] max-w-lg rounded-[32px] z-50 bg-[#282a2c]/80 backdrop-blur-[32px] shadow-[0_32px_64px_rgba(0,0,0,0.6)] border border-white/5 md:hidden">
+      <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[92%] max-w-lg rounded-[32px] z-50 bg-surface/80 backdrop-blur-[32px] shadow-ambient border border-outline-variant md:hidden">
         <div className="flex justify-around items-center h-20 px-6">
           <Link
             to="/"
-            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${isActive('/') ? 'bg-white/10 text-white scale-110 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]' : 'text-[#c5c5d8]/50 hover:text-white'}`}
+            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${isActive('/') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
             onMouseEnter={() => prefetch('lobby')}
           >
             <span className="material-symbols-outlined" style={{ fontVariationSettings: isActive('/') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>dashboard</span>
           </Link>
           <Link
             to="/properties"
-            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/properties') ? 'bg-white/10 text-white scale-110 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]' : 'text-[#c5c5d8]/50 hover:text-white'}`}
+            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/properties') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
             onMouseEnter={() => prefetch('properties')}
           >
             <span className="material-symbols-outlined" style={{ fontVariationSettings: location.pathname.startsWith('/properties') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>domain</span>
           </Link>
           <Link
             to="/hostels"
-            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/hostels') ? 'bg-white/10 text-white scale-110 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]' : 'text-[#c5c5d8]/50 hover:text-white'}`}
+            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/hostels') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
             onMouseEnter={() => prefetch('hostels')}
           >
             <span className="material-symbols-outlined" style={{ fontVariationSettings: location.pathname.startsWith('/hostels') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>hotel</span>
           </Link>
           <Link
             to="/leases"
-            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/leases') ? 'bg-white/10 text-white scale-110 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]' : 'text-[#c5c5d8]/50 hover:text-white'}`}
+            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/leases') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
             onMouseEnter={() => prefetch('leases')}
           >
             <span className="material-symbols-outlined" style={{ fontVariationSettings: location.pathname.startsWith('/leases') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>contract</span>
           </Link>
           <button
-            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${moreOpen ? 'bg-white/10 text-white' : 'text-[#c5c5d8]/50'}`}
+            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${moreOpen ? 'bg-surface-container-highest text-primary' : 'text-on-surface-variant opacity-50'}`}
             onClick={() => setMoreOpen(prev => !prev)}
           >
             <span className="material-symbols-outlined" style={{ transform: moreOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.3s ease', fontSize: '1.75rem' }}>more_horiz</span>

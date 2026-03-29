@@ -7,9 +7,9 @@ import { auth, db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
 import { useTheme } from '../context/ThemeContext';
 import { LoadingScreen } from './layout/LoadingScreen';
-import '../styles/Auth.css';
 import '../styles/Properties.css';
 import '../styles/Settings.css';
+import '../styles/Leases.css';
 
 const currencies = [
   { code: 'USD', symbol: '$', name: 'US Dollar' },
@@ -71,7 +71,8 @@ const Settings: React.FC = () => {
     try {
       await updateDoc(doc(db, 'owners', ownerId!), profile);
       queryClient.invalidateQueries({ queryKey: ['owner-profile', ownerId] });
-      setMessage({ text: 'Settings updated successfully!', type: 'success' });
+      setMessage({ text: 'System parameters synchronized.', type: 'success' });
+      setTimeout(() => setMessage(null), 3000);
     } catch (err) {
       setMessage({ text: (err as Error).message, type: 'error' });
     } finally {
@@ -86,165 +87,155 @@ const Settings: React.FC = () => {
 
   const currentCurrency = currencies.find(c => c.code === profile.currency) || currencies[0];
 
-  if (isLoading) return <LoadingScreen message="Loading settings" />;
+  if (isLoading) return <LoadingScreen message="Accessing System Preferences" />;
 
   return (
-    <div className="view-container">
+    <div className="view-container page-fade-in">
+      {/* Editorial Header */}
       <header className="view-header">
-        <div>
-          <p className="view-eyebrow">
-            System Preferences
-          </p>
-          <h1 className="view-title">Account Settings</h1>
-        </div>
+        <p className="view-eyebrow">System Configuration</p>
+        <h1 className="text-white font-display font-black text-4xl md:text-6xl tracking-tighter leading-none mt-2">
+          Preferences
+        </h1>
       </header>
 
       {message && (
-        <div className={`mb-8 p-4 rounded-xl border ${message.type === 'success' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`} style={{
-          backgroundColor: message.type === 'success' ? 'var(--primary-container)' : 'rgba(186,26,26,0.1)',
-          color: message.type === 'success' ? 'var(--on-primary-container)' : 'var(--error)',
-          borderColor: 'transparent',
-          fontSize: '0.9rem',
-          fontWeight: 600,
-          borderRadius: '1rem',
-          marginBottom: '2rem'
-        }}>
-          {message.text}
+        <div className={`mb-10 p-6 rounded-[2rem] border transition-all duration-500 animate-in fade-in slide-in-from-top-4 ${message.type === 'success' ? 'bg-primary/10 border-primary/20 text-white' : 'bg-error/10 border-error/20 text-error'}`}>
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined">{message.type === 'success' ? 'check_circle' : 'error'}</span>
+            <span className="font-bold tracking-tight">{message.text}</span>
+          </div>
         </div>
       )}
 
-      <div className="modern-card mb-12" style={{ padding: '2.5rem' }}>
-        <h2 className="settings-section-title" style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 800, marginBottom: '1.5rem' }}>Owner Profile</h2>
-        <form onSubmit={handleSave} className="settings-form">
-          <div className="settings-grid">
-            <div className="form-group-modern">
-              <label>Full Name</label>
-              <input
-                type="text"
-                value={profile.name}
-                onChange={e => setProfile(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Ex: John Doe"
-                required
-              />
-            </div>
-            <div className="form-group-modern">
-              <label>Email Address</label>
-              <input
-                type="email"
-                value={profile.email}
-                disabled
-                style={{ opacity: 0.6, cursor: 'not-allowed' }}
-              />
-            </div>
-            <div className="form-group-modern">
-              <label>Phone Number</label>
-              <input
-                type="tel"
-                value={profile.phone}
-                onChange={e => setProfile(prev => ({ ...prev, phone: e.target.value }))}
-                placeholder="+1 (555) 000-0000"
-              />
-            </div>
-            <div className="form-group-modern">
-              <label>Preferred Currency</label>
-              <div className="custom-select-container" ref={dropdownRef}>
-                <div
-                  className={`custom-select-trigger ${isDropdownOpen ? 'open' : ''}`}
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontWeight: 800, color: 'var(--primary)' }}>{currentCurrency.symbol}</span>
-                    {currentCurrency.code} — {currentCurrency.name}
-                  </span>
-                  <span className="material-symbols-outlined" style={{
-                    transform: isDropdownOpen ? 'rotate(180deg)' : 'none',
-                    transition: 'transform 0.2s ease'
-                  }}>expand_more</span>
-                </div>
-                {isDropdownOpen && (
-                  <div className="custom-options" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                    {currencies.map(c => (
-                      <div
-                        key={c.code}
-                        className={`custom-option ${profile.currency === c.code ? 'selected' : ''}`}
-                        onClick={() => selectCurrency(c.code)}
-                      >
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <span style={{ width: '1.5rem', fontWeight: 800 }}>{c.symbol}</span>
-                          <span>{c.code} <span style={{ opacity: 0.5, fontWeight: 400, fontSize: '0.75rem' }}>— {c.name}</span></span>
-                        </span>
-                        {profile.currency === c.code && <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check</span>}
-                      </div>
-                    ))}
-                  </div>
-                )}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        {/* Left Column: Profile (8 cols) */}
+        <div className="lg:col-span-8">
+          <div className="glass-panel p-10 md:p-16 rounded-[48px]">
+            <h2 className="text-white font-display font-bold text-3xl tracking-tight mb-12">Registry Profile</h2>
+            
+            <form onSubmit={handleSave} className="flex flex-col gap-10">
+              <div className="form-group-modern">
+                <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Legal Entity Name</label>
+                <input
+                  type="text"
+                  value={profile.name}
+                  onChange={e => setProfile(prev => ({ ...prev, name: e.target.value }))}
+                  className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-display font-bold text-xl"
+                  placeholder="Registry designation"
+                  required
+                />
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div className="form-group-modern">
+                  <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Digital Correspondence</label>
+                  <input
+                    type="email"
+                    value={profile.email}
+                    disabled
+                    className="auth-input w-full bg-surface-container-low opacity-40 cursor-not-allowed border-none rounded-2xl p-5 font-medium"
+                  />
+                </div>
+                <div className="form-group-modern">
+                  <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Primary Tele-Channel</label>
+                  <input
+                    type="tel"
+                    value={profile.phone}
+                    onChange={e => setProfile(prev => ({ ...prev, phone: e.target.value }))}
+                    className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-medium"
+                    placeholder="Registry contact"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group-modern">
+                <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Operational Currency</label>
+                <div className="custom-select-container relative" ref={dropdownRef}>
+                  <div
+                    className={`custom-select-trigger flex justify-between items-center bg-surface-container-low p-5 rounded-2xl cursor-pointer hover:bg-surface-container-high transition-colors ${isDropdownOpen ? 'open' : ''}`}
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  >
+                    <span className="flex items-center gap-4 text-white">
+                      <span className="w-10 h-10 flex items-center justify-center bg-primary/10 rounded-xl text-primary font-black text-lg">{currentCurrency.symbol}</span>
+                      <span className="font-bold">{currentCurrency.code} <span className="opacity-40 font-medium ml-2">— {currentCurrency.name}</span></span>
+                    </span>
+                    <span className="material-symbols-outlined transition-transform duration-300" style={{ transform: isDropdownOpen ? 'rotate(180deg)' : 'none' }}>expand_more</span>
+                  </div>
+                  
+                  {isDropdownOpen && (
+                    <div className="custom-options absolute top-full left-0 right-0 mt-2 z-50 glass-panel overflow-hidden animate-in fade-in zoom-in-95 duration-200" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                      {currencies.map(c => (
+                        <div
+                          key={c.code}
+                          className={`custom-option p-4 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors ${profile.currency === c.code ? 'bg-primary/5 text-primary' : 'text-white/60'}`}
+                          onClick={() => selectCurrency(c.code)}
+                        >
+                          <span className="flex items-center gap-4">
+                            <span className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg font-black text-sm">{c.symbol}</span>
+                            <span className="font-bold">{c.code} <span className="opacity-40 font-medium text-xs ml-1">— {c.name}</span></span>
+                          </span>
+                          {profile.currency === c.code && <span className="material-symbols-outlined text-primary">check</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <footer className="flex justify-end gap-6 mt-6 pt-10 border-t border-white/5">
+                <button type="submit" className="primary-button min-w-[220px]" disabled={saving}>
+                  {saving ? 'Synchronizing...' : 'Finalize Profile'}
+                </button>
+              </footer>
+            </form>
+          </div>
+        </div>
+
+        {/* Right Column: Appearance & Auth (4 cols) */}
+        <div className="lg:col-span-4 flex flex-col gap-8">
+          {/* Theme Switcher */}
+          <div className="glass-panel p-10 rounded-[40px]">
+            <h3 className="view-eyebrow text-[0.625rem] opacity-40 mb-8">Environment Appearance</h3>
+            <div className="flex flex-col gap-4">
+              <button
+                onClick={() => setTheme('light')}
+                className={`flex items-center justify-between p-6 rounded-3xl transition-all duration-300 ${theme === 'light' ? 'bg-white text-black scale-[1.02] shadow-xl' : 'bg-surface-container-low text-secondary/40 hover:text-white'}`}
+              >
+                <div className="flex items-center gap-4">
+                  <span className="material-symbols-outlined">light_mode</span>
+                  <span className="font-bold uppercase tracking-widest text-[0.7rem]">Frosted Light</span>
+                </div>
+                {theme === 'light' && <span className="material-symbols-outlined">check_circle</span>}
+              </button>
+              <button
+                onClick={() => setTheme('dark')}
+                className={`flex items-center justify-between p-6 rounded-3xl transition-all duration-300 ${theme === 'dark' ? 'bg-white text-black scale-[1.02] shadow-xl' : 'bg-surface-container-low text-secondary/40 hover:text-white'}`}
+              >
+                <div className="flex items-center gap-4">
+                  <span className="material-symbols-outlined">dark_mode</span>
+                  <span className="font-bold uppercase tracking-widest text-[0.7rem]">Obsidian Vault</span>
+                </div>
+                {theme === 'dark' && <span className="material-symbols-outlined">check_circle</span>}
+              </button>
             </div>
           </div>
-          <button type="submit" className="primary-button" disabled={saving} style={{ marginTop: '2rem' }}>
-            {saving ? 'Syncing...' : 'Update Profile'}
-          </button>
-        </form>
-      </div>
 
-      <div className="modern-card mb-12" style={{ padding: '2.5rem' }}>
-        <h2 className="settings-section-title" style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 800, marginBottom: '1.5rem' }}>Display Theme</h2>
-        <div className="appearance-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-          <button
-            className={`appearance-card ${theme === 'light' ? 'active' : ''}`}
-            onClick={() => setTheme('light')}
-            style={{
-              padding: '2rem',
-              borderRadius: '1.5rem',
-              border: `2px solid ${theme === 'light' ? 'var(--primary)' : 'var(--outline-variant)'}`,
-              background: theme === 'light' ? 'var(--primary-container)' : 'var(--surface-container-low)',
-              cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '1rem',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '2.5rem', color: theme === 'light' ? 'var(--primary)' : 'var(--on-surface-variant)' }}>light_mode</span>
-            <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--on-surface)' }}>Light</span>
-          </button>
-          <button
-            className={`appearance-card ${theme === 'dark' ? 'active' : ''}`}
-            onClick={() => setTheme('dark')}
-            style={{
-              padding: '2rem',
-              borderRadius: '1.5rem',
-              border: `2px solid ${theme === 'dark' ? 'var(--primary)' : 'var(--outline-variant)'}`,
-              background: theme === 'dark' ? 'var(--primary-container)' : 'var(--surface-container-low)',
-              cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '1rem',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '2.5rem', color: theme === 'dark' ? 'var(--primary)' : 'var(--on-surface-variant)' }}>dark_mode</span>
-            <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--on-surface)' }}>Dark</span>
-          </button>
+          {/* Session Management */}
+          <div className="glass-panel p-10 rounded-[40px] border border-error/10 bg-error/5">
+            <h3 className="view-eyebrow text-[0.625rem] text-error/60 mb-8">Session Integrity</h3>
+            <p className="text-secondary/60 text-xs font-medium leading-relaxed mb-8">
+              Terminating the current session will revoke access on this device. Registry parameters will persist.
+            </p>
+            <button
+              onClick={async () => { await signOut(auth); navigate('/login'); }}
+              className="w-full py-4 rounded-2xl bg-error text-white font-black uppercase tracking-[0.2em] text-[0.65rem] hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-sm">logout</span>
+              Terminate Session
+            </button>
+          </div>
         </div>
-      </div>
-
-      <div className="modern-card" style={{ padding: '2.5rem', border: '1px solid rgba(186,26,26,0.2)', background: 'rgba(186,26,26,0.02)' }}>
-        <h2 className="settings-section-title" style={{ color: 'var(--error)', fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 800, marginBottom: '1rem' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: '1.5rem', verticalAlign: 'middle', marginRight: '0.5rem' }}>dangerous</span>
-          Session Termination
-        </h2>
-        <p className="settings-description" style={{ color: 'var(--on-surface-variant)', opacity: 0.7 }}>You will be signed out of your account on this device. All unsaved changes will be lost.</p>
-        <button
-          className="primary-button"
-          style={{ background: 'var(--error)', marginTop: '1.5rem' }}
-          onClick={async () => { await signOut(auth); navigate('/login'); }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle', marginRight: '0.35rem' }}>logout</span>
-          Sign Out
-        </button>
       </div>
     </div>
   );

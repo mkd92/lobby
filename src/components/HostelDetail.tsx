@@ -5,18 +5,19 @@ import {
   getDoc,
   getDocs,
   addDoc,
-  updateDoc,
   collection,
   query,
   where,
   serverTimestamp,
   writeBatch,
+  updateDoc,
 } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import { LoadingScreen } from './layout/LoadingScreen';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import '../styles/Units.css';
 import '../styles/HostelDetail.css';
 import '../styles/Properties.css';
@@ -56,7 +57,15 @@ const HostelDetail: React.FC = () => {
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [newBed, setNewBed] = useState({ count: 1, price: 0 });
 
+  const [isAddRoomModalOpen, setIsAddRoomModalOpen] = useState(false);
+  const [isAddBedModalOpen, setIsAddBedModalOpen] = useState(false);
+
   const [vacancyFilter, setVacancyFilter] = useState<'All' | 'Vacant' | 'Full'>('All');
+
+  useEscapeKey(() => {
+    setIsAddRoomModalOpen(false);
+    setIsAddBedModalOpen(false);
+  }, isAddRoomModalOpen || isAddBedModalOpen);
 
   const { data, isLoading } = useQuery({
     queryKey: ['hostel', id, ownerId],
@@ -148,7 +157,7 @@ const HostelDetail: React.FC = () => {
       });
       setNewRoom({ room_number: '', floor: 0 });
       queryClient.invalidateQueries({ queryKey: ['hostel', id, ownerId] });
-      (document.getElementById('add-room-dialog') as any)?.close();
+      setIsAddRoomModalOpen(false);
     } catch (err) {
       showAlert((err as Error).message);
     }
@@ -174,7 +183,7 @@ const HostelDetail: React.FC = () => {
       await batch.commit();
       setSelectedRoomId(null);
       queryClient.invalidateQueries({ queryKey: ['hostel', id, ownerId] });
-      (document.getElementById('add-beds-dialog') as any)?.close();
+      setIsAddBedModalOpen(false);
     } catch (err) {
       showAlert((err as Error).message);
     }
@@ -203,7 +212,7 @@ const HostelDetail: React.FC = () => {
           </p>
         </div>
         {!isStaff && (
-          <button className="primary-button min-w-[200px]" onClick={() => (document.getElementById('add-room-dialog') as any)?.showModal()}>
+          <button className="primary-button min-w-[200px]" onClick={() => setIsAddRoomModalOpen(true)}>
             <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle', fontSize: '1.25rem' }}>add_circle</span>
             Add Room
           </button>
@@ -331,7 +340,7 @@ const HostelDetail: React.FC = () => {
                   <div className="pt-4 border-t border-white/5 mt-2 flex justify-between items-center">
                     <span className="text-[0.6rem] font-bold text-secondary/60 uppercase tracking-widest">{room.beds.length} Total Inventory</span>
                     {!isStaff && (
-                      <button className="btn-icon" onClick={(e) => { e.stopPropagation(); setSelectedRoomId(room.id); (document.getElementById('add-beds-dialog') as any)?.showModal(); }} title="Allocate Beds">
+                      <button className="btn-icon" onClick={(e) => { e.stopPropagation(); setSelectedRoomId(room.id); setIsAddBedModalOpen(true); }} title="Allocate Beds">
                         <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>add_circle</span>
                       </button>
                     )}
@@ -343,49 +352,89 @@ const HostelDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* Dialogs */}
-      <dialog id="add-room-dialog" className="modal-modern" style={{ padding: 0, border: 'none' }}>
-        <header className="modal-header">
-          <h2 className="modal-title">Add New Room</h2>
-          <button className="modal-close-btn" onClick={() => (document.getElementById('add-room-dialog') as any)?.close()}><span className="material-symbols-outlined">close</span></button>
-        </header>
-        <form onSubmit={handleAddRoom} className="modal-form-modern">
-          <div className="form-group-modern">
-            <label>Room Number</label>
-            <input type="text" value={newRoom.room_number} onChange={e => setNewRoom({...newRoom, room_number: e.target.value})} required />
+      {/* Redesigned Modals */}
+      {isAddRoomModalOpen && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setIsAddRoomModalOpen(false)}>
+          <div className="modal-content-modern" style={{ maxWidth: '560px' }}>
+            <header className="modal-header-modern">
+              <h2 className="modal-title">New Room</h2>
+              <p className="modal-subtitle">Define spatial parameters for the shared facility</p>
+            </header>
+            <form onSubmit={handleAddRoom} className="modal-form-modern">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="form-group-modern">
+                  <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Room Number</label>
+                  <input 
+                    type="text" 
+                    value={newRoom.room_number} 
+                    onChange={e => setNewRoom({...newRoom, room_number: e.target.value})} 
+                    className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-display font-bold text-xl"
+                    placeholder="e.g. 101"
+                    required 
+                  />
+                </div>
+                <div className="form-group-modern">
+                  <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Floor Level</label>
+                  <input 
+                    type="number" 
+                    value={newRoom.floor} 
+                    onChange={e => setNewRoom({...newRoom, floor: parseInt(e.target.value)})} 
+                    className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-display font-bold text-xl"
+                    required 
+                  />
+                </div>
+              </div>
+              <footer className="flex justify-end gap-4 mt-8 pt-6 border-t border-white/5">
+                <button type="button" className="primary-button glass-panel" onClick={() => setIsAddRoomModalOpen(false)} style={{ background: 'rgba(255,255,255,0.05)' }}>Discard</button>
+                <button type="submit" className="primary-button" style={{ minWidth: '160px' }}>Finalize Room</button>
+              </footer>
+            </form>
           </div>
-          <div className="form-group-modern">
-            <label>Floor</label>
-            <input type="number" value={newRoom.floor} onChange={e => setNewRoom({...newRoom, floor: parseInt(e.target.value)})} required />
-          </div>
-          <footer className="modal-footer-modern" style={{ padding: 0 }}>
-            <button type="submit" className="primary-button">Create Room</button>
-          </footer>
-        </form>
-      </dialog>
+        </div>
+      )}
 
-      <dialog id="add-beds-dialog" className="modal-modern" style={{ padding: 0, border: 'none' }}>
-        <header className="modal-header">
-          <h2 className="modal-title">Allocate Beds</h2>
-          <button className="modal-close-btn" onClick={() => (document.getElementById('add-beds-dialog') as any)?.close()}><span className="material-symbols-outlined">close</span></button>
-        </header>
-        <form onSubmit={handleAddBeds} className="modal-form-modern">
-          <div className="form-group-modern">
-            <label>Quantity of Units</label>
-            <input type="number" min="1" max="10" value={newBed.count} onChange={e => setNewBed({...newBed, count: parseInt(e.target.value)})} required />
+      {isAddBedModalOpen && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setIsAddBedModalOpen(false)}>
+          <div className="modal-content-modern" style={{ maxWidth: '560px' }}>
+            <header className="modal-header-modern">
+              <h2 className="modal-title">Allocate Beds</h2>
+              <p className="modal-subtitle">Define quantity and yield for the room inventory</p>
+            </header>
+            <form onSubmit={handleAddBeds} className="modal-form-modern">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="form-group-modern">
+                  <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Quantity of Units</label>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max="10" 
+                    value={newBed.count} 
+                    onChange={e => setNewBed({...newBed, count: parseInt(e.target.value)})} 
+                    className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-display font-bold text-xl"
+                    required 
+                  />
+                </div>
+                <div className="form-group-modern">
+                  <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Base Price per Bed ({data.currencySymbol})</label>
+                  <input 
+                    type="number" 
+                    value={newBed.price} 
+                    onChange={e => setNewBed({...newBed, price: parseFloat(e.target.value)})} 
+                    className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-display font-bold text-xl"
+                    required 
+                  />
+                </div>
+              </div>
+              <footer className="flex justify-end gap-4 mt-8 pt-6 border-t border-white/5">
+                <button type="button" className="primary-button glass-panel" onClick={() => setIsAddBedModalOpen(false)} style={{ background: 'rgba(255,255,255,0.05)' }}>Discard</button>
+                <button type="submit" className="primary-button" style={{ minWidth: '160px' }}>Sync Inventory</button>
+              </footer>
+            </form>
           </div>
-          <div className="form-group-modern">
-            <label>Base Price per Unit ({data.currencySymbol})</label>
-            <input type="number" value={newBed.price} onChange={e => setNewBed({...newBed, price: parseFloat(e.target.value)})} required />
-          </div>
-          <footer className="modal-footer-modern" style={{ padding: 0 }}>
-            <button type="submit" className="primary-button">Finalize Allocation</button>
-          </footer>
-        </form>
-      </dialog>
+        </div>
+      )}
     </div>
   );
 };
 
 export default HostelDetail;
-;
