@@ -1,0 +1,86 @@
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { prefetchMap } from '../../App';
+
+export const BottomNav: React.FC = () => {
+  const location = useLocation();
+  const isActive = (path: string) => location.pathname === path;
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  useEffect(() => { setMoreOpen(false); }, [location.pathname]);
+
+  const prefetch = (key: keyof typeof prefetchMap) => {
+    prefetchMap[key]?.();
+  };
+
+  return (
+    <>
+      {moreOpen && (
+        <div className="more-sheet-overlay" onClick={() => setMoreOpen(false)}>
+          <div className="more-sheet glass-panel" onClick={e => e.stopPropagation()} style={{ background: 'rgba(40, 42, 44, 0.95)' }}>
+            <Link
+              to="/customers"
+              className={`more-sheet-item ${isActive('/customers') ? 'active' : ''}`}
+              onMouseEnter={() => prefetch('customers')}
+            >
+              <span className="material-symbols-outlined">group</span>
+              <span>Relationship Management</span>
+            </Link>
+            <Link
+              to="/payments"
+              className={`more-sheet-item ${isActive('/payments') ? 'active' : ''}`}
+              onMouseEnter={() => prefetch('payments')}
+            >
+              <span className="material-symbols-outlined">payments</span>
+              <span>Financial Ledger</span>
+            </Link>
+            {typeof __BUILD_TIME__ !== 'undefined' && (
+              <div style={{ padding: '1rem', fontSize: '0.6rem', opacity: 0.3, color: 'var(--on-surface-variant)', fontFamily: 'monospace', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', marginTop: '0.5rem' }}>
+                VAULT v{new Date(__BUILD_TIME__).toLocaleDateString(undefined, { month: 'short', year: '2-digit' })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[92%] max-w-lg rounded-[32px] z-50 bg-[#282a2c]/80 backdrop-blur-[32px] shadow-[0_32px_64px_rgba(0,0,0,0.6)] border border-white/5 md:hidden">
+        <div className="flex justify-around items-center h-20 px-6">
+          <Link
+            to="/"
+            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${isActive('/') ? 'bg-white/10 text-white scale-110 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]' : 'text-[#c5c5d8]/50 hover:text-white'}`}
+            onMouseEnter={() => prefetch('lobby')}
+          >
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: isActive('/') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>dashboard</span>
+          </Link>
+          <Link
+            to="/properties"
+            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/properties') ? 'bg-white/10 text-white scale-110 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]' : 'text-[#c5c5d8]/50 hover:text-white'}`}
+            onMouseEnter={() => prefetch('properties')}
+          >
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: location.pathname.startsWith('/properties') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>domain</span>
+          </Link>
+          <Link
+            to="/hostels"
+            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/hostels') ? 'bg-white/10 text-white scale-110 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]' : 'text-[#c5c5d8]/50 hover:text-white'}`}
+            onMouseEnter={() => prefetch('hostels')}
+          >
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: location.pathname.startsWith('/hostels') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>hotel</span>
+          </Link>
+          <Link
+            to="/leases"
+            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/leases') ? 'bg-white/10 text-white scale-110 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]' : 'text-[#c5c5d8]/50 hover:text-white'}`}
+            onMouseEnter={() => prefetch('leases')}
+          >
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: location.pathname.startsWith('/leases') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>contract</span>
+          </Link>
+          <button
+            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${moreOpen ? 'bg-white/10 text-white' : 'text-[#c5c5d8]/50'}`}
+            onClick={() => setMoreOpen(prev => !prev)}
+          >
+            <span className="material-symbols-outlined" style={{ transform: moreOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.3s ease', fontSize: '1.75rem' }}>more_horiz</span>
+          </button>
+        </div>
+      </nav>
+    </>
+  );
+};

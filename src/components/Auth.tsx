@@ -40,7 +40,6 @@ const Auth: React.FC = () => {
         if (fullName) {
           await updateProfile(user, { displayName: fullName });
         }
-        alert('Account created! You are now signed in.');
       }
     } catch (err) {
       setError((err as Error).message || 'An error occurred during authentication.');
@@ -69,15 +68,17 @@ const Auth: React.FC = () => {
             <LogoMark />
             <span className="auth-brand-name">Lobby</span>
           </div>
-          <h2 className="display-small">{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
-          <p className="text-on-surface-variant">
-            {isLogin ? 'Enter your credentials to access your dashboard.' : 'Join Lobby to manage your portfolio.'}
+          <h2 className="view-title" style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
+            {isLogin ? 'Welcome Back' : 'Create Account'}
+          </h2>
+          <p className="text-on-surface-variant" style={{ fontSize: '0.9375rem', opacity: 0.7 }}>
+            {isLogin ? 'Access your management dashboard' : 'Start managing your portfolio today'}
           </p>
         </div>
 
         <button
           type="button"
-          className="google-button mb-6"
+          className="google-button"
           onClick={handleGoogleLogin}
           disabled={loading}
         >
@@ -90,7 +91,7 @@ const Auth: React.FC = () => {
           Continue with Google
         </button>
 
-        <div className="divider mb-6">
+        <div className="divider">
           <span>or use email</span>
         </div>
 
@@ -98,7 +99,7 @@ const Auth: React.FC = () => {
           {error && <div className="error-message">{error}</div>}
 
           {!isLogin && (
-            <div className="form-group">
+            <div className="auth-input-group">
               <label htmlFor="fullName">Full Name</label>
               <input
                 id="fullName"
@@ -112,7 +113,7 @@ const Auth: React.FC = () => {
             </div>
           )}
 
-          <div className="form-group">
+          <div className="auth-input-group">
             <label htmlFor="email">Email Address</label>
             <input
               id="email"
@@ -125,7 +126,7 @@ const Auth: React.FC = () => {
             />
           </div>
 
-          <div className="form-group">
+          <div className="auth-input-group">
             <label htmlFor="password">Password</label>
             <input
               id="password"
@@ -139,14 +140,14 @@ const Auth: React.FC = () => {
           </div>
 
           <button type="submit" className="primary-button auth-button" disabled={loading}>
-            {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Sign Up'}
+            {loading ? 'Initializing...' : isLogin ? 'Sign In' : 'Create Account'}
           </button>
         </form>
 
         <div className="auth-footer">
-          {isLogin ? "Don't have an account? " : "Already have an account? "}
+          {isLogin ? "New to Lobby?" : "Already have an account?"}
           <span className="auth-link" onClick={() => setIsLogin(!isLogin)}>
-            {isLogin ? 'Sign Up' : 'Sign In'}
+            {isLogin ? 'Join now' : 'Sign in'}
           </span>
         </div>
       </div>

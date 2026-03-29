@@ -5,11 +5,29 @@
 }
 
 .App {
-  height: 100vh;
-  height: 100dvh; /* Use dynamic viewport height for mobile */
-  width: 100vw;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
   position: relative;
+}
+
+.page-fade-in {
+  animation: pageFadeIn 0.3s ease-out;
+}
+
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.loading-spinner {
+  font-weight: 500;
+  color: var(--primary);
+  letter-spacing: 0.5px;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }

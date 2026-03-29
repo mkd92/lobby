@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import { useEscapeKey } from '../hooks/useEscapeKey';
-import { useProperties } from '../hooks/useProperties';
+import { useAppData } from '../hooks/useAppData';
+import { LoadingScreen } from './layout/LoadingScreen';
 import type { Property } from '../hooks/useProperties';
 import '../styles/Properties.css';
 
@@ -13,14 +14,28 @@ const Properties: React.FC = () => {
   const navigate = useNavigate();
   const { showAlert, showConfirm, DialogMount } = useDialog();
   const { isStaff } = useOwner();
-  const { properties, isLoading, saveProperty, removeProperty, checkOccupiedUnits } = useProperties();
+  const { properties, isLoading, mutations } = useAppData();
+  const { saveProperty, removeProperty, checkOccupiedUnits } = mutations;
 
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [editData, setEditData] = useState({ name: '', address: '', type: '' });
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
 
   useEscapeKey(() => setEditingProperty(null), !!editingProperty);
+
+  const filteredProperties = useMemo(() => {
+    return properties.filter(p => 
+      p.name.toLowerCase().includes(search.toLowerCase()) || 
+      p.address.toLowerCase().includes(search.toLowerCase()) ||
+      p.type.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [properties, search]);
+
+  const totalUnits = useMemo(() => 
+    properties.reduce((acc, p) => acc + (p.unitCount || 0), 0), 
+  [properties]);
 
   const openEdit = (e: React.MouseEvent, property: Property) => {
     e.preventDefault();
@@ -65,67 +80,129 @@ const Properties: React.FC = () => {
     }
   };
 
-  if (isLoading) return <div className="p-12">Loading properties...</div>;
+  if (isLoading) return <LoadingScreen message="Accessing Portfolio Vault" />;
 
   return (
-    <div className="properties-container">
+    <div className="view-container page-fade-in">
       {DialogMount}
-      <header className="page-header mb-12">
-        <div>
-          <h1 className="display-small mb-2">Properties</h1>
-          <p className="text-on-surface-variant">Manage your real estate portfolio.</p>
+      
+      <header className="view-header">
+        <p className="view-eyebrow">Portfolio Assets</p>
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+          <h1 className="view-title" style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', margin: 0 }}>Property Management</h1>
+          {!isStaff && (
+            <button onClick={() => navigate('/properties/new')} className="primary-button">
+              <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle', fontSize: '1.25rem' }}>add</span>
+              Register Asset
+            </button>
+          )}
         </div>
-        {!isStaff && (
-          <Link to="/properties/new" className="primary-button">+ Add Property</Link>
-        )}
       </header>
 
+      {/* Portfolio Quick Metrics */}
+      {properties.length > 0 && (
+        <div className="properties-metrics-bar custom-scrollbar">
+          <div className="prop-metric">
+            <span className="prop-metric-label">Holdings</span>
+            <span className="prop-metric-value">{properties.length}</span>
+          </div>
+          <div className="prop-metric">
+            <span className="prop-metric-label">Total Units</span>
+            <span className="prop-metric-value">{totalUnits}</span>
+          </div>
+          <div className="prop-metric">
+            <span className="prop-metric-label">Asset Diversity</span>
+            <span className="prop-metric-value" style={{ fontSize: '1.25rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 'auto' }}>Mixed</span>
+          </div>
+        </div>
+      )}
+
+      {/* Search & Filter Bar */}
+      <div className="properties-toolbar">
+        <div className="prop-search-wrapper">
+          <span className="material-symbols-outlined search-icon">search</span>
+          <input 
+            type="text" 
+            placeholder="Search assets by name, address, or type..." 
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="prop-search-input"
+          />
+        </div>
+        <div className="prop-filter-count">
+          {filteredProperties.length} / {properties.length} Assets Identified
+        </div>
+      </div>
+
       {properties.length === 0 ? (
-        <div className="empty-state">
-          <span className="material-symbols-outlined" style={{ fontSize: '4rem', opacity: 0.2, display: 'block', marginBottom: '1rem' }}>domain</span>
-          <h2 className="mb-2">No properties yet</h2>
-          <p className="text-on-surface-variant mb-8">Start by adding your first property to the platform.</p>
-          <Link to="/properties/new" className="primary-button" style={{ textDecoration: 'none' }}>Create First Property</Link>
+        <div className="empty-state modern-card" style={{ textAlign: 'center', padding: '6rem 2rem' }}>
+          <div className="empty-state-icon" style={{ opacity: 0.2, marginBottom: '2rem' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '4rem' }}>domain_disabled</span>
+          </div>
+          <h2 className="mb-4">Empty Portfolio</h2>
+          <p className="text-on-surface-variant mb-10 max-w-md mx-auto">Register your first property asset to begin tracking units, occupancy, and financial yields.</p>
+          {!isStaff && (
+            <button onClick={() => navigate('/properties/new')} className="primary-button">Initialize Portfolio</button>
+          )}
+        </div>
+      ) : filteredProperties.length === 0 ? (
+        <div className="empty-state modern-card" style={{ textAlign: 'center', padding: '6rem 2rem' }}>
+          <div className="empty-state-icon" style={{ opacity: 0.2, marginBottom: '2rem' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '4rem' }}>search_off</span>
+          </div>
+          <h2 className="mb-4">No Assets Found</h2>
+          <p className="text-on-surface-variant">Adjust your filtering parameters to locate specific property entries.</p>
+          <button className="primary-button glass-panel mt-8" onClick={() => setSearch('')} style={{ background: 'rgba(255,255,255,0.05)' }}>Reset Search</button>
         </div>
       ) : (
         <div className="properties-grid">
-          {properties.map(property => (
-            <div key={property.id} className="property-card" style={{ cursor: 'pointer' }} onClick={() => navigate(`/properties/${property.id}`)}>
-              <div className="property-header-compact">
-                <div className="property-icon-box">
-                  <span className="material-symbols-outlined">apartment</span>
+          {filteredProperties.map(property => (
+            <div key={property.id} className="property-card" onClick={() => navigate(`/properties/${property.id}`)}>
+              <div className="property-card-visual">
+                <div className="property-type-chip">{property.type}</div>
+                <div className="property-icon-large">
+                  <span className="material-symbols-outlined">
+                    {property.type === 'Residential' ? 'home' : 
+                     property.type === 'Commercial' ? 'store' : 
+                     property.type === 'Industrial' ? 'factory' : 'apartment'}
+                  </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
-                  <div className="property-type-badge">{property.type}</div>
-                  {!isStaff && (
-                    <div className="property-actions-compact" onClick={e => e.stopPropagation()}>
-                      <button className="prop-action-btn" title="Edit property" onClick={e => openEdit(e, property)}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>edit</span>
-                      </button>
-                      <button className="prop-action-btn danger" title="Delete property" onClick={e => handleDelete(e, property)}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>delete</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
+                {!isStaff && (
+                  <div className="property-card-quick-actions" onClick={e => e.stopPropagation()}>
+                    <button className="prop-mini-btn" onClick={e => openEdit(e, property)} title="Modify Identity">
+                      <span className="material-symbols-outlined">edit</span>
+                    </button>
+                    <button className="prop-mini-btn danger" onClick={e => handleDelete(e, property)} title="Terminate Asset">
+                      <span className="material-symbols-outlined">delete</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <div className="property-info">
-                <h3 className="property-name">{property.name}</h3>
-                <div className="property-address">
-                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>location_on</span>
+              <div className="property-card-body">
+                <h3 className="property-name-modern">{property.name}</h3>
+                <div className="property-address-modern">
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', color: 'var(--primary)', opacity: 0.5 }}>location_on</span>
                   {property.address}
                 </div>
-                <div className="property-stats">
-                  <div className="stat-item">
-                    <div className="stat-label">Units</div>
-                    <div className="stat-value">{property.unitCount || 0}</div>
+                
+                <div className="property-card-stats-row">
+                  <div className="stat-pill">
+                    <span className="stat-pill-label">Inventory</span>
+                    <span className="stat-pill-value">{property.unitCount || 0} Units</span>
                   </div>
-                  <div className="stat-item">
-                    <div className="stat-label">Status</div>
-                    <div className="stat-value" style={{ color: 'var(--primary)' }}>Active</div>
+                  <div className="stat-pill">
+                    <span className="stat-pill-label">Status</span>
+                    <span className="stat-pill-value" style={{ color: 'var(--primary)' }}>Active</span>
                   </div>
                 </div>
+              </div>
+              
+              <div className="property-card-footer">
+                <span className="view-link">
+                  Detailed Management Dashboard
+                  <span className="material-symbols-outlined">arrow_forward_ios</span>
+                </span>
               </div>
             </div>
           ))}
@@ -134,55 +211,52 @@ const Properties: React.FC = () => {
 
       {editingProperty && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setEditingProperty(null)}>
-          <div className="modal-content" style={{ borderRadius: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
-              <div>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0 }}>Edit Property</h2>
-                <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', opacity: 0.6 }}>Update the property details</p>
-              </div>
-              <button className="icon-action-btn" onClick={() => setEditingProperty(null)}>
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
+          <div className="modal-content-modern">
+            <header className="modal-header-modern">
+              <h2 className="modal-title">Modify Asset</h2>
+              <p className="modal-subtitle">Update core identity and asset classification</p>
+            </header>
 
-            <form onSubmit={handleEditSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div className="unit-input-group">
-                <label>Property Name</label>
-                <input type="text" className="unit-mini-input" value={editData.name} onChange={e => setEditData(d => ({ ...d, name: e.target.value }))} required style={{ padding: '0.7rem 0.9rem', borderRadius: '0.75rem' }} />
+            <form onSubmit={handleEditSave} className="modal-form-modern">
+              <div className="form-group-modern">
+                <label>Legal Asset Name</label>
+                <input 
+                  type="text" 
+                  value={editData.name} 
+                  onChange={e => setEditData(d => ({ ...d, name: e.target.value }))} 
+                  placeholder="Ex: Sapphire Heights"
+                  required 
+                />
               </div>
-              <div className="unit-input-group">
-                <label>Address</label>
-                <input type="text" className="unit-mini-input" value={editData.address} onChange={e => setEditData(d => ({ ...d, address: e.target.value }))} required style={{ padding: '0.7rem 0.9rem', borderRadius: '0.75rem' }} />
+              
+              <div className="form-group-modern">
+                <label>Physical Operating Address</label>
+                <input 
+                  type="text" 
+                  value={editData.address} 
+                  onChange={e => setEditData(d => ({ ...d, address: e.target.value }))} 
+                  placeholder="Full street address, City, ZIP"
+                  required 
+                />
               </div>
-              <div className="unit-input-group">
-                <label>Type</label>
+
+              <div className="form-group-modern">
+                <label>Classification</label>
                 <div className="custom-select-container">
                   <div
                     className={`custom-select-trigger ${typeDropdownOpen ? 'open' : ''}`}
-                    style={{ padding: '0.7rem 0.9rem', fontSize: '0.9rem' }}
+                    style={{ background: 'var(--surface-container-low)', padding: '1.125rem 1.5rem', borderRadius: '1.25rem' }}
                     onClick={() => setTypeDropdownOpen(o => !o)}
-                    tabIndex={0}
-                    onKeyDown={e => {
-                      if (!typeDropdownOpen) {
-                        if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setTypeDropdownOpen(true); }
-                        return;
-                      }
-                      if (e.key === 'Escape') { setTypeDropdownOpen(false); return; }
-                      const idx = propertyTypes.indexOf(editData.type);
-                      if (e.key === 'ArrowDown') { e.preventDefault(); setEditData(d => ({ ...d, type: propertyTypes[(idx + 1) % propertyTypes.length] })); }
-                      if (e.key === 'ArrowUp')   { e.preventDefault(); setEditData(d => ({ ...d, type: propertyTypes[(idx - 1 + propertyTypes.length) % propertyTypes.length] })); }
-                      if (e.key === 'Enter')     { e.preventDefault(); setTypeDropdownOpen(false); }
-                    }}
                   >
-                    {editData.type}
-                    <span className="material-symbols-outlined" style={{ transition: '0.2s', transform: typeDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', fontSize: '1.1rem' }}>keyboard_arrow_down</span>
+                    <span style={{ fontWeight: 700 }}>{editData.type}</span>
+                    <span className="material-symbols-outlined transition-transform">keyboard_arrow_down</span>
                   </div>
                   {typeDropdownOpen && (
-                    <div className="custom-options">
+                    <div className="custom-options" style={{ top: 'calc(100% + 0.5rem)', background: 'rgba(40, 42, 44, 0.95)', backdropFilter: 'blur(24px)' }}>
                       {propertyTypes.map(t => (
                         <div key={t} className={`custom-option ${editData.type === t ? 'selected' : ''}`} onClick={() => { setEditData(d => ({ ...d, type: t })); setTypeDropdownOpen(false); }}>
                           {t}
-                          {editData.type === t && <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>check</span>}
+                          {editData.type === t && <span className="material-symbols-outlined">check</span>}
                         </div>
                       ))}
                     </div>
@@ -190,10 +264,12 @@ const Properties: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', paddingTop: '0.5rem' }}>
-                <button type="button" className="primary-button glass" style={{ padding: '0.7rem 1.5rem' }} onClick={() => setEditingProperty(null)}>Cancel</button>
-                <button type="submit" className="primary-button" style={{ padding: '0.7rem 2rem' }} disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</button>
-              </div>
+              <footer className="flex justify-end gap-4 mt-4">
+                <button type="button" className="primary-button glass-panel" onClick={() => setEditingProperty(null)} style={{ background: 'rgba(255,255,255,0.05)' }}>Discard</button>
+                <button type="submit" className="primary-button" disabled={saving}>
+                  {saving ? 'Syncing...' : 'Confirm Changes'}
+                </button>
+              </footer>
             </form>
           </div>
         </div>

@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useQueryClient } from '@tanstack/react-query';
 import { db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
-import '../styles/Auth.css';
 
 const AddHostel: React.FC = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { ownerId } = useOwner();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +30,7 @@ const AddHostel: React.FC = () => {
         owner_id: ownerId,
         created_at: serverTimestamp(),
       });
+      queryClient.invalidateQueries({ queryKey: ['hostels', ownerId] });
       navigate('/hostels');
     } catch (err) {
       setError((err as Error).message);
@@ -38,34 +40,36 @@ const AddHostel: React.FC = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto py-12">
-      <header className="mb-12">
-        <button onClick={() => navigate(-1)} className="text-primary font-bold flex items-center gap-2 mb-4 hover:opacity-70 transition-opacity" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-          <span className="material-symbols-outlined">arrow_back</span>
-          Back
-        </button>
-        <h1 className="display-small">New Hostel</h1>
-        <p className="text-on-surface-variant">Register a new hostel facility to manage rooms and beds.</p>
+    <div className="view-container" style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <header className="view-header">
+        <div>
+          <div className="view-eyebrow" style={{ cursor: 'pointer' }} onClick={() => navigate(-1)}>
+            <span className="material-symbols-outlined" style={{ fontSize: '1rem', marginRight: '0.5rem' }}>arrow_back</span>
+            Back
+          </div>
+          <h1 className="view-title">New Facility Setup</h1>
+          <p className="text-on-surface-variant mt-2">Initialize a new hostel facility for shared accommodation management.</p>
+        </div>
       </header>
 
-      <div className="bg-surface-container-lowest p-12 rounded-3xl shadow-ambient border border-outline-variant">
-        <form onSubmit={handleSubmit} className="auth-form">
-          {error && <div className="error-message mb-6">{error}</div>}
+      <div className="modern-card" style={{ padding: '3rem' }}>
+        <form onSubmit={handleSubmit} className="modal-form-modern" style={{ padding: 0 }}>
+          {error && <div className="error-message mb-6" style={{ background: 'rgba(186,26,26,0.1)', color: 'var(--error)', padding: '1rem', borderRadius: '0.75rem', fontWeight: 600 }}>{error}</div>}
 
-          <div className="form-group">
-            <label>Hostel Name</label>
-            <input name="name" type="text" className="auth-input" placeholder="e.g. Sunshine Boys Hostel" value={formData.name} onChange={handleChange} required />
+          <div className="form-group-modern">
+            <label>Hostel Facility Name</label>
+            <input name="name" type="text" placeholder="e.g. Skyline Student Living" value={formData.name} onChange={handleChange} required />
           </div>
 
-          <div className="form-group">
-            <label>Full Address</label>
-            <input name="address" type="text" className="auth-input" placeholder="Full street address" value={formData.address} onChange={handleChange} required />
+          <div className="form-group-modern">
+            <label>Physical Operating Address</label>
+            <input name="address" type="text" placeholder="Full street address, City, Zip" value={formData.address} onChange={handleChange} required />
           </div>
 
-          <div className="flex gap-4 mt-8">
-            <button type="button" className="primary-button" style={{ background: 'var(--surface-container-high)', color: 'var(--on-surface)', boxShadow: 'none' }} onClick={() => navigate(-1)}>Cancel</button>
-            <button type="submit" className="primary-button flex-1" disabled={loading}>{loading ? 'Registering...' : 'Register Hostel'}</button>
-          </div>
+          <footer className="modal-footer-modern" style={{ padding: '2rem 0 0', marginTop: '1rem' }}>
+            <button type="button" className="btn-secondary" onClick={() => navigate(-1)}>Discard</button>
+            <button type="submit" className="primary-button flex-1" disabled={loading}>{loading ? 'Initializing...' : 'Confirm Facility'}</button>
+          </footer>
         </form>
       </div>
     </div>

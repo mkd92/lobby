@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
-import { collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { auth, db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
 import { useTheme } from '../context/ThemeContext';
+import { LoadingScreen } from './layout/LoadingScreen';
 import '../styles/Auth.css';
 import '../styles/Properties.css';
 import '../styles/Settings.css';
@@ -18,67 +19,40 @@ const currencies = [
   { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
   { code: 'CAD', symbol: '$', name: 'Canadian Dollar' },
   { code: 'AUD', symbol: '$', name: 'Australian Dollar' },
+  { code: 'SGD', symbol: '$', name: 'Singapore Dollar' },
+  { code: 'CHF', symbol: 'Fr.', name: 'Swiss Franc' },
 ];
 
-type UpdateStatus = 'idle' | 'checking' | 'up-to-date' | 'updating' | 'error';
-
 const Settings: React.FC = () => {
-  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
-  const { ownerId, user } = useOwner();
+  const { ownerId } = useOwner();
+  const { theme, setTheme } = useTheme();
   const queryClient = useQueryClient();
-
+  const [profile, setProfile] = useState({ name: '', email: '', phone: '', currency: 'USD' });
   const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [newStaffEmail, setNewStaffEmail] = useState('');
-  const [staffLoading, setStaffLoading] = useState(false);
-
-  const [profile, setProfile] = useState({
-    full_name: '',
-    email: '',
-    currency: 'USD',
-  });
-
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['settings', ownerId],
-    queryFn: async () => {
-      if (!ownerId) throw new Error('No ownerId');
-      const [ownerSnap, staffSnap] = await Promise.all([
-        getDoc(doc(db, 'owners', ownerId)),
-        getDocs(query(collection(db, 'staff'), where('owner_id', '==', ownerId))),
-      ]);
-
-      let profileData = { full_name: '', email: '', currency: 'USD' };
-      if (ownerSnap.exists()) {
-        const d = ownerSnap.data();
-        profileData = {
-          full_name: d.full_name || '',
-          email: d.email || user?.email || '',
-          currency: d.currency || 'USD',
-        };
-      }
-
-      const staffEmails = staffSnap.docs.map(d => ({
-        id: d.id,
-        staff_email: d.data().staff_email as string,
-        status: (d.data().status as string) || 'pending',
-      }));
-
-      return { profile: profileData, staffEmails };
-    },
+    queryKey: ['owner-profile', ownerId],
     enabled: !!ownerId,
+    queryFn: async () => {
+      const snap = await getDoc(doc(db, 'owners', ownerId!));
+      return snap.data();
+    },
   });
 
-  // Sync query data into editable local profile state
   useEffect(() => {
-    if (data?.profile) setProfile(data.profile);
+    if (data) {
+      setProfile({
+        name: data.name || '',
+        email: data.email || '',
+        phone: data.phone || '',
+        currency: data.currency || 'USD',
+      });
+    }
   }, [data]);
-
-  const staffEmails = data?.staffEmails ?? [];
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -90,91 +64,16 @@ const Settings: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleCheckUpdate = async () => {
-    setUpdateStatus('checking');
-    try {
-      const reg = await navigator.serviceWorker?.getRegistration();
-      if (!reg) {
-        window.location.reload();
-        return;
-      }
-      await reg.update();
-      if (reg.waiting) {
-        setUpdateStatus('updating');
-        window.__updateSW?.(true);
-        return;
-      }
-      // Listen briefly in case SW is still installing
-      const onUpdateFound = () => {
-        const sw = reg.installing;
-        if (!sw) return;
-        sw.addEventListener('statechange', () => {
-          if (sw.state === 'installed' && reg.waiting) {
-            setUpdateStatus('updating');
-            window.__updateSW?.(true);
-          }
-        });
-      };
-      reg.addEventListener('updatefound', onUpdateFound);
-      setTimeout(() => {
-        reg.removeEventListener('updatefound', onUpdateFound);
-        setUpdateStatus('up-to-date');
-        setTimeout(() => setUpdateStatus('idle'), 3000);
-      }, 3000);
-    } catch {
-      setUpdateStatus('error');
-      setTimeout(() => setUpdateStatus('idle'), 3000);
-    }
-  };
-
-  const handleAddStaff = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newStaffEmail.trim() || !ownerId) return;
-    setStaffLoading(true);
-    try {
-      const email = newStaffEmail.trim().toLowerCase();
-      await addDoc(collection(db, 'staff'), {
-        owner_id: ownerId,
-        staff_email: email,
-        status: 'pending',
-        invited_at: serverTimestamp(),
-      });
-      setNewStaffEmail('');
-      queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
-
-      // Open mailto invite
-      const appUrl = window.location.origin;
-      const subject = encodeURIComponent('You have been invited as a staff member');
-      const body = encodeURIComponent(
-        `Hi,\n\nYou have been invited to access a property management account on Lobby as a read-only staff member.\n\nSimply sign up or log in at the link below using this email address (${email}):\n${appUrl}\n\nYou will automatically have read-only access once you log in.\n\nThanks`
-      );
-      window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
-    } catch (error) {
-      console.error('Error adding staff:', error);
-    }
-    setStaffLoading(false);
-  };
-
-  const handleRemoveStaff = async (id: string) => {
-    await deleteDoc(doc(db, 'staff', id));
-    queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
-  };
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ownerId) return;
     setSaving(true);
     setMessage(null);
-
     try {
-      await updateDoc(doc(db, 'owners', ownerId), {
-        full_name: profile.full_name,
-        currency: profile.currency,
-      });
-      setMessage({ type: 'success', text: 'Settings updated successfully!' });
-      queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
-    } catch (error) {
-      setMessage({ type: 'error', text: (error as Error).message });
+      await updateDoc(doc(db, 'owners', ownerId!), profile);
+      queryClient.invalidateQueries({ queryKey: ['owner-profile', ownerId] });
+      setMessage({ text: 'Settings updated successfully!', type: 'success' });
+    } catch (err) {
+      setMessage({ text: (err as Error).message, type: 'error' });
     } finally {
       setSaving(false);
     }
@@ -187,252 +86,160 @@ const Settings: React.FC = () => {
 
   const currentCurrency = currencies.find(c => c.code === profile.currency) || currencies[0];
 
-  if (isLoading) return <div className="p-12">Loading settings...</div>;
+  if (isLoading) return <LoadingScreen message="Loading settings" />;
 
   return (
-    <div className="settings-page">
-      <header className="mb-12">
-        <h1 className="display-small">Settings</h1>
-        <p className="text-on-surface-variant">Manage your profile and platform preferences.</p>
+    <div className="view-container">
+      <header className="view-header">
+        <div>
+          <p className="view-eyebrow">
+            System Preferences
+          </p>
+          <h1 className="view-title">Account Settings</h1>
+        </div>
       </header>
 
       {message && (
-        <div className={`mb-8 p-4 rounded-xl border ${
-          message.type === 'success'
-            ? 'settings-success-message'
-            : 'error-message'
-        }`}>
+        <div className={`mb-8 p-4 rounded-xl border ${message.type === 'success' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`} style={{
+          backgroundColor: message.type === 'success' ? 'var(--primary-container)' : 'rgba(186,26,26,0.1)',
+          color: message.type === 'success' ? 'var(--on-primary-container)' : 'var(--error)',
+          borderColor: 'transparent',
+          fontSize: '0.9rem',
+          fontWeight: 600,
+          borderRadius: '1rem',
+          marginBottom: '2rem'
+        }}>
           {message.text}
         </div>
       )}
 
-      {/* Staff Access */}
-      <div className="settings-card">
-        <h2 className="settings-section-title">Staff Access</h2>
-        <p className="settings-description">Staff members can view all your data but cannot make changes.</p>
-
-        <form onSubmit={handleAddStaff} className="settings-row" style={{ alignItems: 'flex-end', gap: '0.75rem' }}>
-          <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-            <label>Add Staff Email</label>
-            <input
-              type="email"
-              className="auth-input"
-              placeholder="staff@example.com"
-              value={newStaffEmail}
-              onChange={e => setNewStaffEmail(e.target.value)}
-              required
-            />
-          </div>
-          <button type="submit" className="primary-button" disabled={staffLoading} style={{ padding: '0.65rem 1.25rem', flexShrink: 0 }}>
-            {staffLoading ? 'Adding...' : 'Add'}
-          </button>
-        </form>
-
-        {staffEmails.length > 0 && (
-          <div style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {staffEmails.map(s => (
-              <div key={s.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'var(--surface-container-low)', borderRadius: '0.75rem', border: '1px solid var(--outline-variant)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', color: 'var(--primary)' }}>badge</span>
-                  <div>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>{s.staff_email}</span>
-                    <span style={{
-                      marginLeft: '0.6rem',
-                      fontSize: '0.7rem',
-                      fontWeight: 700,
-                      padding: '0.15rem 0.5rem',
-                      borderRadius: '99px',
-                      background: s.status === 'active' ? 'var(--primary-container)' : 'var(--surface-container-high)',
-                      color: s.status === 'active' ? 'var(--on-primary-container)' : 'var(--on-surface-variant)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.04em',
-                    }}>
-                      {s.status === 'active' ? 'Active' : 'Pending'}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleRemoveStaff(s.id)}
-                  style={{ background: 'none', border: '1px solid var(--error)', cursor: 'pointer', color: 'var(--error)', display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.75rem', borderRadius: '0.5rem', fontSize: '0.75rem', fontWeight: 600 }}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>remove_circle</span>
-                  Revoke
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="settings-card">
-        <form onSubmit={handleSave} className="auth-form">
-
-          {/* Profile */}
-          <section className="settings-section">
-            <h2 className="settings-section-title">
-              <span className="material-symbols-outlined">person</span>
-              Profile Information
-            </h2>
-            <div className="form-group mb-6">
+      <div className="modern-card mb-12" style={{ padding: '2.5rem' }}>
+        <h2 className="settings-section-title" style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 800, marginBottom: '1.5rem' }}>Owner Profile</h2>
+        <form onSubmit={handleSave} className="settings-form">
+          <div className="settings-grid">
+            <div className="form-group-modern">
               <label>Full Name</label>
               <input
                 type="text"
-                className="auth-input"
-                value={profile.full_name}
-                onChange={e => setProfile({ ...profile, full_name: e.target.value })}
+                value={profile.name}
+                onChange={e => setProfile(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Ex: John Doe"
+                required
               />
             </div>
-            <div className="form-group">
+            <div className="form-group-modern">
               <label>Email Address</label>
               <input
                 type="email"
-                className="auth-input opacity-50"
                 value={profile.email}
                 disabled
+                style={{ opacity: 0.6, cursor: 'not-allowed' }}
               />
-              <p className="text-xs mt-2 opacity-50">Email cannot be changed here.</p>
             </div>
-          </section>
-
-          {/* Appearance */}
-          <section className="settings-section">
-            <h2 className="settings-section-title">
-              <span className="material-symbols-outlined">palette</span>
-              Appearance
-            </h2>
-            <div className="settings-toggle-row">
-              <div className="settings-toggle-info">
-                <div className="settings-toggle-label">Night Mode</div>
-                <div className="settings-toggle-desc">
-                  Switch to a dark, low-light interface
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={toggleTheme}
-                className={`theme-toggle-switch ${theme === 'dark' ? 'active' : ''}`}
-                aria-label="Toggle night mode"
-                title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Night Mode'}
-              >
-                <span className="theme-toggle-thumb">
-                  <span className="material-symbols-outlined">
-                    {theme === 'dark' ? 'dark_mode' : 'light_mode'}
-                  </span>
-                </span>
-              </button>
+            <div className="form-group-modern">
+              <label>Phone Number</label>
+              <input
+                type="tel"
+                value={profile.phone}
+                onChange={e => setProfile(prev => ({ ...prev, phone: e.target.value }))}
+                placeholder="+1 (555) 000-0000"
+              />
             </div>
-          </section>
-
-          {/* Financial */}
-          <section className="settings-section">
-            <h2 className="settings-section-title">
-              <span className="material-symbols-outlined">payments</span>
-              Financial Preferences
-            </h2>
-            <div className="form-group">
-              <label>Default Currency</label>
+            <div className="form-group-modern">
+              <label>Preferred Currency</label>
               <div className="custom-select-container" ref={dropdownRef}>
                 <div
                   className={`custom-select-trigger ${isDropdownOpen ? 'open' : ''}`}
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (!isDropdownOpen) {
-                      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setIsDropdownOpen(true); }
-                      return;
-                    }
-                    if (e.key === 'Escape' || e.key === 'Tab') { setIsDropdownOpen(false); return; }
-                    const idx = currencies.findIndex(c => c.code === profile.currency);
-                    if (e.key === 'ArrowDown') { e.preventDefault(); setProfile(p => ({ ...p, currency: currencies[(idx + 1) % currencies.length].code })); }
-                    if (e.key === 'ArrowUp')   { e.preventDefault(); setProfile(p => ({ ...p, currency: currencies[(idx - 1 + currencies.length) % currencies.length].code })); }
-                    if (e.key === 'Enter')     { e.preventDefault(); setIsDropdownOpen(false); }
-                  }}
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold text-primary">{currentCurrency.symbol}</span>
-                    <span>{currentCurrency.code} - {currentCurrency.name}</span>
-                  </div>
-                  <span className="material-symbols-outlined" style={{
-                    transition: '0.2s',
-                    transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)'
-                  }}>
-                    keyboard_arrow_down
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontWeight: 800, color: 'var(--primary)' }}>{currentCurrency.symbol}</span>
+                    {currentCurrency.code} — {currentCurrency.name}
                   </span>
+                  <span className="material-symbols-outlined" style={{
+                    transform: isDropdownOpen ? 'rotate(180deg)' : 'none',
+                    transition: 'transform 0.2s ease'
+                  }}>expand_more</span>
                 </div>
                 {isDropdownOpen && (
-                  <div className="custom-options">
-                    {currencies.map(curr => (
+                  <div className="custom-options" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                    {currencies.map(c => (
                       <div
-                        key={curr.code}
-                        className={`custom-option ${profile.currency === curr.code ? 'selected' : ''}`}
-                        onClick={() => selectCurrency(curr.code)}
+                        key={c.code}
+                        className={`custom-option ${profile.currency === c.code ? 'selected' : ''}`}
+                        onClick={() => selectCurrency(c.code)}
                       >
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold opacity-50">{curr.symbol}</span>
-                          <span>{curr.code} - {curr.name}</span>
-                        </div>
-                        {profile.currency === curr.code && (
-                          <span className="material-symbols-outlined text-sm">check</span>
-                        )}
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <span style={{ width: '1.5rem', fontWeight: 800 }}>{c.symbol}</span>
+                          <span>{c.code} <span style={{ opacity: 0.5, fontWeight: 400, fontSize: '0.75rem' }}>— {c.name}</span></span>
+                        </span>
+                        {profile.currency === c.code && <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check</span>}
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-              <p className="text-xs mt-2 opacity-50">This will update all financial displays across the platform.</p>
             </div>
-          </section>
-
-          {/* App Updates */}
-          <section className="settings-section">
-            <h2 className="settings-section-title">
-              <span className="material-symbols-outlined">system_update</span>
-              App Updates
-            </h2>
-            <div className="settings-toggle-row">
-              <div className="settings-toggle-info">
-                <div className="settings-toggle-label">Check for Updates</div>
-                <div className="settings-toggle-desc">
-                  {updateStatus === 'idle' && 'Fetch the latest version deployed on Vercel.'}
-                  {updateStatus === 'checking' && 'Checking for a new version...'}
-                  {updateStatus === 'up-to-date' && 'You\'re on the latest version.'}
-                  {updateStatus === 'updating' && 'Applying update and reloading...'}
-                  {updateStatus === 'error' && 'Could not check for updates. Try again.'}
-                </div>
-              </div>
-              <button
-                type="button"
-                className="primary-button"
-                onClick={handleCheckUpdate}
-                disabled={updateStatus === 'checking' || updateStatus === 'updating'}
-                style={{ minWidth: '7rem', flexShrink: 0 }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', verticalAlign: 'middle', marginRight: '0.3rem' }}>
-                  {updateStatus === 'up-to-date' ? 'check_circle' : updateStatus === 'error' ? 'error' : 'refresh'}
-                </span>
-                {updateStatus === 'checking' ? 'Checking...' : updateStatus === 'updating' ? 'Updating...' : 'Refresh'}
-              </button>
-            </div>
-          </section>
-
-          <div className="pt-8 border-t border-outline-variant">
-            <button type="submit" className="primary-button w-full" disabled={saving}>
-              {saving ? 'Saving Changes...' : 'Save Settings'}
-            </button>
           </div>
+          <button type="submit" className="primary-button" disabled={saving} style={{ marginTop: '2rem' }}>
+            {saving ? 'Syncing...' : 'Update Profile'}
+          </button>
         </form>
       </div>
 
-      {/* Sign Out */}
-      <div className="settings-card" style={{ borderColor: 'var(--error-container)' }}>
-        <h2 className="settings-section-title" style={{ color: 'var(--error)' }}>
-          <span className="material-symbols-outlined">logout</span>
-          Sign Out
+      <div className="modern-card mb-12" style={{ padding: '2.5rem' }}>
+        <h2 className="settings-section-title" style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 800, marginBottom: '1.5rem' }}>Display Theme</h2>
+        <div className="appearance-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+          <button
+            className={`appearance-card ${theme === 'light' ? 'active' : ''}`}
+            onClick={() => setTheme('light')}
+            style={{
+              padding: '2rem',
+              borderRadius: '1.5rem',
+              border: `2px solid ${theme === 'light' ? 'var(--primary)' : 'var(--outline-variant)'}`,
+              background: theme === 'light' ? 'var(--primary-container)' : 'var(--surface-container-low)',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '1rem',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '2.5rem', color: theme === 'light' ? 'var(--primary)' : 'var(--on-surface-variant)' }}>light_mode</span>
+            <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--on-surface)' }}>Light</span>
+          </button>
+          <button
+            className={`appearance-card ${theme === 'dark' ? 'active' : ''}`}
+            onClick={() => setTheme('dark')}
+            style={{
+              padding: '2rem',
+              borderRadius: '1.5rem',
+              border: `2px solid ${theme === 'dark' ? 'var(--primary)' : 'var(--outline-variant)'}`,
+              background: theme === 'dark' ? 'var(--primary-container)' : 'var(--surface-container-low)',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '1rem',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '2.5rem', color: theme === 'dark' ? 'var(--primary)' : 'var(--on-surface-variant)' }}>dark_mode</span>
+            <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--on-surface)' }}>Dark</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="modern-card" style={{ padding: '2.5rem', border: '1px solid rgba(186,26,26,0.2)', background: 'rgba(186,26,26,0.02)' }}>
+        <h2 className="settings-section-title" style={{ color: 'var(--error)', fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 800, marginBottom: '1rem' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: '1.5rem', verticalAlign: 'middle', marginRight: '0.5rem' }}>dangerous</span>
+          Session Termination
         </h2>
-        <p className="settings-description">You will be signed out of your account on this device.</p>
+        <p className="settings-description" style={{ color: 'var(--on-surface-variant)', opacity: 0.7 }}>You will be signed out of your account on this device. All unsaved changes will be lost.</p>
         <button
           className="primary-button"
-          style={{ background: 'var(--error)', marginTop: '1rem' }}
+          style={{ background: 'var(--error)', marginTop: '1.5rem' }}
           onClick={async () => { await signOut(auth); navigate('/login'); }}
         >
           <span className="material-symbols-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle', marginRight: '0.35rem' }}>logout</span>

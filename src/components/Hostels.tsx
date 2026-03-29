@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useQueryClient } from '@tanstack/react-query';
 import { db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
 import { useQuery } from '@tanstack/react-query';
+import { LoadingScreen } from './layout/LoadingScreen';
 import { useDialog } from '../hooks/useDialog';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import '../styles/Properties.css';
@@ -17,6 +18,7 @@ interface HostelData {
 }
 
 const Hostels: React.FC = () => {
+  const navigate = useNavigate();
   const { ownerId, isStaff } = useOwner();
   const queryClient = useQueryClient();
   const { showAlert, showConfirm, DialogMount } = useDialog();
@@ -24,6 +26,7 @@ const Hostels: React.FC = () => {
   const [editingHostel, setEditingHostel] = useState<HostelData | null>(null);
   const [editData, setEditData] = useState({ name: '', address: '' });
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
 
   useEscapeKey(() => setEditingHostel(null), !!editingHostel);
 
@@ -50,6 +53,17 @@ const Hostels: React.FC = () => {
     },
     enabled: !!ownerId,
   });
+
+  const filteredHostels = useMemo(() => {
+    return hostels.filter(h => 
+      h.name.toLowerCase().includes(search.toLowerCase()) || 
+      h.address.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [hostels, search]);
+
+  const totalRooms = useMemo(() => 
+    hostels.reduce((acc, h) => acc + h.roomCount, 0), 
+  [hostels]);
 
   const openEdit = (e: React.MouseEvent, hostel: HostelData) => {
     e.preventDefault();
@@ -78,11 +92,11 @@ const Hostels: React.FC = () => {
     e.stopPropagation();
 
     if (hostel.roomCount > 0) {
-      await showAlert(`Cannot delete — "${hostel.name}" has ${hostel.roomCount} room(s). Remove all rooms first.`);
+      await showAlert(`Cannot terminate — "${hostel.name}" currently contains ${hostel.roomCount} room records. Remove room inventory first.`);
       return;
     }
 
-    const ok = await showConfirm(`Delete "${hostel.name}"? This cannot be undone.`, { danger: true });
+    const ok = await showConfirm(`Terminate registration for "${hostel.name}"? This action is permanent.`, { danger: true });
     if (!ok) return;
 
     try {
@@ -93,67 +107,125 @@ const Hostels: React.FC = () => {
     }
   };
 
-  if (isLoading) return <div className="p-12">Loading hostels...</div>;
+  if (isLoading) return <LoadingScreen message="Accessing Shared Facility Vault" />;
 
   return (
-    <div className="properties-container">
+    <div className="view-container page-fade-in">
       {DialogMount}
-      <header className="page-header">
-        <div>
-          <h1 className="display-small">Hostels</h1>
-          <p className="text-on-surface-variant">Manage your shared accommodation facilities.</p>
+      
+      <header className="view-header">
+        <p className="view-eyebrow">Shared Facilities</p>
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+          <h1 className="view-title" style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', margin: 0 }}>Hostel Facilities</h1>
+          {!isStaff && (
+            <button onClick={() => navigate('/hostels/new')} className="primary-button">
+              <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle', fontSize: '1.25rem' }}>add_home</span>
+              Add Facility
+            </button>
+          )}
         </div>
-        {!isStaff && (
-          <Link to="/hostels/new" className="primary-button">
-            <span className="material-symbols-outlined">add</span>
-            New Hostel
-          </Link>
-        )}
       </header>
 
+      {/* Metrics Bar */}
+      {hostels.length > 0 && (
+        <div className="properties-metrics-bar custom-scrollbar">
+          <div className="prop-metric">
+            <span className="prop-metric-label">Facilities</span>
+            <span className="prop-metric-value">{hostels.length}</span>
+          </div>
+          <div className="prop-metric">
+            <span className="prop-metric-label">Room Inventory</span>
+            <span className="prop-metric-value">{totalRooms}</span>
+          </div>
+          <div className="prop-metric">
+            <span className="prop-metric-label">Target Occupancy</span>
+            <span className="prop-metric-value" style={{ fontSize: '1.25rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 'auto', color: 'var(--secondary)' }}>88% Avg</span>
+          </div>
+        </div>
+      )}
+
+      {/* Toolbar */}
+      <div className="properties-toolbar">
+        <div className="prop-search-wrapper">
+          <span className="material-symbols-outlined search-icon">search</span>
+          <input 
+            type="text" 
+            placeholder="Search by facility name or location..." 
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="prop-search-input"
+          />
+        </div>
+        <div className="prop-filter-count">
+          {filteredHostels.length} / {hostels.length} Facilities Identified
+        </div>
+      </div>
+
       {hostels.length === 0 ? (
-        <div className="empty-state">
-          <span className="material-symbols-outlined" style={{ fontSize: '4rem', opacity: 0.2, display: 'block', marginBottom: '1rem' }}>hotel</span>
-          <h2 className="mb-2">No hostels yet</h2>
-          <p className="text-on-surface-variant mb-8">Start by registering your first hostel facility.</p>
-          <Link to="/hostels/new" className="primary-button" style={{ textDecoration: 'none' }}>Create First Hostel</Link>
+        <div className="empty-state modern-card" style={{ textAlign: 'center', padding: '6rem 2rem' }}>
+          <div className="empty-state-icon" style={{ opacity: 0.2, marginBottom: '2rem' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '4rem' }}>hotel_class</span>
+          </div>
+          <h2 className="mb-4">No Hostels Registered</h2>
+          <p className="text-on-surface-variant mb-10 max-w-md mx-auto">Initialize your first shared accommodation facility to begin managing rooms and bed allocations.</p>
+          {!isStaff && (
+            <button onClick={() => navigate('/hostels/new')} className="primary-button">Register First Facility</button>
+          )}
+        </div>
+      ) : filteredHostels.length === 0 ? (
+        <div className="empty-state modern-card" style={{ textAlign: 'center', padding: '6rem 2rem' }}>
+          <div className="empty-state-icon" style={{ opacity: 0.2, marginBottom: '2rem' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '4rem' }}>search_off</span>
+          </div>
+          <h2 className="mb-4">No Matching Facilities</h2>
+          <p className="text-on-surface-variant">Adjust your search parameters to find specific accommodation entries.</p>
+          <button className="primary-button glass-panel mt-8" onClick={() => setSearch('')} style={{ background: 'rgba(255,255,255,0.05)' }}>Clear Search</button>
         </div>
       ) : (
         <div className="properties-grid">
-          {hostels.map((hostel) => (
-            <div key={hostel.id} className="property-card" style={{ cursor: 'pointer' }} onClick={() => window.location.href = `/hostels/${hostel.id}`}>
-              <div className="property-header-compact">
-                <div className="property-icon-box">
+          {filteredHostels.map(hostel => (
+            <div key={hostel.id} className="property-card" onClick={() => navigate(`/hostels/${hostel.id}`)}>
+              <div className="property-card-visual" style={{ background: 'linear-gradient(135deg, rgba(197, 197, 216, 0.05) 0%, rgba(208, 228, 255, 0.02) 100%)' }}>
+                <div className="property-type-chip">Shared Asset</div>
+                <div className="property-icon-large" style={{ color: 'var(--secondary)' }}>
                   <span className="material-symbols-outlined">hotel</span>
                 </div>
                 {!isStaff && (
-                  <div className="property-actions-compact" onClick={e => e.stopPropagation()}>
-                    <button className="prop-action-btn" title="Edit hostel" onClick={e => openEdit(e, hostel)}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>edit</span>
+                  <div className="property-card-quick-actions" onClick={e => e.stopPropagation()}>
+                    <button className="prop-mini-btn" onClick={e => openEdit(e, hostel)} title="Modify Identity">
+                      <span className="material-symbols-outlined">edit</span>
                     </button>
-                    <button className="prop-action-btn danger" title="Delete hostel" onClick={e => handleDelete(e, hostel)}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>delete</span>
+                    <button className="prop-mini-btn danger" onClick={e => handleDelete(e, hostel)} title="Terminate Registration">
+                      <span className="material-symbols-outlined">delete</span>
                     </button>
                   </div>
                 )}
               </div>
 
-              <div className="property-info">
-                <h3 className="property-name">{hostel.name}</h3>
-                <div className="property-address">
-                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>location_on</span>
+              <div className="property-card-body">
+                <h3 className="property-name-modern">{hostel.name}</h3>
+                <div className="property-address-modern">
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', color: 'var(--secondary)', opacity: 0.5 }}>location_on</span>
                   {hostel.address}
                 </div>
-                <div className="property-stats">
-                  <div className="stat-item">
-                    <div className="stat-label">Rooms</div>
-                    <div className="stat-value">{hostel.roomCount}</div>
+                
+                <div className="property-card-stats-row">
+                  <div className="stat-pill">
+                    <span className="stat-pill-label">Inventory</span>
+                    <span className="stat-pill-value">{hostel.roomCount} Rooms</span>
                   </div>
-                  <div className="stat-item">
-                    <div className="stat-label">Facility</div>
-                    <div className="stat-value">Hostel</div>
+                  <div className="stat-pill">
+                    <span className="stat-pill-label">Status</span>
+                    <span className="stat-pill-value" style={{ color: 'var(--primary)' }}>Active</span>
                   </div>
                 </div>
+              </div>
+              
+              <div className="property-card-footer">
+                <span className="view-link" style={{ color: 'var(--secondary)' }}>
+                  Manage Room & Bed Inventory
+                  <span className="material-symbols-outlined">arrow_forward_ios</span>
+                </span>
               </div>
             </div>
           ))}
@@ -162,30 +234,25 @@ const Hostels: React.FC = () => {
 
       {editingHostel && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setEditingHostel(null)}>
-          <div className="modal-content" style={{ borderRadius: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
-              <div>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0 }}>Edit Hostel</h2>
-                <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', opacity: 0.6 }}>Update the hostel details</p>
-              </div>
-              <button className="icon-action-btn" onClick={() => setEditingHostel(null)}>
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
+          <div className="modal-content-modern">
+            <header className="modal-header-modern">
+              <h2 className="modal-title">Modify Facility</h2>
+              <p className="modal-subtitle">Update facility naming and primary operating address</p>
+            </header>
 
-            <form onSubmit={handleEditSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div className="unit-input-group">
-                <label>Hostel Name</label>
-                <input type="text" className="unit-mini-input" value={editData.name} onChange={e => setEditData(d => ({ ...d, name: e.target.value }))} required style={{ padding: '0.7rem 0.9rem', borderRadius: '0.75rem' }} />
+            <form onSubmit={handleEditSave} className="modal-form-modern">
+              <div className="form-group-modern">
+                <label>Facility Name</label>
+                <input type="text" value={editData.name} onChange={e => setEditData(d => ({ ...d, name: e.target.value }))} placeholder="e.g. Skyline Living" required />
               </div>
-              <div className="unit-input-group">
-                <label>Address</label>
-                <input type="text" className="unit-mini-input" value={editData.address} onChange={e => setEditData(d => ({ ...d, address: e.target.value }))} required style={{ padding: '0.7rem 0.9rem', borderRadius: '0.75rem' }} />
+              <div className="form-group-modern">
+                <label>Operating Address</label>
+                <input type="text" value={editData.address} onChange={e => setEditData(d => ({ ...d, address: e.target.value }))} placeholder="Full address, City, ZIP" required />
               </div>
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', paddingTop: '0.5rem' }}>
-                <button type="button" className="primary-button glass" style={{ padding: '0.7rem 1.5rem' }} onClick={() => setEditingHostel(null)}>Cancel</button>
-                <button type="submit" className="primary-button" style={{ padding: '0.7rem 2rem' }} disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</button>
-              </div>
+              <footer className="flex justify-end gap-4 mt-4">
+                <button type="button" className="primary-button glass-panel" onClick={() => setEditingHostel(null)} style={{ background: 'rgba(255,255,255,0.05)' }}>Discard</button>
+                <button type="submit" className="primary-button" disabled={saving}>{saving ? 'Syncing...' : 'Confirm Changes'}</button>
+              </footer>
             </form>
           </div>
         </div>

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
-import '../styles/Auth.css';
 
 const AddCustomer: React.FC = () => {
   const navigate = useNavigate();
@@ -38,39 +37,42 @@ const AddCustomer: React.FC = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto py-12">
-      <header className="mb-12">
-        <button onClick={() => navigate(-1)} className="text-primary font-bold flex items-center gap-2 mb-4 hover:opacity-70 transition-opacity" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-          <span className="material-symbols-outlined">arrow_back</span>
-          Back
-        </button>
-        <h1 className="display-small">New Customer</h1>
-        <p className="text-on-surface-variant">Register a new tenant or client to your system.</p>
+    <div className="view-container" style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <header className="view-header">
+        <div>
+          <div className="view-eyebrow" style={{ cursor: 'pointer' }} onClick={() => navigate(-1)}>
+            <span className="material-symbols-outlined" style={{ fontSize: '1rem', marginRight: '0.5rem' }}>arrow_back</span>
+            Back
+          </div>
+          <h1 className="view-title">Onboard New Customer</h1>
+          <p className="text-on-surface-variant mt-2">Establish a new professional relationship in your database.</p>
+        </div>
       </header>
 
-      <div className="bg-surface-container-lowest p-12 rounded-3xl shadow-ambient border border-outline-variant">
-        <form onSubmit={handleSubmit} className="auth-form">
-          {error && <div className="error-message mb-6">{error}</div>}
+      <div className="modern-card" style={{ padding: '3rem' }}>
+        <form onSubmit={handleSubmit} className="modal-form-modern" style={{ padding: 0 }}>
+          {error && <div className="error-message mb-6" style={{ background: 'rgba(186,26,26,0.1)', color: 'var(--error)', padding: '1rem', borderRadius: '0.75rem', fontWeight: 600 }}>{error}</div>}
 
-          <div className="form-group">
-            <label>Full Name</label>
-            <input name="full_name" type="text" className="auth-input" placeholder="e.g. John Doe" value={formData.full_name} onChange={handleChange} required />
+          <div className="form-group-modern">
+            <label>Legal Full Name</label>
+            <input name="full_name" type="text" placeholder="e.g. Alexandra Sterling" value={formData.full_name} onChange={handleChange} required />
           </div>
 
-          <div className="form-group">
-            <label>Email Address (Optional)</label>
-            <input name="email" type="email" className="auth-input" placeholder="john@example.com" value={formData.email} onChange={handleChange} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            <div className="form-group-modern">
+              <label>Official Email Address</label>
+              <input name="email" type="email" placeholder="alexandra@example.com" value={formData.email} onChange={handleChange} />
+            </div>
+            <div className="form-group-modern">
+              <label>Primary Phone Number</label>
+              <input name="phone" type="tel" placeholder="+1 (555) 000-0000" value={formData.phone} onChange={handleChange} />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label>Phone Number</label>
-            <input name="phone" type="tel" className="auth-input" placeholder="+1 (555) 000-0000" value={formData.phone} onChange={handleChange} />
-          </div>
-
-          <div className="flex gap-4 mt-8">
-            <button type="button" className="primary-button" style={{ background: 'var(--surface-container-high)', color: 'var(--on-surface)', boxShadow: 'none' }} onClick={() => navigate(-1)}>Cancel</button>
-            <button type="submit" className="primary-button flex-1" disabled={loading}>{loading ? 'Adding...' : 'Register Customer'}</button>
-          </div>
+          <footer className="modal-footer-modern" style={{ padding: '2rem 0 0', marginTop: '1rem' }}>
+            <button type="button" className="btn-secondary" onClick={() => navigate(-1)}>Discard</button>
+            <button type="submit" className="primary-button flex-1" disabled={loading}>{loading ? 'Establishing...' : 'Confirm Registration'}</button>
+          </footer>
         </form>
       </div>
     </div>

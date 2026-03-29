@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   collection, query, where, getDocs, doc, getDoc,
-  addDoc, updateDoc, deleteDoc, serverTimestamp,
 } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
-import { useEscapeKey } from '../hooks/useEscapeKey';
 import { generateMonthlyPayments } from '../utils/generateMonthlyPayments';
+import { LoadingScreen } from './layout/LoadingScreen';
 import '../styles/Units.css';
 import '../styles/Leases.css';
 import '../styles/Payments.css';
@@ -34,241 +34,64 @@ interface Payment {
 
 type FilterTab = 'All' | 'Paid' | 'Pending';
 
-const METHODS = ['Cash', 'Bank Transfer', 'Online', 'Check'];
-const STATUSES = ['Paid', 'Pending'];
-
-// ── CustomSelect ───────────────────────────────────────────────────────
-interface SelectOpt { value: string; label: string; sub?: string; }
-
-const CustomSelect: React.FC<{
-  options: SelectOpt[];
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  disabled?: boolean;
-}> = ({ options, value, onChange, placeholder = 'Select…', disabled = false }) => {
-  const [open, setOpen] = useState(false);
-  const [highlightedIdx, setHighlightedIdx] = useState(-1);
-  const ref = useRef<HTMLDivElement>(null);
-  const optionsRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
-  }, []);
-
-  useEffect(() => {
-    if (open) {
-      const currentIdx = options.findIndex(o => o.value === value);
-      setHighlightedIdx(currentIdx >= 0 ? currentIdx : 0);
-    } else {
-      setHighlightedIdx(-1);
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (optionsRef.current && highlightedIdx >= 0) {
-      const el = optionsRef.current.querySelectorAll<HTMLElement>('.custom-option')[highlightedIdx];
-      el?.scrollIntoView({ block: 'nearest' });
-    }
-  }, [highlightedIdx]);
-
-  const selected = options.find(o => o.value === value);
-
-  const selectHighlighted = () => {
-    if (highlightedIdx >= 0 && options[highlightedIdx]) {
-      onChange(options[highlightedIdx].value);
-      setOpen(false);
-    }
-  };
-
-  return (
-    <div className="custom-select-container" ref={ref}>
-      <div
-        className={`custom-select-trigger ${open ? 'open' : ''} ${disabled ? 'disabled' : ''}`}
-        onClick={() => !disabled && setOpen(o => !o)}
-        tabIndex={disabled ? -1 : 0}
-        onKeyDown={e => {
-          if (!open) {
-            if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === ' ' || e.key === 'Enter') { e.preventDefault(); !disabled && setOpen(true); }
-            return;
-          }
-          if (e.key === 'Escape' || e.key === 'Tab') { setOpen(false); return; }
-          if (e.key === 'ArrowDown') { e.preventDefault(); setHighlightedIdx(i => Math.min(i + 1, options.length - 1)); }
-          if (e.key === 'ArrowUp')   { e.preventDefault(); setHighlightedIdx(i => Math.max(i - 1, 0)); }
-          if (e.key === 'Enter')     { e.preventDefault(); selectHighlighted(); }
-        }}
-      >
-        <span style={{ color: selected ? 'var(--on-surface)' : 'var(--on-surface-variant)', opacity: selected ? 1 : 0.5 }}>
-          {selected ? selected.label : placeholder}
-        </span>
-        <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', transition: '0.2s', transform: open ? 'rotate(180deg)' : '', flexShrink: 0 }}>
-          keyboard_arrow_down
-        </span>
-      </div>
-      {open && !disabled && (
-        <div className="custom-options" ref={optionsRef}>
-          {options.length === 0
-            ? <div className="custom-option-empty">No options available</div>
-            : options.map((opt, idx) => (
-              <div key={opt.value} className={`custom-option ${value === opt.value ? 'selected' : ''} ${idx === highlightedIdx ? 'highlighted' : ''}`} onClick={() => { onChange(opt.value); setOpen(false); }}>
-                <div>
-                  <div className="custom-option-label">{opt.label}</div>
-                  {opt.sub && <div className="custom-option-sub">{opt.sub}</div>}
-                </div>
-                {value === opt.value && <span className="material-symbols-outlined" style={{ fontSize: '0.9rem', flexShrink: 0 }}>check</span>}
-              </div>
-            ))
-          }
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ── Main component ─────────────────────────────────────────────────────
 const Payments: React.FC = () => {
-  const { showAlert, showConfirm, DialogMount } = useDialog();
   const { ownerId, isStaff } = useOwner();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { showAlert, showConfirm, DialogMount } = useDialog();
 
-  const [filter, setFilter]       = useState<FilterTab>('All');
-  const [search, setSearch]       = useState('');
+  const [filter, setFilter] = useState<FilterTab>('All');
+  const [search, setSearch] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [currencySymbol, setCurrencySymbol] = useState('$');
 
-  // Modal state
-  const [showModal, setShowModal]           = useState(false);
-  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
-  const [modalMode, setModalMode]           = useState<'log' | 'edit'>('log');
-  const [saving, setSaving]                 = useState(false);
-  const [form, setForm] = useState({
-    amount: '',
-    payment_date: new Date().toISOString().split('T')[0],
-    month_for: '',
-    payment_method: 'Cash',
-    status: 'Paid' as 'Paid' | 'Pending',
-  });
-
-
-  // ── Queries ────────────────────────────────────────────────────────
   const { data: payments = [], isLoading } = useQuery({
     queryKey: ['payments', ownerId],
     queryFn: async () => {
-      if (!ownerId) return [];
-      // Fire-and-forget monthly generation — don't block data loading
-      void generateMonthlyPayments(ownerId);
+      const ownerSnap = await getDoc(doc(db, 'owners', ownerId!));
+      const ownerData = ownerSnap.data();
+      const curr = ownerData?.currency || 'USD';
+      const symbols: any = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
+      setCurrencySymbol(symbols[curr] || '$');
 
-      const snap = await getDocs(query(
-        collection(db, 'payments'),
-        where('owner_id', '==', ownerId)
-      ));
-
-      const data: Payment[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as Payment));
-      // Sort by payment_date descending
-      data.sort((a, b) => (b.payment_date || '').localeCompare(a.payment_date || ''));
-      return data;
+      const snap = await getDocs(query(collection(db, 'payments'), where('owner_id', '==', ownerId)));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as Payment))
+        .sort((a, b) => b.month_for.localeCompare(a.month_for) || b.payment_date.localeCompare(a.payment_date));
     },
     enabled: !!ownerId,
   });
 
-  const { data: currencySymbol = '₹' } = useQuery({
-    queryKey: ['currency', ownerId],
-    queryFn: async () => {
-      if (!ownerId) return '₹';
-      const ownerDoc = await getDoc(doc(db, 'owners', ownerId));
-      const data = ownerDoc.data();
-      const symbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
-      return symbols[data?.currency || 'USD'] || '$';
-    },
-    enabled: !!ownerId,
-  });
-
-  const invalidatePayments = () => queryClient.invalidateQueries({ queryKey: ['payments', ownerId] });
-
-  // ── Open modals ────────────────────────────────────────────────────
-  const openLogPayment = (payment: Payment) => {
-    setEditingPayment(payment);
-    setModalMode('log');
-    setForm({
-      amount:         String(payment.amount),
-      payment_date:   new Date().toISOString().split('T')[0],
-      month_for:      payment.month_for,
-      payment_method: 'Cash',
-      status:         'Paid',
+  const filtered = useMemo(() => {
+    return payments.filter(p => {
+      const matchFilter = filter === 'All' || p.status === filter;
+      const q = search.toLowerCase();
+      const matchSearch = p.tenant_name.toLowerCase().includes(q) ||
+        (p.property_name && p.property_name.toLowerCase().includes(q)) ||
+        (p.hostel_name && p.hostel_name.toLowerCase().includes(q)) ||
+        (p.unit_number && p.unit_number.toLowerCase().includes(q)) ||
+        (p.month_for && p.month_for.toLowerCase().includes(q));
+      return matchFilter && matchSearch;
     });
-    setShowModal(true);
-  };
+  }, [payments, filter, search]);
 
-  const openEdit = (payment: Payment) => {
-    setEditingPayment(payment);
-    setModalMode('edit');
-    setForm({
-      amount:         String(payment.amount),
-      payment_date:   payment.payment_date,
-      month_for:      payment.month_for,
-      payment_method: payment.payment_method || 'Cash',
-      status:         payment.status,
-    });
-    setShowModal(true);
-  };
+  const stats = useMemo(() => {
+    const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+    const thisMonth = payments.filter(p => p.month_for === currentMonth);
+    return {
+      totalPaid: payments.filter(p => p.status === 'Paid').reduce((sum, p) => sum + p.amount, 0),
+      thisMonthPending: thisMonth.filter(p => p.status === 'Pending').reduce((sum, p) => sum + p.amount, 0),
+      thisMonthPaid: thisMonth.filter(p => p.status === 'Paid').reduce((sum, p) => sum + p.amount, 0),
+    };
+  }, [payments]);
 
-  const closeModal = () => { setShowModal(false); setEditingPayment(null); };
-
-  useEscapeKey(closeModal, showModal);
-
-  // ── Save ───────────────────────────────────────────────────────────
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingPayment) return;
-
-    const paidAmount = parseFloat(form.amount) || 0;
-    if (paidAmount <= 0) { showAlert('Please enter a valid amount.'); return; }
-
-    setSaving(true);
+  const handleSync = async () => {
+    const ok = await showConfirm('Sync will generate pending payments for all active leases for the current month. Proceed with batch generation?');
+    if (!ok) return;
     try {
-      if (modalMode === 'log') {
-        const remainder = Math.round((editingPayment.amount - paidAmount) * 100) / 100;
-
-        // Mark this payment as Paid with the amount entered
-        await updateDoc(doc(db, 'payments', editingPayment.id), {
-          amount:         paidAmount,
-          payment_date:   form.payment_date,
-          payment_method: form.payment_method || null,
-          status:         'Paid',
-        });
-
-        // If partial, create a new Pending for the remainder
-        if (remainder > 0) {
-          await addDoc(collection(db, 'payments'), {
-            owner_id:       editingPayment.owner_id,
-            lease_id:       editingPayment.lease_id,
-            tenant_name:    editingPayment.tenant_name,
-            unit_number:    editingPayment.unit_number || null,
-            property_name:  editingPayment.property_name || null,
-            bed_number:     editingPayment.bed_number || null,
-            room_number:    editingPayment.room_number || null,
-            hostel_name:    editingPayment.hostel_name || null,
-            rent_amount:    editingPayment.rent_amount,
-            amount:         remainder,
-            payment_date:   editingPayment.payment_date,
-            month_for:      editingPayment.month_for,
-            payment_method: null,
-            status:         'Pending',
-            created_at:     serverTimestamp(),
-          });
-        }
-      } else {
-        await updateDoc(doc(db, 'payments', editingPayment.id), {
-          amount:         paidAmount,
-          payment_date:   form.payment_date,
-          month_for:      form.month_for,
-          payment_method: form.payment_method || null,
-          status:         form.status,
-        });
-      }
-
-      closeModal();
-      invalidatePayments();
+      setSaving(true);
+      await generateMonthlyPayments(ownerId!);
+      queryClient.invalidateQueries({ queryKey: ['payments', ownerId] });
+      showAlert('Cycle generation completed successfully.');
     } catch (err) {
       showAlert((err as Error).message);
     } finally {
@@ -276,320 +99,152 @@ const Payments: React.FC = () => {
     }
   };
 
-  // ── Delete ─────────────────────────────────────────────────────────
-  const handleDelete = async (id: string) => {
-    const ok = await showConfirm('Delete this payment record?', { danger: true });
-    if (!ok) return;
-    try {
-      await deleteDoc(doc(db, 'payments', id));
-      invalidatePayments();
-    } catch (err) {
-      showAlert((err as Error).message);
-    }
-  };
+  if (isLoading) return <LoadingScreen message="Accessing Ledger Vault" />;
 
-  // ── Derived ────────────────────────────────────────────────────────
-  const totalCollected = payments.filter(p => p.status === 'Paid').reduce((s, p) => s + p.amount, 0);
-  const totalPending   = payments.filter(p => p.status === 'Pending').reduce((s, p) => s + p.amount, 0);
-
-  const fmt      = (d: string) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-  const initials = (name: string) => name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
-
-  const locationLabel = (p: Payment) => {
-    if (p.property_name && p.unit_number) return `${p.property_name} · Unit ${p.unit_number}`;
-    if (p.hostel_name && p.bed_number)    return `${p.hostel_name} · ${p.bed_number}`;
-    return '—';
-  };
-
-  const filtered = payments
-    .filter(p => filter === 'All' || p.status === filter)
-    .filter(p => {
-      if (!search.trim()) return true;
-      const q = search.toLowerCase();
-      return (
-        p.tenant_name?.toLowerCase().includes(q) ||
-        locationLabel(p).toLowerCase().includes(q) ||
-        p.month_for?.toLowerCase().includes(q) ||
-        (p.payment_method || '').toLowerCase().includes(q)
-      );
-    });
-
-  const methodOptions: SelectOpt[] = METHODS.map(m => ({ value: m, label: m }));
-  const statusOptions: SelectOpt[] = STATUSES.map(s => ({ value: s, label: s }));
-
-  // ── Render ─────────────────────────────────────────────────────────
   return (
-    <div className="payments-page">
+    <div className="view-container page-fade-in">
       {DialogMount}
-
-      {/* Header */}
-      <div className="flex justify-between items-start mb-10">
-        <div>
-          <h1 className="display-medium mb-2">Payments</h1>
-          <p className="text-on-surface-variant">Track rent collection and outstanding balances</p>
+      
+      <header className="view-header">
+        <p className="view-eyebrow">Financial Ledger</p>
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+          <h1 className="view-title" style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', margin: 0 }}>Revenue & Receipts</h1>
+          {!isStaff && (
+            <button onClick={handleSync} className="primary-button" disabled={saving}>
+              <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle', fontSize: '1.25rem' }}>autorenew</span>
+              {saving ? 'Processing...' : 'Generate Cycle'}
+            </button>
+          )}
         </div>
-      </div>
+      </header>
 
-      {/* Stats */}
-      <div className="lease-stats-row" style={{ marginBottom: '2.5rem' }}>
-        <div className="lease-stat-card">
-          <div className="stat-label">Total Records</div>
-          <div className="stat-value">{payments.length}</div>
+      {/* Metrics Bar */}
+      {payments.length > 0 && (
+        <div className="properties-metrics-bar custom-scrollbar">
+          <div className="prop-metric">
+            <span className="prop-metric-label">Gross Realized</span>
+            <span className="prop-metric-value" style={{ color: 'var(--primary)' }}>{currencySymbol}{stats.totalPaid.toLocaleString()}</span>
+          </div>
+          <div className="prop-metric">
+            <span className="prop-metric-label">Settled (Cycle)</span>
+            <span className="prop-metric-value" style={{ color: 'var(--color-success)' }}>{currencySymbol}{stats.thisMonthPaid.toLocaleString()}</span>
+          </div>
+          <div className="prop-metric">
+            <span className="prop-metric-label">Outstanding (Cycle)</span>
+            <span className="prop-metric-value" style={{ color: 'var(--error)' }}>{currencySymbol}{stats.thisMonthPending.toLocaleString()}</span>
+          </div>
         </div>
-        <div className="lease-stat-card">
-          <div className="stat-label">Collected</div>
-          <div className="stat-value green">{currencySymbol}{totalCollected.toLocaleString()}</div>
-        </div>
-        <div className="lease-stat-card">
-          <div className="stat-label">Pending</div>
-          <div className="stat-value amber">{currencySymbol}{totalPending.toLocaleString()}</div>
-        </div>
-      </div>
+      )}
 
-      {/* Search */}
-      <div className="payments-search-wrap">
-        <span className="material-symbols-outlined payments-search-icon">search</span>
-        <input
-          className="payments-search-input"
-          type="text"
-          placeholder="Search by tenant, property, month…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        {search && (
-          <button className="payments-search-clear" onClick={() => setSearch('')} aria-label="Clear search">
-            <span className="material-symbols-outlined">close</span>
-          </button>
-        )}
-      </div>
-
-      {/* Filter */}
-      <div className="lease-filter-bar">
-        <div className="filter-tabs">
+      {/* Toolbar */}
+      <div className="properties-toolbar">
+        <div className="prop-search-wrapper">
+          <span className="material-symbols-outlined search-icon">search</span>
+          <input 
+            type="text" 
+            placeholder="Search by payee entity, asset, or period..." 
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="prop-search-input"
+          />
+        </div>
+        <div className="filter-tabs-modern">
           {(['All', 'Paid', 'Pending'] as FilterTab[]).map(tab => (
-            <button key={tab} className={`filter-tab ${filter === tab ? 'active' : ''}`} onClick={() => setFilter(tab)}>{tab}</button>
+            <button key={tab} className={`tab-btn ${filter === tab ? 'active' : ''}`} onClick={() => setFilter(tab)}>
+              {tab}
+              {filter === tab && <div className="tab-indicator" />}
+            </button>
           ))}
         </div>
-        <span className="label-small opacity-50">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
       </div>
 
-      {isLoading ? (
-        <div style={{ padding: '4rem', textAlign: 'center', opacity: 0.5 }}>Loading payments…</div>
-      ) : filtered.length === 0 ? (
-        <div style={{ padding: '4rem', textAlign: 'center', opacity: 0.4 }}>
-          {search ? `No results for "${search}"` : `No ${filter !== 'All' ? filter.toLowerCase() + ' ' : ''}payments found.`}
-        </div>
-      ) : (
-        <>
-          {/* Desktop Table */}
-          <div className="leases-table-wrap payments-desktop-table">
-            <table className="leases-table">
-              <thead>
-                <tr>
-                  <th>Tenant</th>
-                  <th>Property / Hostel</th>
-                  <th>Month For</th>
-                  <th>Date</th>
-                  <th>Amount</th>
-                  <th>Method</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(p => (
-                  <tr key={p.id}>
-                    <td>
-                      <div className="tenant-cell">
-                        <div className="tenant-avatar">{initials(p.tenant_name || '?')}</div>
-                        <div className="tenant-name">{p.tenant_name || '—'}</div>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="location-name" style={{ fontSize: '0.875rem' }}>{locationLabel(p)}</div>
-                    </td>
-                    <td style={{ fontWeight: 600 }}>{p.month_for}</td>
-                    <td style={{ fontSize: '0.8rem', color: 'var(--on-surface-variant)' }}>{fmt(p.payment_date)}</td>
-                    <td className="rent-amount">{currencySymbol}{Number(p.amount).toLocaleString()}</td>
-                    <td style={{ fontSize: '0.8rem' }}>{p.payment_method || '—'}</td>
-                    <td>
-                      <span className={`status-badge payment-status-${p.status.toLowerCase()}`}>{p.status}</span>
-                    </td>
-                    <td>
-                      {!isStaff && (
-                        <div className="row-actions">
-                          {p.status === 'Pending' && (
-                            <button className="log-payment-btn" title="Mark as Paid" onClick={() => openLogPayment(p)}>
-                              <span className="material-symbols-outlined">payments</span>
-                              Mark as Paid
-                            </button>
-                          )}
-                          <button className="icon-action-btn" title="Edit" onClick={() => openEdit(p)}>
-                            <span className="material-symbols-outlined">edit</span>
-                          </button>
-                          <button className="icon-action-btn danger" title="Delete" onClick={() => handleDelete(p.id)}>
-                            <span className="material-symbols-outlined">delete</span>
-                          </button>
-                        </div>
-                      )}
-                    </td>
+      <div className="payments-content-area">
+        {filtered.length === 0 ? (
+          <div className="empty-state modern-card" style={{ textAlign: 'center', padding: '6rem 2rem' }}>
+            <div className="empty-state-icon" style={{ opacity: 0.2, marginBottom: '2rem' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '4rem' }}>receipt_long</span>
+            </div>
+            <h2>Clear Ledger</h2>
+            <p className="text-on-surface-variant mb-10 max-w-md mx-auto">No transaction records found for this selection. Adjust your parameters or generate the next billing cycle.</p>
+          </div>
+        ) : (
+          <>
+            <div className="modern-table-wrap desktop-only" style={{ background: 'var(--surface-container-lowest)', borderRadius: '2rem', border: 'none', boxShadow: 'var(--shadow-ambient)' }}>
+              <table className="modern-table">
+                <thead>
+                  <tr>
+                    <th>Payee Entity</th>
+                    <th>Asset Inventory</th>
+                    <th>Service Period</th>
+                    <th>Value</th>
+                    <th>Settlement</th>
+                    <th>Status</th>
+                    <th></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile Cards */}
-          <div className="payment-cards-list payments-mobile-cards">
-            {filtered.map(p => (
-              <div key={p.id} className="payment-mobile-card">
-                {/* Card Header: avatar + name + status */}
-                <div className="payment-card-header">
-                  <div className="tenant-cell">
-                    <div className="tenant-avatar">{initials(p.tenant_name || '?')}</div>
-                    <div>
-                      <div className="tenant-name">{p.tenant_name || '—'}</div>
-                      <div className="payment-card-location">{locationLabel(p)}</div>
-                    </div>
-                  </div>
-                  <span className={`status-badge payment-status-${p.status.toLowerCase()}`}>{p.status}</span>
-                </div>
-
-                {/* Card Body: month, amount, date, method */}
-                <div className="payment-card-body">
-                  <div className="payment-card-row">
-                    <div className="payment-card-field">
-                      <span className="payment-card-label">Month</span>
-                      <span className="payment-card-value">{p.month_for}</span>
-                    </div>
-                    <div className="payment-card-field">
-                      <span className="payment-card-label">Amount</span>
-                      <span className="payment-card-value payment-card-amount">{currencySymbol}{Number(p.amount).toLocaleString()}</span>
-                    </div>
-                  </div>
-                  <div className="payment-card-row">
-                    <div className="payment-card-field">
-                      <span className="payment-card-label">Date</span>
-                      <span className="payment-card-value">{fmt(p.payment_date)}</span>
-                    </div>
-                    <div className="payment-card-field">
-                      <span className="payment-card-label">Method</span>
-                      <span className="payment-card-value">{p.payment_method || '—'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Card Footer: actions */}
-                {!isStaff && (
-                  <div className="payment-card-footer">
-                    {p.status === 'Pending' && (
-                      <button className="log-payment-btn payment-card-mark-paid" onClick={() => openLogPayment(p)}>
-                        <span className="material-symbols-outlined">payments</span>
-                        Mark as Paid
-                      </button>
-                    )}
-                    <div className="payment-card-icon-actions">
-                      <button className="icon-action-btn" title="Edit" onClick={() => openEdit(p)}>
-                        <span className="material-symbols-outlined">edit</span>
-                      </button>
-                      <button className="icon-action-btn danger" title="Delete" onClick={() => handleDelete(p.id)}>
-                        <span className="material-symbols-outlined">delete</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* ── Modal ── */}
-      {showModal && editingPayment && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && closeModal()}>
-          <div className="lease-modal" style={{ maxWidth: '480px' }}>
-            <div className="lease-modal-header">
-              <div>
-                <h2>{modalMode === 'log' ? 'Log Payment' : 'Edit Payment'}</h2>
-                <p style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '0.25rem' }}>
-                  {editingPayment.tenant_name} · {locationLabel(editingPayment)} · {editingPayment.month_for}
-                </p>
-              </div>
-              <button className="icon-action-btn" onClick={closeModal}>
-                <span className="material-symbols-outlined">close</span>
-              </button>
+                </thead>
+                <tbody>
+                  {filtered.map(p => {
+                    const isHostel = !!p.bed_number;
+                    return (
+                      <tr key={p.id} onClick={() => navigate(`/payments/${p.id}`)} style={{ cursor: 'pointer' }}>
+                        <td><span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{p.tenant_name}</span></td>
+                        <td>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                            <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{p.property_name || p.hostel_name}</span>
+                            <span style={{ fontSize: '0.75rem', opacity: 0.5, fontWeight: 600 }}>{isHostel ? `Shared · Bed ${p.bed_number}` : `Private · Unit ${p.unit_number}`}</span>
+                          </div>
+                        </td>
+                        <td><span style={{ fontSize: '0.875rem', fontWeight: 500 }}>{p.month_for}</span></td>
+                        <td style={{ fontWeight: 800, color: 'var(--primary)', fontFamily: 'var(--font-display)', fontSize: '1rem' }}>{currencySymbol}{p.amount.toLocaleString()}</td>
+                        <td>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                            <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{p.payment_method || '—'}</span>
+                            <span style={{ fontSize: '0.75rem', opacity: 0.4, fontWeight: 500 }}>{p.payment_date ? new Date(p.payment_date).toLocaleDateString() : 'Unsettled'}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`badge-modern ${p.status === 'Paid' ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.55rem' }}>{p.status}</span>
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <span className="material-symbols-outlined opacity-20 group-hover:opacity-100 transition-opacity" style={{ fontSize: '1.25rem' }}>arrow_forward_ios</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
 
-            <form onSubmit={handleSave}>
-              <div className="lease-modal-body">
-
-                <div className="form-row cols-2">
-                  <div className="form-group">
-                    <label>Amount Paid ({currencySymbol}) *</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      placeholder="0.00"
-                      value={form.amount}
-                      onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
-                      min={0} step="0.01"
-                    />
-                    {modalMode === 'log' && (() => {
-                      const paid = parseFloat(form.amount) || 0;
-                      const remainder = Math.round((editingPayment.amount - paid) * 100) / 100;
-                      if (remainder > 0 && paid > 0) return (
-                        <span className="payment-partial-hint">
-                          <span className="material-symbols-outlined" style={{ fontSize: '0.85rem' }}>info</span>
-                          {currencySymbol}{remainder.toLocaleString()} remaining — a new pending payment will be created
-                        </span>
-                      );
-                      return null;
-                    })()}
-                  </div>
-                  <div className="form-group">
-                    <label>Payment Date *</label>
-                    <input type="date" className="form-input" value={form.payment_date} onChange={e => setForm(f => ({ ...f, payment_date: e.target.value }))} />
-                  </div>
-                </div>
-
-                <div className="form-row cols-2">
-                  <div className="form-group">
-                    <label>Payment Method</label>
-                    <CustomSelect options={methodOptions} value={form.payment_method} onChange={v => setForm(f => ({ ...f, payment_method: v }))} />
-                  </div>
-                  {modalMode === 'edit' && (
-                    <div className="form-group">
-                      <label>Status *</label>
-                      <CustomSelect options={statusOptions} value={form.status} onChange={v => setForm(f => ({ ...f, status: v as 'Paid' | 'Pending' }))} />
+            <div className="mobile-only flex flex-col gap-5">
+              {filtered.map(p => (
+                <div key={p.id} className="modern-card glass-panel" style={{ padding: '1.5rem', cursor: 'pointer' }} onClick={() => navigate(`/payments/${p.id}`)}>
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 800 }}>{p.tenant_name}</h3>
+                      <div style={{ fontSize: '0.8125rem', opacity: 0.6, fontWeight: 700, color: 'var(--primary)' }}>{p.month_for}</div>
                     </div>
-                  )}
-                </div>
-
-                {modalMode === 'edit' && (
-                  <div className="form-group">
-                    <label>Month For</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="e.g. March 2026"
-                      value={form.month_for}
-                      onChange={e => setForm(f => ({ ...f, month_for: e.target.value }))}
-                    />
+                    <span className={`badge-modern ${p.status === 'Paid' ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.55rem' }}>{p.status}</span>
                   </div>
-                )}
-
-              </div>
-
-              <div className="lease-modal-footer">
-                <button type="button" className="primary-button glass" onClick={closeModal}>Cancel</button>
-                <button type="submit" className="primary-button" disabled={saving}>
-                  {saving ? 'Saving…' : modalMode === 'log' ? 'Mark as Paid' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+                  <div className="grid grid-cols-2 gap-6 mb-6">
+                    <div>
+                      <div style={{ fontSize: '0.625rem', textTransform: 'uppercase', fontWeight: 800, opacity: 0.4, letterSpacing: '0.1em', marginBottom: '0.25rem' }}>Value Received</div>
+                      <div style={{ fontWeight: 900, fontSize: '1.25rem', color: 'var(--on-surface)', fontFamily: 'var(--font-display)' }}>{currencySymbol}{p.amount.toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.625rem', textTransform: 'uppercase', fontWeight: 800, opacity: 0.4, letterSpacing: '0.1em', marginBottom: '0.25rem' }}>Channel</div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{p.payment_method || 'Unset'}</div>
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-white/5 flex justify-between items-center">
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Receipted: {p.payment_date || 'N/A'}</span>
+                    <span className="material-symbols-outlined opacity-40" style={{ fontSize: '1.125rem' }}>arrow_forward_ios</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };

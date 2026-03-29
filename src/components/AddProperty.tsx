@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
-import '../styles/Auth.css';
-import '../styles/Properties.css';
 
 const propertyTypes = ['Residential', 'Commercial', 'Industrial', 'Mixed'];
 
@@ -64,73 +62,65 @@ const AddProperty: React.FC = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto py-12">
-      <header className="mb-12">
-        <button
-          onClick={() => navigate(-1)}
-          className="text-primary font-bold flex items-center gap-2 mb-4 hover:opacity-70 transition-opacity"
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-        >
-          <span className="material-symbols-outlined">arrow_back</span>
-          Back
-        </button>
-        <h1 className="display-small">New Property</h1>
-        <p className="text-on-surface-variant">Enter the details to add a new property to your portfolio.</p>
+    <div className="view-container" style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <header className="view-header">
+        <div>
+          <div className="view-eyebrow" style={{ cursor: 'pointer' }} onClick={() => navigate(-1)}>
+            <span className="material-symbols-outlined" style={{ fontSize: '1rem', marginRight: '0.5rem' }}>arrow_back</span>
+            Back
+          </div>
+          <h1 className="view-title">New Asset Registration</h1>
+          <p className="text-on-surface-variant mt-2">Onboard a new property into your management portfolio.</p>
+        </div>
       </header>
 
-      <div className="bg-surface-container-lowest p-12 rounded-3xl shadow-ambient border border-outline-variant">
-        <form onSubmit={handleSubmit} className="auth-form">
-          {error && <div className="error-message mb-6">{error}</div>}
+      <div className="modern-card" style={{ padding: '3rem' }}>
+        <form onSubmit={handleSubmit} className="modal-form-modern" style={{ padding: 0 }}>
+          {error && <div className="error-message mb-6" style={{ background: 'rgba(186,26,26,0.1)', color: 'var(--error)', padding: '1rem', borderRadius: '0.75rem', fontWeight: 600 }}>{error}</div>}
 
-          <div className="form-group">
-            <label htmlFor="name">Property Name</label>
-            <input id="name" name="name" type="text" className="auth-input" placeholder="e.g. Indigo Estate" value={formData.name} onChange={handleChange} required />
+          <div className="form-group-modern">
+            <label>Legal Property Name</label>
+            <input name="name" type="text" placeholder="e.g. Sapphire Heights" value={formData.name} onChange={handleChange} required />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="address">Full Address</label>
-            <input id="address" name="address" type="text" className="auth-input" placeholder="123 Architect St, City, Country" value={formData.address} onChange={handleChange} required />
+          <div className="form-group-modern">
+            <label>Full Physical Address</label>
+            <input name="address" type="text" placeholder="Street, City, State, ZIP" value={formData.address} onChange={handleChange} required />
           </div>
 
-          <div className="grid grid-cols-1 gap-6">
-            <div className="form-group">
-              <label htmlFor="type">Property Type</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            <div className="form-group-modern">
+              <label>Asset Classification</label>
               <div className="custom-select-container" ref={dropdownRef}>
                 <div
                   className={`custom-select-trigger ${isDropdownOpen ? 'open' : ''}`}
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsDropdownOpen(!isDropdownOpen); }
-                    else if (e.key === 'Escape') setIsDropdownOpen(false);
-                  }}
                 >
                   {formData.type}
-                  <span className="material-symbols-outlined" style={{ transition: '0.2s', transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', fontSize: '1.25rem' }}>keyboard_arrow_down</span>
+                  <span className="material-symbols-outlined transition-transform">keyboard_arrow_down</span>
                 </div>
                 {isDropdownOpen && (
                   <div className="custom-options">
                     {propertyTypes.map(type => (
                       <div key={type} className={`custom-option ${formData.type === type ? 'selected' : ''}`} onClick={() => selectType(type)}>
                         {type}
-                        {formData.type === type && <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check</span>}
+                        {formData.type === type && <span className="material-symbols-outlined">check</span>}
                       </div>
                     ))}
                   </div>
                 )}
               </div>
             </div>
+            <div className="form-group-modern">
+              <label>Image URL (Optional)</label>
+              <input name="image_url" type="url" placeholder="https://..." value={formData.image_url} onChange={handleChange} />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="image_url">Header Image URL (Optional)</label>
-            <input id="image_url" name="image_url" type="url" className="auth-input" placeholder="https://images.unsplash.com/..." value={formData.image_url} onChange={handleChange} />
-          </div>
-
-          <div className="flex gap-4 mt-8">
-            <button type="button" className="primary-button" style={{ background: 'var(--surface-container-high)', color: 'var(--on-surface)', boxShadow: 'none' }} onClick={() => navigate(-1)}>Cancel</button>
-            <button type="submit" className="primary-button flex-1" disabled={loading}>{loading ? 'Creating Property...' : 'Register Property'}</button>
-          </div>
+          <footer className="modal-footer-modern" style={{ padding: '2rem 0 0', marginTop: '1rem' }}>
+            <button type="button" className="btn-secondary" onClick={() => navigate(-1)}>Discard</button>
+            <button type="submit" className="primary-button flex-1" disabled={loading}>{loading ? 'Onboarding...' : 'Confirm Registration'}</button>
+          </footer>
         </form>
       </div>
     </div>

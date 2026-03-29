@@ -1,124 +1,152 @@
-/* Auth.css */
+/* Auth.css - Premium Redesign */
 .auth-container {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
   background-color: var(--surface);
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(136, 216, 176, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(255, 183, 178, 0.1) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(136, 216, 176, 0.1) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(255, 183, 178, 0.15) 0px, transparent 50%);
   padding: 2rem;
+  position: relative;
+  overflow: hidden;
 }
 
 .auth-card {
-  background-color: var(--surface-container-lowest);
-  padding: 3rem;
-  border-radius: 2rem;
-  box-shadow: var(--shadow-ambient);
+  background-color: rgba(var(--surface-container-lowest-rgb, 255, 255, 255), 0.8);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  padding: 3.5rem;
+  border-radius: 2.5rem;
+  border: 1px solid var(--outline-variant);
+  box-shadow: var(--shadow-elevated);
   width: 100%;
-  max-width: 450px;
+  max-width: 480px;
+  animation: authFadeIn 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 1;
+}
+
+@keyframes authFadeIn {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 @media (max-width: 480px) {
   .auth-card {
-    padding: 2rem 1.5rem;
-    border-radius: 1.5rem;
+    padding: 2.5rem 1.5rem;
+    border-radius: 2rem;
     box-shadow: none;
     background: transparent;
+    border: none;
+    backdrop-filter: none;
   }
   .auth-container {
     padding: 1rem;
-    align-items: flex-start;
-    padding-top: 4rem;
+    align-items: center;
   }
 }
 
 .auth-header {
   text-align: center;
-  margin-bottom: 2.5rem;
+  margin-bottom: 3rem;
 }
 
 .auth-brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
 }
 
 .auth-brand-name {
-  font-size: 1.375rem;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   color: var(--on-surface);
 }
 
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.75rem;
 }
 
-.form-group {
+.auth-input-group {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.625rem;
 }
 
-.form-group label {
-  font-size: var(--font-label-small);
-  font-weight: 700;
+.auth-input-group label {
+  font-size: 0.75rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   color: var(--on-surface-variant);
+  opacity: 0.8;
+  padding-left: 0.25rem;
 }
 
 .auth-input {
   background-color: var(--surface-container-low);
   border: 1px solid var(--outline-variant);
-  border-radius: 0.75rem;
-  padding: 0.875rem 1rem;
+  border-radius: 1.125rem;
+  padding: 1rem 1.25rem;
   font-family: var(--font-main);
-  font-size: var(--font-body-large);
+  font-size: 1rem;
   color: var(--on-surface);
-  transition: var(--transition-fast);
+  transition: all 0.25s ease;
 }
 
 .auth-input:focus {
   outline: none;
   border-color: var(--primary);
   background-color: var(--surface-container-lowest);
-  box-shadow: 0 0 0 4px rgba(0, 135, 90, 0.1);
+  box-shadow: 0 0 0 4px var(--primary-container);
+  transform: translateY(-1px);
 }
 
 .auth-button {
   margin-top: 1rem;
+  padding: 1.125rem !important;
+  border-radius: 1.125rem !important;
+  font-size: 1rem !important;
+  font-weight: 800 !important;
 }
 
 .google-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
+  gap: 0.875rem;
   width: 100%;
   background-color: var(--surface-container-lowest);
   border: 1px solid var(--outline-variant);
-  border-radius: 0.75rem;
-  padding: 0.875rem;
+  border-radius: 1.125rem;
+  padding: 1rem;
   font-family: var(--font-main);
-  font-size: var(--font-body-large);
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 700;
   color: var(--on-surface);
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: all 0.25s ease;
+  box-shadow: var(--shadow-ambient);
 }
 
 .google-button:hover {
   background-color: var(--surface-container-low);
   border-color: var(--primary);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-elevated);
 }
 
 .google-icon {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
 }
 
 .divider {
@@ -126,10 +154,12 @@
   align-items: center;
   text-align: center;
   color: var(--on-surface-variant);
-  font-size: var(--font-label-small);
+  font-size: 0.6875rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  opacity: 0.6;
+  letter-spacing: 0.15em;
+  opacity: 0.5;
+  margin: 2rem 0;
 }
 
 .divider::before,
@@ -140,36 +170,49 @@
 }
 
 .divider:not(:empty)::before {
-  margin-right: 1rem;
+  margin-right: 1.25rem;
 }
 
 .divider:not(:empty)::after {
-  margin-left: 1rem;
+  margin-left: 1.25rem;
 }
 
 .auth-footer {
-  margin-top: 2rem;
+  margin-top: 2.5rem;
   text-align: center;
-  font-size: var(--font-body-medium);
+  font-size: 0.9375rem;
   color: var(--on-surface-variant);
+  font-weight: 500;
 }
 
 .auth-link {
   color: var(--primary);
-  font-weight: 700;
+  font-weight: 800;
   text-decoration: none;
   cursor: pointer;
+  margin-left: 0.25rem;
+  transition: opacity 0.2s ease;
 }
 
 .auth-link:hover {
-  text-decoration: underline;
+  opacity: 0.7;
 }
 
 .error-message {
-  background-color: rgba(186, 26, 26, 0.05);
+  background-color: rgba(var(--error-rgb, 229, 115, 115), 0.1);
   color: var(--error);
-  padding: 1rem;
-  border-radius: 0.75rem;
-  font-size: var(--font-body-medium);
-  border-left: 4px solid var(--error);
+  padding: 1.125rem;
+  border-radius: 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1px solid rgba(var(--error-rgb, 229, 115, 115), 0.2);
+  margin-bottom: 1.5rem;
+  animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
 }

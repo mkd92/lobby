@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   collection, query, where, getDocs, doc, getDoc,
-  addDoc, updateDoc, writeBatch, serverTimestamp,
+  writeBatch, serverTimestamp,
 } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { LoadingScreen } from './layout/LoadingScreen';
 import '../styles/Units.css';
 import '../styles/Leases.css';
 
@@ -60,24 +62,6 @@ const EMPTY_FORM = {
   notes: '',
 };
 
-// ── Proration helpers ──────────────────────────────────────────────────
-const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
-
-const calcFirstMonthRent = (rentAmount: string, startDate: string): { value: string; breakdown: string } | null => {
-  const rent = parseFloat(rentAmount);
-  if (!rent || !startDate) return null;
-  const d   = new Date(startDate);
-  const day = d.getDate();
-  const dim = daysInMonth(d.getFullYear(), d.getMonth());
-  const remaining = dim - day + 1;
-  if (remaining === dim) return null; // starts on 1st — full month, no proration needed
-  const prorated = Math.round((rent / dim) * remaining * 100) / 100;
-  return {
-    value:     String(prorated),
-    breakdown: `${remaining} of ${dim} days`,
-  };
-};
-
 // ── CustomSelect ───────────────────────────────────────────────────────
 const CustomSelect: React.FC<{
   options: SelectOption[];
@@ -103,584 +87,246 @@ const CustomSelect: React.FC<{
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  useEffect(() => {
-    if (open) {
-      if (searchable) setTimeout(() => searchInputRef.current?.focus(), 50);
-      const currentIdx = filteredOptions.findIndex(o => o.value === value);
-      setHighlightedIdx(currentIdx >= 0 ? currentIdx : 0);
-    } else {
-      setSearchTerm('');
-      setHighlightedIdx(-1);
-    }
-  }, [open]);
-
-  // Reset highlight when search changes
-  useEffect(() => { setHighlightedIdx(0); }, [searchTerm]);
-
-  // Scroll highlighted option into view
-  useEffect(() => {
-    if (optionsRef.current && highlightedIdx >= 0) {
-      const el = optionsRef.current.querySelectorAll<HTMLElement>('.custom-option')[highlightedIdx];
-      el?.scrollIntoView({ block: 'nearest' });
-    }
-  }, [highlightedIdx]);
-
   const selected = options.find(o => o.value === value);
-  const filteredOptions = options.filter(o =>
-    o.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (o.sub && o.sub.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filtered = searchable 
+    ? options.filter(o => o.label.toLowerCase().includes(searchTerm.toLowerCase()) || (o.sub && o.sub.toLowerCase().includes(searchTerm.toLowerCase())))
+    : options;
 
-  const triggerClass = [
-    'custom-select-trigger',
-    open     ? 'open'      : '',
-    disabled ? 'disabled'  : '',
-    prefilled && !open ? 'prefilled' : '',
-  ].filter(Boolean).join(' ');
+  useEffect(() => {
+    if (open && searchable && searchInputRef.current) {
+      searchInputRef.current.focus();
+      setSearchTerm('');
+    }
+    setHighlightedIdx(-1);
+  }, [open, searchable]);
 
-  const toggle = () => { if (!disabled) setOpen(o => !o); };
-
-  const selectHighlighted = () => {
-    if (highlightedIdx >= 0 && filteredOptions[highlightedIdx]) {
-      onChange(filteredOptions[highlightedIdx].value);
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!open) { setOpen(true); return; }
+      setHighlightedIdx(p => (p < filtered.length - 1 ? p + 1 : p));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedIdx(p => (p > 0 ? p - 1 : p));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (open && highlightedIdx >= 0) {
+        onChange(filtered[highlightedIdx].value);
+        setOpen(false);
+      } else {
+        setOpen(!open);
+      }
+    } else if (e.key === 'Escape') {
       setOpen(false);
     }
   };
 
-  const handleKey = (e: React.KeyboardEvent) => {
-    if (!open) {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === ' ' || e.key === 'Enter') {
-        e.preventDefault(); setOpen(true);
-      }
-      return;
-    }
-    if (e.key === 'Escape' || e.key === 'Tab') { setOpen(false); return; }
-    if (e.key === 'ArrowDown') { e.preventDefault(); setHighlightedIdx(i => Math.min(i + 1, filteredOptions.length - 1)); }
-    if (e.key === 'ArrowUp')   { e.preventDefault(); setHighlightedIdx(i => Math.max(i - 1, 0)); }
-    if (e.key === 'Enter')     { e.preventDefault(); selectHighlighted(); }
-  };
-
-  const handleSearchKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); setHighlightedIdx(i => Math.min(i + 1, filteredOptions.length - 1)); }
-    if (e.key === 'ArrowUp')   { e.preventDefault(); setHighlightedIdx(i => Math.max(i - 1, 0)); }
-    if (e.key === 'Enter')     { e.preventDefault(); selectHighlighted(); }
-    if (e.key === 'Escape')    { setOpen(false); }
-  };
-
   return (
-    <div className="custom-select-container" ref={ref}>
-      <div className={triggerClass} onClick={toggle} tabIndex={disabled ? -1 : 0} onKeyDown={handleKey}>
-        <span style={{ color: selected ? 'var(--on-surface)' : 'var(--on-surface-variant)', opacity: selected ? 1 : 0.5 }}>
-          {selected ? selected.label : placeholder}
-        </span>
-        <span className="material-symbols-outlined" style={{
-          fontSize: '1.1rem',
-          transition: '0.2s',
-          transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-          flexShrink: 0,
-        }}>
+    <div className={`custom-select-container ${disabled ? 'disabled' : ''}`} ref={ref} onKeyDown={handleKeyDown}>
+      <div 
+        className={`custom-select-trigger ${open ? 'open' : ''} ${prefilled ? 'prefilled' : ''}`} 
+        onClick={() => !disabled && setOpen(!open)}
+        tabIndex={disabled ? -1 : 0}
+        style={{ background: 'var(--surface-container-low)', padding: '1rem 1.25rem', borderRadius: '1.125rem', border: 'none' }}
+      >
+        <div className="trigger-text-wrap">
+          {selected ? (
+            <div className="selected-val">
+              <span className="main-lab" style={{ color: 'var(--primary)', fontWeight: 700 }}>{selected.label}</span>
+              {selected.sub && <span className="sub-lab" style={{ opacity: 0.5, fontSize: '0.75rem', marginLeft: '0.5rem' }}>{selected.sub}</span>}
+            </div>
+          ) : <span className="placeholder" style={{ opacity: 0.4 }}>{placeholder}</span>}
+        </div>
+        <span className="material-symbols-outlined trigger-icon" style={{ transition: '0.2s', transform: open ? 'rotate(180deg)' : 'none' }}>
           keyboard_arrow_down
         </span>
       </div>
 
-      {open && !disabled && (
-        <div className="custom-options" ref={optionsRef}>
+      {open && (
+        <div className="custom-options glass-panel" style={{ top: 'calc(100% + 0.5rem)', background: 'rgba(40, 42, 44, 0.95)', backdropFilter: 'blur(32px)', borderRadius: '1.25rem', border: '1px solid rgba(255,255,255,0.05)' }}>
           {searchable && (
-            <div className="custom-select-search-wrap">
-              <input
+            <div className="select-search-box" style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <input 
                 ref={searchInputRef}
-                type="text"
-                className="custom-select-search"
-                placeholder="Type to search…"
-                value={searchTerm}
+                type="text" 
+                placeholder="Type to filter..." 
+                value={searchTerm} 
                 onChange={e => setSearchTerm(e.target.value)}
                 onClick={e => e.stopPropagation()}
-                onKeyDown={handleSearchKey}
+                style={{ background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '0.75rem', padding: '0.5rem 0.75rem', width: '100%', color: 'white', fontSize: '0.875rem' }}
               />
             </div>
           )}
-          {filteredOptions.length === 0 ? (
-            <div className="custom-option-empty">No options found</div>
-          ) : (
-            filteredOptions.map((opt, idx) => (
-              <div
-                key={opt.value}
-                className={`custom-option ${value === opt.value ? 'selected' : ''} ${idx === highlightedIdx ? 'highlighted' : ''}`}
-                onClick={() => { onChange(opt.value); setOpen(false); }}
+          <div className="options-list-scroll custom-scrollbar" style={{ maxHeight: '240px', overflowY: 'auto' }} ref={optionsRef}>
+            {filtered.length === 0 ? (
+              <div className="no-options" style={{ padding: '1rem', textAlign: 'center', opacity: 0.5, fontSize: '0.875rem' }}>No matches identified</div>
+            ) : filtered.map((o, i) => (
+              <div 
+                key={o.value} 
+                className={`custom-option ${o.value === value ? 'selected' : ''} ${highlightedIdx === i ? 'highlighted' : ''}`}
+                onClick={() => { onChange(o.value); setOpen(false); }}
+                style={{ padding: '0.875rem 1.25rem', transition: '0.2s' }}
               >
-                <div>
-                  <div className="custom-option-label">{opt.label}</div>
-                  {opt.sub && <div className="custom-option-sub">{opt.sub}</div>}
+                <div className="opt-content">
+                  <div className="opt-label" style={{ fontWeight: o.value === value ? 800 : 600, color: o.value === value ? 'var(--primary)' : 'inherit' }}>{o.label}</div>
+                  {o.sub && <div className="opt-sub" style={{ fontSize: '0.7rem', opacity: 0.4, marginTop: '0.15rem' }}>{o.sub}</div>}
                 </div>
-                {value === opt.value && (
-                  <span className="material-symbols-outlined" style={{ fontSize: '0.9rem', flexShrink: 0 }}>check</span>
-                )}
               </div>
-            ))
-          )}
+            ))}
+          </div>
         </div>
       )}
     </div>
   );
 };
 
-// ── Main component ─────────────────────────────────────────────────────
+// ── Main Component ─────────────────────────────────────────────────────
 const Leases: React.FC = () => {
-  const { showAlert, showConfirm, DialogMount } = useDialog();
   const { ownerId, isStaff } = useOwner();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [filter, setFilter]       = useState<FilterTab>('All');
+  const { showAlert, showConfirm, DialogMount } = useDialog();
 
-  // Modal
-  const [showModal, setShowModal]       = useState(false);
-  const [editingLease, setEditingLease] = useState<Lease | null>(null);
-  const [saving, setSaving]             = useState(false);
-
-  // Form
+  const [filter, setFilter] = useState<FilterTab>('All');
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [leaseType, setLeaseType] = useState<LeaseType>('property');
-  const [form, setForm]           = useState({ ...EMPTY_FORM });
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+  const [currencySymbol, setCurrencySymbol] = useState('$');
 
-  // Cascade data
-  const [tenants,    setTenants]    = useState<Tenant[]>([]);
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [units,      setUnits]      = useState<Unit[]>([]);
-  const [hostels,    setHostels]    = useState<Hostel[]>([]);
-  const [rooms,      setRooms]      = useState<Room[]>([]);
-  const [beds,       setBeds]       = useState<Bed[]>([]);
-
-  const [selectedPropertyId, setSelectedPropertyId] = useState('');
-  const [selectedHostelId,   setSelectedHostelId]   = useState('');
-  const [selectedRoomId,     setSelectedRoomId]     = useState('');
-  const [rentPrefilled,          setRentPrefilled]          = useState(false);
-  const [firstMonthPrefilled,    setFirstMonthPrefilled]    = useState(false);
-  const [firstMonthBreakdown,    setFirstMonthBreakdown]    = useState('');
-  const firstMonthUserEdited = useRef(false);
-
-  // ── Queries ────────────────────────────────────────────────────────
-  const { data: leases = [], isLoading } = useQuery({
-    queryKey: ['leases', ownerId],
-    queryFn: async () => {
-      if (!ownerId) return [];
-      // Fire-and-forget auto-expire — don't block data loading
-      void (async () => {
-        const today = new Date().toISOString().split('T')[0];
-        const activeSnap = await getDocs(query(
-          collection(db, 'leases'),
-          where('owner_id', '==', ownerId),
-          where('status', '==', 'Active')
-        ));
-        const batch = writeBatch(db);
-        let hasExpired = false;
-        for (const leaseDoc of activeSnap.docs) {
-          const lease = leaseDoc.data();
-          if (lease.end_date && lease.end_date < today) {
-            batch.update(leaseDoc.ref, { status: 'Expired' });
-            hasExpired = true;
-          }
-        }
-        if (hasExpired) await batch.commit();
-      })();
-
-      const snap = await getDocs(query(
-        collection(db, 'leases'),
-        where('owner_id', '==', ownerId)
-      ));
-
-      const data: Lease[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as Lease));
-      // Sort by created_at descending (newest first)
-      data.sort((a: any, b: any) => {
-        const ta = a.created_at?.seconds ?? 0;
-        const tb = b.created_at?.seconds ?? 0;
-        return tb - ta;
-      });
-      return data;
-    },
-    enabled: !!ownerId,
-  });
-
-  const { data: currencySymbol = '₹' } = useQuery({
-    queryKey: ['currency', ownerId],
-    queryFn: async () => {
-      if (!ownerId) return '₹';
-      const ownerDoc = await getDoc(doc(db, 'owners', ownerId));
-      const data = ownerDoc.data();
-      const symbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
-      return symbols[data?.currency || 'USD'] || '$';
-    },
-    enabled: !!ownerId,
-  });
+  useEscapeKey(() => closeModal(), isModalOpen);
 
   const invalidateLeases = () => queryClient.invalidateQueries({ queryKey: ['leases', ownerId] });
 
-  // Auto-calculate first month rent whenever rent or start date changes
-  useEffect(() => {
-    if (firstMonthUserEdited.current) return;
-    if (!showModal) return;
-    const result = calcFirstMonthRent(form.rent_amount, form.start_date);
-    if (result) {
-      setForm(f => ({ ...f, first_month_rent: result.value }));
-      setFirstMonthBreakdown(result.breakdown);
-      setFirstMonthPrefilled(true);
-    } else {
-      // Starts on 1st or no data — mirror full rent
-      if (form.rent_amount) {
-        setForm(f => ({ ...f, first_month_rent: form.rent_amount }));
-        setFirstMonthBreakdown('');
-      }
-      setFirstMonthPrefilled(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.rent_amount, form.start_date, showModal]);
+  // ── Data Fetching ──────────────────────────────────────────────────
+  const { data: leases = [], isLoading } = useQuery({
+    queryKey: ['leases', ownerId],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, 'leases'), where('owner_id', '==', ownerId)));
+      const ownerSnap = await getDoc(doc(db, 'owners', ownerId!));
+      const ownerData = ownerSnap.data();
+      const curr = ownerData?.currency || 'USD';
+      const symbols: any = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
+      setCurrencySymbol(symbols[curr] || '$');
 
-  // ── Form reference data ────────────────────────────────────────────
-  const loadFormData = async () => {
-    if (!ownerId) return;
-    const [tSnap, pSnap, hSnap] = await Promise.all([
-      getDocs(query(collection(db, 'tenants'), where('owner_id', '==', ownerId))),
-      getDocs(query(collection(db, 'properties'), where('owner_id', '==', ownerId))),
-      getDocs(query(collection(db, 'hostels'), where('owner_id', '==', ownerId))),
-    ]);
-    const tData = tSnap.docs.map(d => ({ id: d.id, ...d.data() } as Tenant))
-      .sort((a, b) => a.full_name.localeCompare(b.full_name));
-    const pData = pSnap.docs.map(d => ({ id: d.id, ...d.data() } as Property))
-      .sort((a, b) => a.name.localeCompare(b.name));
-    const hData = hSnap.docs.map(d => ({ id: d.id, ...d.data() } as Hostel))
-      .sort((a, b) => a.name.localeCompare(b.name));
-    setTenants(tData);
-    setProperties(pData);
-    setHostels(hData);
-  };
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as Lease))
+        .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+    },
+    enabled: !!ownerId,
+  });
 
-  const loadUnits = async (propertyId: string) => {
-    const snap = await getDocs(query(
-      collection(db, 'units'),
-      where('property_id', '==', propertyId)
-    ));
-    let data = snap.docs.map(d => ({ id: d.id, ...d.data() } as Unit))
-      .sort((a, b) => a.unit_number.localeCompare(b.unit_number));
-    if (!editingLease) {
-      data = data.filter(u => u.status === 'Vacant');
-    } else {
-      // In edit mode, show Vacant units PLUS the currently leased unit
-      data = data.filter(u => u.status === 'Vacant' || u.id === editingLease.unit_id);
-    }
-    setUnits(data);
-  };
+  const { data: tenants = [] } = useQuery({
+    queryKey: ['tenants', ownerId],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, 'tenants'), where('owner_id', '==', ownerId)));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as Tenant)).sort((a, b) => a.full_name.localeCompare(b.full_name));
+    },
+    enabled: isModalOpen,
+  });
 
-  const loadRooms = async (hostelId: string) => {
-    const [roomsSnap, bedsSnap] = await Promise.all([
-      getDocs(query(collection(db, 'rooms'), where('hostel_id', '==', hostelId))),
-      getDocs(query(collection(db, 'beds'), where('hostel_id', '==', hostelId))),
-    ]);
+  const { data: properties = [] } = useQuery({
+    queryKey: ['properties', ownerId],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, 'properties'), where('owner_id', '==', ownerId)));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as Property));
+    },
+    enabled: isModalOpen && leaseType === 'property',
+  });
 
-    const allBeds = bedsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Bed));
-    // Group beds by room_id
-    const bedsByRoom: Record<string, Bed[]> = {};
-    for (const bed of allBeds) {
-      if (!bedsByRoom[bed.room_id]) bedsByRoom[bed.room_id] = [];
-      bedsByRoom[bed.room_id].push(bed);
-    }
+  const { data: units = [] } = useQuery({
+    queryKey: ['units', ownerId, form.unit_id],
+    queryFn: async () => {
+      const q = query(collection(db, 'units'), where('property_id', '==', form.unit_id), where('status', '==', 'Vacant'));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as Unit));
+    },
+    enabled: isModalOpen && leaseType === 'property' && !!form.unit_id,
+  });
 
-    let data = roomsSnap.docs.map(d => ({
-      id: d.id,
-      ...d.data(),
-      beds: bedsByRoom[d.id] || [],
-    } as Room)).sort((a, b) => String(a.room_number).localeCompare(String(b.room_number)));
+  const { data: hostels = [] } = useQuery({
+    queryKey: ['hostels', ownerId],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, 'hostels'), where('owner_id', '==', ownerId)));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as Hostel));
+    },
+    enabled: isModalOpen && leaseType === 'hostel',
+  });
 
-    if (!editingLease) {
-      // Show only rooms that have at least one vacant bed
-      data = data.filter(r => r.beds?.some(b => b.status === 'Vacant'));
-    } else {
-      // In edit mode, show rooms with vacant beds PLUS the room that has the currently leased bed
-      data = data.filter(r =>
-        r.beds?.some(b => b.status === 'Vacant' || b.id === editingLease.bed_id)
-      );
-    }
-    setRooms(data);
-  };
+  const { data: rooms = [] } = useQuery({
+    queryKey: ['rooms', ownerId, form.unit_id],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, 'rooms'), where('hostel_id', '==', form.unit_id)));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as Room));
+    },
+    enabled: isModalOpen && leaseType === 'hostel' && !!form.unit_id,
+  });
 
-  const loadBeds = async (roomId: string) => {
-    const snap = await getDocs(query(
-      collection(db, 'beds'),
-      where('room_id', '==', roomId)
-    ));
-    let data = snap.docs.map(d => ({ id: d.id, ...d.data() } as Bed))
-      .sort((a, b) => a.bed_number.localeCompare(b.bed_number));
-    if (!editingLease) {
-      data = data.filter(b => b.status === 'Vacant');
-    } else {
-      // In edit mode, show Vacant beds PLUS the currently leased bed
-      data = data.filter(b => b.status === 'Vacant' || b.id === editingLease.bed_id);
-    }
-    setBeds(data);
-  };
+  const { data: beds = [] } = useQuery({
+    queryKey: ['beds', ownerId, form.bed_id],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, 'beds'), where('room_id', '==', form.bed_id), where('status', '==', 'Vacant')));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as Bed));
+    },
+    enabled: isModalOpen && leaseType === 'hostel' && !!form.bed_id,
+  });
 
-  // ── Open modal ─────────────────────────────────────────────────────
+  // ── Modal Actions ──────────────────────────────────────────────────
   const openCreate = () => {
-    setEditingLease(null);
-    setForm({ ...EMPTY_FORM });
+    setForm(EMPTY_FORM);
     setLeaseType('property');
-    setSelectedPropertyId(''); setSelectedHostelId(''); setSelectedRoomId('');
-    setUnits([]); setRooms([]); setBeds([]);
-    setRentPrefilled(false);
-    setFirstMonthPrefilled(false);
-    setFirstMonthBreakdown('');
-    firstMonthUserEdited.current = false;
-    setShowModal(true);
-    loadFormData();
+    setIsModalOpen(true);
   };
 
-  const openEdit = async (lease: Lease) => {
-    setEditingLease(lease);
-    setLeaseType(lease.bed_id ? 'hostel' : 'property');
-    setForm({
-      tenant_id:        lease.tenant_id,
-      unit_id:          lease.unit_id || '',
-      bed_id:           lease.bed_id  || '',
-      rent_amount:      String(lease.rent_amount),
-      first_month_rent: '',
-      security_deposit: String(lease.security_deposit ?? ''),
-      start_date:       lease.start_date,
-      end_date:         lease.end_date || '',
-      status:           lease.status,
-      notes:            lease.notes || '',
-    });
-
-    // Set cascade selection IDs — fetch from Firestore since data is flat (no joins)
-    if (lease.unit_id) {
-      const unitDoc = await getDoc(doc(db, 'units', lease.unit_id));
-      if (unitDoc.exists()) {
-        const unitData = unitDoc.data();
-        setSelectedPropertyId(unitData.property_id);
-        loadUnits(unitData.property_id);
-      }
-    } else if (lease.bed_id) {
-      const bedDoc = await getDoc(doc(db, 'beds', lease.bed_id));
-      if (bedDoc.exists()) {
-        const bedData = bedDoc.data() as Bed;
-        const roomDoc = await getDoc(doc(db, 'rooms', bedData.room_id));
-        if (roomDoc.exists()) {
-          const roomData = roomDoc.data();
-          setSelectedHostelId(roomData.hostel_id);
-          setSelectedRoomId(bedData.room_id);
-          loadRooms(roomData.hostel_id);
-          loadBeds(bedData.room_id);
-        }
-      }
-    }
-
-    setRentPrefilled(false);
-    setFirstMonthPrefilled(false);
-    setFirstMonthBreakdown('');
-    firstMonthUserEdited.current = false; // allow recalc from existing rent + start_date
-    setShowModal(true);
-    loadFormData();
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setForm(EMPTY_FORM);
   };
 
-  const closeModal = () => { setShowModal(false); setEditingLease(null); };
-
-  useEscapeKey(closeModal, showModal);
-
-  // ── Cascade handlers ───────────────────────────────────────────────
-  const onPropertyChange = (propertyId: string) => {
-    setSelectedPropertyId(propertyId);
-    setForm(f => ({ ...f, unit_id: '' }));
-    setUnits([]); setRentPrefilled(false);
-    if (propertyId) loadUnits(propertyId);
-  };
-
-  const onUnitChange = (unitId: string) => {
-    const unit = units.find(u => u.id === unitId);
-    setForm(f => ({ ...f, unit_id: unitId, rent_amount: unit ? String(unit.base_rent) : f.rent_amount }));
-    setRentPrefilled(!!unit);
-  };
-
-  const onHostelChange = (hostelId: string) => {
-    setSelectedHostelId(hostelId);
-    setSelectedRoomId('');
-    setForm(f => ({ ...f, bed_id: '' }));
-    setRooms([]); setBeds([]); setRentPrefilled(false);
-    if (hostelId) loadRooms(hostelId);
-  };
-
-  const onRoomChange = (roomId: string) => {
-    setSelectedRoomId(roomId);
-    setForm(f => ({ ...f, bed_id: '' }));
-    setBeds([]); setRentPrefilled(false);
-    if (roomId) loadBeds(roomId);
-  };
-
-  const onBedChange = (bedId: string) => {
-    const bed = beds.find(b => b.id === bedId);
-    setForm(f => ({ ...f, bed_id: bedId, rent_amount: bed ? String(bed.price) : f.rent_amount }));
-    setRentPrefilled(!!bed);
-  };
-
-  const onTypeSwitch = (t: LeaseType) => {
-    setLeaseType(t);
-    setForm(f => ({ ...f, unit_id: '', bed_id: '', rent_amount: '' }));
-    setSelectedPropertyId(''); setSelectedHostelId(''); setSelectedRoomId('');
-    setUnits([]); setRooms([]); setBeds([]);
-    setRentPrefilled(false);
-  };
-
-  // ── Save ───────────────────────────────────────────────────────────
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.tenant_id) { showAlert('Please select a tenant.'); return; }
-    if (leaseType === 'property' && !form.unit_id) { showAlert('Please select a unit.'); return; }
-    if (leaseType === 'hostel'   && !form.bed_id)  { showAlert('Please select a bed.'); return; }
-    if (!form.rent_amount) { showAlert('Please enter rent amount.'); return; }
-    if (!form.start_date)  { showAlert('Please enter a start date.'); return; }
-
     setSaving(true);
     try {
-      const selectedTenant    = tenants.find(t => t.id === form.tenant_id);
-      const selectedUnit      = units.find(u => u.id === form.unit_id);
-      const selectedProperty  = properties.find(p => p.id === selectedPropertyId);
-      const selectedBed       = beds.find(b => b.id === form.bed_id);
-      const selectedRoom      = rooms.find(r => r.id === selectedRoomId);
-      const selectedHostel    = hostels.find(h => h.id === selectedHostelId);
+      const tenant = tenants.find(t => t.id === form.tenant_id);
+      let payload: any = {
+        owner_id: ownerId,
+        tenant_id: form.tenant_id,
+        tenant_name: tenant?.full_name || '',
+        rent_amount: parseFloat(form.rent_amount),
+        security_deposit: form.security_deposit ? parseFloat(form.security_deposit) : null,
+        start_date: form.start_date,
+        end_date: form.end_date || null,
+        status: form.status,
+        notes: form.notes || null,
+        updated_at: serverTimestamp(),
+      };
 
-      if (editingLease) {
-        // ── Update existing lease ──
-        const updatedFields: Record<string, any> = {
-          tenant_id:        form.tenant_id,
-          tenant_name:      selectedTenant?.full_name || editingLease.tenant_name,
-          rent_amount:      parseFloat(form.rent_amount) || 0,
-          security_deposit: parseFloat(form.security_deposit) || null,
-          start_date:       form.start_date,
-          end_date:         form.end_date || null,
-          status:           form.status,
-          notes:            form.notes || null,
-        };
+      const batch = writeBatch(db);
 
-        if (leaseType === 'property') {
-          updatedFields.unit_id      = form.unit_id || null;
-          updatedFields.unit_number  = selectedUnit?.unit_number || editingLease.unit_number || null;
-          updatedFields.property_id  = selectedPropertyId || null;
-          updatedFields.property_name = selectedProperty?.name || editingLease.property_name || null;
-          updatedFields.bed_id       = null;
-          updatedFields.bed_number   = null;
-          updatedFields.room_id      = null;
-          updatedFields.room_number  = null;
-          updatedFields.hostel_id    = null;
-          updatedFields.hostel_name  = null;
-        } else {
-          updatedFields.bed_id       = form.bed_id || null;
-          updatedFields.bed_number   = selectedBed?.bed_number || editingLease.bed_number || null;
-          updatedFields.room_id      = selectedRoomId || null;
-          updatedFields.room_number  = selectedRoom?.room_number || editingLease.room_number || null;
-          updatedFields.hostel_id    = selectedHostelId || null;
-          updatedFields.hostel_name  = selectedHostel?.name || editingLease.hostel_name || null;
-          updatedFields.unit_id      = null;
-          updatedFields.unit_number  = null;
-          updatedFields.property_id  = null;
-          updatedFields.property_name = null;
-        }
-
-        await updateDoc(doc(db, 'leases', editingLease.id), updatedFields);
+      if (leaseType === 'property') {
+        const unit = units.find(u => u.id === form.unit_id);
+        const prop = properties.find(p => p.id === unit?.property_id);
+        payload.unit_id = form.unit_id;
+        payload.unit_number = unit?.unit_number || '';
+        payload.property_name = prop?.name || '';
+        payload.bed_id = null;
+        batch.update(doc(db, 'units', form.unit_id), { status: 'Occupied' });
       } else {
-        // ── Create new lease ──
-        let leaseData: any = {
-          owner_id:         ownerId,
-          tenant_id:        form.tenant_id,
-          tenant_name:      selectedTenant?.full_name || '',
-          rent_amount:      parseFloat(form.rent_amount),
-          security_deposit: form.security_deposit ? parseFloat(form.security_deposit) : null,
-          start_date:       form.start_date,
-          end_date:         form.end_date || null,
-          status:           form.status,
-          notes:            form.notes || null,
-          created_at:       serverTimestamp(),
-        };
-
-        if (leaseType === 'property' && selectedUnit) {
-          leaseData = {
-            ...leaseData,
-            unit_id:      selectedUnit.id,
-            unit_number:  selectedUnit.unit_number,
-            property_id:  selectedUnit.property_id,
-            property_name: selectedProperty?.name || '',
-            bed_id:       null,
-            bed_number:   null,
-            room_id:      null,
-            room_number:  null,
-            hostel_id:    null,
-            hostel_name:  null,
-          };
-          // Mark unit as Occupied
-          await updateDoc(doc(db, 'units', selectedUnit.id), { status: 'Occupied' });
-        } else if (leaseType === 'hostel' && selectedBed) {
-          leaseData = {
-            ...leaseData,
-            bed_id:       selectedBed.id,
-            bed_number:   selectedBed.bed_number,
-            room_id:      selectedRoom?.id || null,
-            room_number:  selectedRoom?.room_number || null,
-            hostel_id:    selectedHostel?.id || null,
-            hostel_name:  selectedHostel?.name || null,
-            unit_id:      null,
-            unit_number:  null,
-            property_id:  null,
-            property_name: null,
-          };
-          // Mark bed as Occupied
-          await updateDoc(doc(db, 'beds', selectedBed.id), { status: 'Occupied' });
-        }
-
-        const leaseRef = await addDoc(collection(db, 'leases'), leaseData);
-
-        // ── Create initial payments ──
-        // Parse date parts directly to avoid UTC-to-local timezone shift
-        const [sy, sm] = form.start_date.split('-').map(Number);
-        const monthLabel = new Date(sy, sm - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-        const today = new Date().toISOString().split('T')[0];
-
-        const firstRent = parseFloat(form.first_month_rent);
-        if (firstRent > 0) {
-          await addDoc(collection(db, 'payments'), {
-            owner_id:       ownerId,
-            lease_id:       leaseRef.id,
-            tenant_name:    leaseData.tenant_name,
-            unit_number:    leaseData.unit_number || null,
-            property_name:  leaseData.property_name || null,
-            bed_number:     leaseData.bed_number || null,
-            room_number:    leaseData.room_number || null,
-            hostel_name:    leaseData.hostel_name || null,
-            rent_amount:    leaseData.rent_amount,
-            amount:         firstRent,
-            payment_date:   today,
-            month_for:      monthLabel,
-            payment_method: null,
-            status:         'Pending',
-            created_at:     serverTimestamp(),
-          });
-        }
-
-        const deposit = parseFloat(form.security_deposit);
-        if (deposit > 0) {
-          await addDoc(collection(db, 'payments'), {
-            owner_id:       ownerId,
-            lease_id:       leaseRef.id,
-            tenant_name:    leaseData.tenant_name,
-            unit_number:    leaseData.unit_number || null,
-            property_name:  leaseData.property_name || null,
-            bed_number:     leaseData.bed_number || null,
-            room_number:    leaseData.room_number || null,
-            hostel_name:    leaseData.hostel_name || null,
-            rent_amount:    leaseData.rent_amount,
-            amount:         deposit,
-            payment_date:   today,
-            month_for:      'Security Deposit',
-            payment_method: null,
-            status:         'Pending',
-            created_at:     serverTimestamp(),
-          });
-        }
+        const bed = beds.find(b => b.id === form.bed_id);
+        const room = rooms.find(r => r.id === form.bed_id);
+        payload.bed_id = form.bed_id;
+        payload.bed_number = bed?.bed_number || '';
+        payload.room_number = room?.room_number || '';
+        payload.hostel_name = hostels.find(h => h.id === form.unit_id)?.name || '';
+        batch.update(doc(db, 'beds', form.bed_id), { status: 'Occupied' });
       }
 
-      closeModal(); invalidateLeases();
+      payload.created_at = serverTimestamp();
+      batch.set(doc(collection(db, 'leases')), payload);
+
+      await batch.commit();
+      invalidateLeases();
+      closeModal();
     } catch (err) {
       showAlert((err as Error).message);
     } finally {
@@ -688,9 +334,8 @@ const Leases: React.FC = () => {
     }
   };
 
-  // ── Delete ─────────────────────────────────────────────────────────
   const handleDelete = async (lease: Lease) => {
-    const ok = await showConfirm('Delete this lease? This cannot be undone.', { danger: true });
+    const ok = await showConfirm(`Are you sure you want to terminate this lease agreement for ${lease.tenant_name}? This action is irreversible.`, { danger: true });
     if (!ok) return;
     try {
       const batch = writeBatch(db);
@@ -712,80 +357,92 @@ const Leases: React.FC = () => {
     total:      leases.length,
     active:     leases.filter(l => l.status === 'Active').length,
     expired:    leases.filter(l => l.status === 'Expired').length,
-    terminated: leases.filter(l => l.status === 'Terminated').length,
   };
   const initials = (name: string) => name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
   const fmt = (d: string) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
-  // ── Option builders ────────────────────────────────────────────────
-  const tenantOptions:   SelectOption[] = tenants.map(t => ({ value: t.id, label: t.full_name, sub: t.phone || t.email }));
-  const propertyOptions: SelectOption[] = properties.map(p => ({ value: p.id, label: p.name }));
-  const unitOptions:     SelectOption[] = units.map(u => ({ value: u.id, label: u.unit_number, sub: u.type }));
-  const hostelOptions:   SelectOption[] = hostels.map(h => ({ value: h.id, label: h.name }));
-  const roomOptions:     SelectOption[] = rooms.map(r => ({ value: r.id, label: `Room ${r.room_number}`, sub: `Floor ${r.floor}` }));
-  const bedOptions:      SelectOption[] = beds.map(b => ({ value: b.id, label: b.bed_number, sub: `${currencySymbol}${b.price.toLocaleString()}` }));
-  const statusOptions:   SelectOption[] = [
-    { value: 'Active',     label: 'Active' },
-    { value: 'Expired',    label: 'Expired' },
-    { value: 'Terminated', label: 'Terminated' },
-  ];
-
   // ── Render ─────────────────────────────────────────────────────────
   return (
-    <div className="leases-container">
+    <div className="view-container page-fade-in">
       {DialogMount}
-      {/* Header */}
-      <div className="leases-header-row flex justify-between items-center mb-10">
-        <div>
-          <h1 className="display-medium mb-2">Leases</h1>
-          <p className="text-on-surface-variant">Manage property and hostel lease agreements</p>
+      
+      <header className="view-header">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+          <div>
+            <p className="view-eyebrow">Lease Portfolio</p>
+            <h1 className="view-title" style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', margin: 0 }}>Contractual Yield</h1>
+          </div>
+          {!isStaff && (
+            <button onClick={openCreate} className="primary-button">
+              <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle', fontSize: '1.25rem' }}>description</span>
+              Generate Agreement
+            </button>
+          )}
         </div>
-        {!isStaff && (
-          <button className="primary-button" onClick={openCreate}>
-            + New Lease
-          </button>
-        )}
-      </div>
+      </header>
 
-      {/* Stats */}
-      <div className="lease-stats-row">
-        <div className="lease-stat-card"><div className="stat-label">Total Leases</div><div className="stat-value">{stats.total}</div></div>
-        <div className="lease-stat-card"><div className="stat-label">Active</div><div className="stat-value green">{stats.active}</div></div>
-        <div className="lease-stat-card"><div className="stat-label">Expired</div><div className="stat-value amber">{stats.expired}</div></div>
-        <div className="lease-stat-card"><div className="stat-label">Terminated</div><div className="stat-value red">{stats.terminated}</div></div>
-      </div>
+      {/* Metrics Bar */}
+      {leases.length > 0 && (
+        <div className="properties-metrics-bar custom-scrollbar">
+          <div className="prop-metric">
+            <span className="prop-metric-label">Active Contracts</span>
+            <span className="prop-metric-value" style={{ color: 'var(--color-success)' }}>{stats.active}</span>
+          </div>
+          <div className="prop-metric">
+            <span className="prop-metric-label">Maturity Alerts</span>
+            <span className="prop-metric-value" style={{ color: stats.expired > 0 ? 'var(--error)' : 'inherit' }}>{stats.expired}</span>
+          </div>
+          <div className="prop-metric">
+            <span className="prop-metric-label">Total Volume</span>
+            <span className="prop-metric-value">{stats.total}</span>
+          </div>
+        </div>
+      )}
 
-      {/* Filter */}
-      <div className="lease-filter-bar">
-        <div className="filter-tabs">
+      {/* Modern Filter Tabs */}
+      <div className="view-toolbar">
+        <div className="filter-tabs-modern">
           {(['All', 'Active', 'Expired', 'Terminated'] as FilterTab[]).map(tab => (
-            <button key={tab} className={`filter-tab ${filter === tab ? 'active' : ''}`} onClick={() => setFilter(tab)}>{tab}</button>
+            <button 
+              key={tab} 
+              className={`tab-btn ${filter === tab ? 'active' : ''}`} 
+              onClick={() => setFilter(tab)}
+            >
+              {tab}
+              {filter === tab && <div className="tab-indicator" />}
+            </button>
           ))}
         </div>
-        <span className="label-small opacity-50">{filtered.length} lease{filtered.length !== 1 ? 's' : ''}</span>
+        <div className="prop-filter-count">
+          {filtered.length} / {leases.length} Legal Agreements Identified
+        </div>
       </div>
 
-      {/* Table & Cards */}
       <div className="leases-content-area">
         {isLoading ? (
-          <div style={{ padding: '4rem', textAlign: 'center', opacity: 0.5 }}>Loading leases…</div>
+          <div style={{ minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <LoadingScreen message="Accessing Agreement Vault" />
+          </div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: '4rem', textAlign: 'center', opacity: 0.4 }}>
-            No {filter !== 'All' ? filter.toLowerCase() + ' ' : ''}leases found.
-            {filter === 'All' && <button style={{ color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }} onClick={openCreate}> Create the first one.</button>}
+          <div className="empty-state modern-card" style={{ textAlign: 'center', padding: '6rem 2rem' }}>
+            <div className="empty-state-icon" style={{ opacity: 0.2, marginBottom: '2rem' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '4rem' }}>contract_delete</span>
+            </div>
+            <h2>Clean Slate</h2>
+            <p className="text-on-surface-variant mb-10 max-w-md mx-auto">Your document vault is clear for this selection. Adjust your parameters or initialize a new agreement.</p>
+            {filter === 'All' && !isStaff && <button className="primary-button glass-panel mt-4" onClick={openCreate} style={{ background: 'rgba(255,255,255,0.05)' }}>Initialize First Agreement</button>}
           </div>
         ) : (
           <>
-            {/* Desktop View */}
-            <div className="leases-table-wrap desktop-only">
-              <table className="leases-table">
+            <div className="leases-table-container desktop-only">
+              <table className="modern-table">
                 <thead>
                   <tr>
-                    <th>Tenant</th>
-                    <th>Property / Hostel</th>
-                    <th>Unit / Bed</th>
-                    <th>Rent</th>
-                    <th>Period</th>
+                    <th className="col-tenant">Tenant Entity</th>
+                    <th className="col-asset">Asset Designation</th>
+                    <th>Inventory</th>
+                    <th>Financial Value</th>
+                    <th>Contractual Period</th>
                     <th>Status</th>
                     <th></th>
                   </tr>
@@ -795,46 +452,40 @@ const Leases: React.FC = () => {
                     const isHostel  = !!lease.bed_id;
                     const propName  = isHostel ? lease.hostel_name : lease.property_name;
                     const unitLabel = isHostel
-                      ? `Room ${lease.room_number} · ${lease.bed_number}`
+                      ? `Room ${lease.room_number} · Bed ${lease.bed_number}`
                       : `${lease.unit_number}`;
                     return (
-                      <tr key={lease.id}>
+                      <tr key={lease.id} onClick={() => navigate(`/leases/${lease.id}`)} style={{ cursor: 'pointer' }}>
+                        <td className="col-tenant">
+                          <div className="flex items-center gap-4" style={{ overflow: 'hidden' }}>
+                            <div style={{ width: '36px', height: '36px', borderRadius: '12px', background: 'var(--primary-container)', color: 'var(--on-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.875rem', fontWeight: 900, flexShrink: 0 }}>{initials(lease.tenant_name || '?')}</div>
+                            <span className="text-truncate" style={{ fontWeight: 700, fontSize: '0.9375rem' }} title={lease.tenant_name}>{lease.tenant_name}</span>
+                          </div>
+                        </td>
+                        <td className="col-asset">
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', overflow: 'hidden' }}>
+                            <div className="badge-modern" style={{ width: 'fit-content', fontSize: '0.55rem', padding: '0.15rem 0.5rem', background: isHostel ? 'rgba(208, 228, 255, 0.1)' : 'rgba(194, 217, 211, 0.1)', color: isHostel ? 'var(--tertiary)' : 'var(--primary)' }}>{isHostel ? 'Shared' : 'Private'}</div>
+                            <span className="text-truncate" style={{ fontSize: '0.875rem', fontWeight: 500 }} title={propName || '—'}>{propName || '—'}</span>
+                          </div>
+                        </td>
+                        <td><span style={{ fontWeight: 800, fontSize: '0.875rem', color: 'var(--primary)', fontFamily: 'var(--font-display)' }}>{unitLabel}</span></td>
                         <td>
-                          <div className="tenant-cell">
-                            <div className="tenant-avatar">{initials(lease.tenant_name || '?')}</div>
-                            <div>
-                              <div className="tenant-name">{lease.tenant_name}</div>
-                            </div>
+                          <div className="financial-cell" style={{ fontSize: '1rem' }}>{currencySymbol}{Number(lease.rent_amount).toLocaleString()}</div>
+                          {lease.security_deposit ? <div style={{ fontSize: '0.6875rem', opacity: 0.4, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dep: {currencySymbol}{Number(lease.security_deposit).toLocaleString()}</div> : null}
+                        </td>
+                        <td>
+                          <div className="period-cell">
+                            <div>{fmt(lease.start_date)}</div>
+                            <div style={{ opacity: 0.4 }}>{lease.end_date ? `to ${fmt(lease.end_date)}` : 'Rolling Open'}</div>
                           </div>
                         </td>
                         <td>
-                          <div className={`location-type-chip ${isHostel ? 'hostel' : 'property'}`}>
-                            <span className="material-symbols-outlined" style={{ fontSize: '0.8rem' }}>{isHostel ? 'hotel' : 'domain'}</span>
-                            {isHostel ? 'Hostel' : 'Property'}
-                          </div>
-                          <div className="location-name">{propName || '—'}</div>
+                          <span className={`badge-modern ${lease.status === 'Active' ? 'badge-success' : lease.status === 'Expired' ? 'badge-warning' : 'badge-error'}`} style={{ fontSize: '0.55rem' }}>{lease.status}</span>
                         </td>
-                        <td><div className="location-unit">{unitLabel}</div></td>
-                        <td>
-                          <div className="rent-amount">{currencySymbol}{Number(lease.rent_amount).toLocaleString()}</div>
-                          {lease.security_deposit ? <div className="deposit-amount">Dep: {currencySymbol}{Number(lease.security_deposit).toLocaleString()}</div> : null}
-                        </td>
-                        <td>
-                          <div className="date-range">
-                            <div className="date-start">{fmt(lease.start_date)}</div>
-                            <div className="date-end">{lease.end_date ? fmt(lease.end_date) : 'Open-ended'}</div>
-                          </div>
-                        </td>
-                        <td><span className={`status-badge status-${lease.status.toLowerCase()}`}>{lease.status}</span></td>
                         <td>
                           {!isStaff && (
-                            <div className="row-actions">
-                              <button className="icon-action-btn" title="Edit" onClick={() => openEdit(lease)}>
-                                <span className="material-symbols-outlined">edit</span>
-                              </button>
-                              <button className="icon-action-btn danger" title="Delete" onClick={() => handleDelete(lease)}>
-                                <span className="material-symbols-outlined">delete</span>
-                              </button>
+                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                              <button className="btn-icon danger" style={{ color: 'var(--error)' }} onClick={(e) => { e.stopPropagation(); handleDelete(lease); }}><span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span></button>
                             </div>
                           )}
                         </td>
@@ -845,299 +496,68 @@ const Leases: React.FC = () => {
               </table>
             </div>
 
-            {/* Mobile View */}
-            <div className="mobile-only lease-cards-list">
-              {filtered.map(lease => {
-                const isHostel  = !!lease.bed_id;
-                const propName  = isHostel ? lease.hostel_name : lease.property_name;
-                const unitLabel = isHostel
-                  ? `Room ${lease.room_number} · ${lease.bed_number}`
-                  : `${lease.unit_number}`;
-                return (
-                  <div key={lease.id} className="lease-mobile-card">
-                    <div className="lease-card-header">
-                      <div className="tenant-info">
-                        <div className="tenant-avatar">{initials(lease.tenant_name || '?')}</div>
-                        <div>
-                          <div className="tenant-name">{lease.tenant_name}</div>
-                          <span className={`status-badge status-${lease.status.toLowerCase()}`} style={{ fontSize: '0.6rem' }}>{lease.status}</span>
-                        </div>
+            <div className="mobile-only flex flex-col gap-5">
+              {filtered.map(lease => (
+                <div key={lease.id} className="modern-card glass-panel" style={{ padding: '1.5rem', cursor: 'pointer' }} onClick={() => navigate(`/leases/${lease.id}`)}>
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="flex gap-4 items-center" style={{ overflow: 'hidden', flex: 1 }}>
+                      <div style={{ width: '44px', height: '44px', borderRadius: '14px', background: 'var(--primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span className="material-symbols-outlined" style={{ color: 'var(--on-primary)', fontSize: '1.5rem' }}>{lease.bed_id ? 'hotel' : 'domain'}</span>
                       </div>
-                      {!isStaff && (
-                        <div className="lease-card-actions">
-                          <button className="icon-action-btn" onClick={() => openEdit(lease)}>
-                            <span className="material-symbols-outlined">edit</span>
-                          </button>
-                          <button className="icon-action-btn danger" onClick={() => handleDelete(lease)}>
-                            <span className="material-symbols-outlined">delete</span>
-                          </button>
-                        </div>
-                      )}
+                      <div style={{ overflow: 'hidden' }}>
+                        <h3 className="lease-tenant-name" title={lease.tenant_name}>{lease.tenant_name}</h3>
+                        <div className="text-truncate" style={{ fontSize: '0.8125rem', opacity: 0.6, fontWeight: 700, color: 'var(--primary)' }} title={lease.unit_number || `Bed ${lease.bed_number}`}>{lease.unit_number || `Bed ${lease.bed_number}`}</div>
+                      </div>
                     </div>
-
-                    <div className="lease-card-details">
-                      <div className="detail-item">
-                        <span className="material-symbols-outlined">{isHostel ? 'hotel' : 'domain'}</span>
-                        <div>
-                          <div className="detail-label">{isHostel ? 'Hostel' : 'Property'}</div>
-                          <div className="detail-value">{propName || '—'}</div>
-                        </div>
-                      </div>
-                      <div className="detail-item">
-                        <span className="material-symbols-outlined">meeting_room</span>
-                        <div>
-                          <div className="detail-label">{isHostel ? 'Bed' : 'Unit'}</div>
-                          <div className="detail-value">{unitLabel}</div>
-                        </div>
-                      </div>
-                      <div className="detail-item">
-                        <span className="material-symbols-outlined">payments</span>
-                        <div>
-                          <div className="detail-label">Monthly Rent</div>
-                          <div className="detail-value">{currencySymbol}{Number(lease.rent_amount).toLocaleString()}</div>
-                        </div>
-                      </div>
-                      <div className="detail-item">
-                        <span className="material-symbols-outlined">calendar_today</span>
-                        <div>
-                          <div className="detail-label">Period</div>
-                          <div className="detail-value">{fmt(lease.start_date)} - {lease.end_date ? fmt(lease.end_date) : 'Open'}</div>
-                        </div>
-                      </div>
+                    <span className={`badge-modern ${lease.status === 'Active' ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.55rem', flexShrink: 0, marginLeft: '1rem' }}>{lease.status}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-6 mb-6">
+                    <div>
+                      <div style={{ opacity: 0.4, fontSize: '0.625rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.1em', marginBottom: '0.25rem' }}>Monthly Yield</div>
+                      <div style={{ fontWeight: 900, color: 'var(--on-surface)', fontFamily: 'var(--font-display)', fontSize: '1.25rem' }}>{currencySymbol}{Number(lease.rent_amount).toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div style={{ opacity: 0.4, fontSize: '0.625rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.1em', marginBottom: '0.25rem' }}>Agreement End</div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{lease.end_date ? fmt(lease.end_date) : 'Open Rolling'}</div>
                     </div>
                   </div>
-                );
-              })}
+                  <div className="pt-4 border-t border-white/5 flex justify-between items-center">
+                    <span className="view-link" style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--secondary)' }}>Manage Contract <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>arrow_forward_ios</span></span>
+                    {!isStaff && (
+                      <button className="btn-icon danger" style={{ color: 'var(--error)' }} onClick={(e) => { e.stopPropagation(); handleDelete(lease); }}><span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span></button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </>
         )}
       </div>
 
-      {/* ── Modal ── */}
-      {showModal && (
+      {isModalOpen && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && closeModal()}>
-          <div className="lease-modal">
-            <div className="lease-modal-header">
-              <div>
-                <h2>{editingLease ? 'Edit Lease' : 'New Lease'}</h2>
-                <p>{editingLease ? 'Update the lease details below' : 'Fill in the details to create an agreement'}</p>
+          <div className="modal-content-modern" style={{ maxWidth: '680px' }}>
+            <header className="modal-header-modern">
+              <h2 className="modal-title">Executive Agreement</h2>
+              <p className="modal-subtitle">Establish legal terms and financial obligations for this entity</p>
+            </header>
+            <form onSubmit={handleSubmit} className="modal-form-modern">
+              <div className="lease-type-toggle" style={{ display: 'flex', gap: '0.5rem', background: 'var(--surface-container-low)', padding: '0.4rem', borderRadius: '1.25rem', marginBottom: '1.5rem' }}>
+                <button type="button" className={`toggle-btn ${leaseType === 'property' ? 'active' : ''}`} onClick={() => setLeaseType('property')} style={{ flex: 1, border: 'none', padding: '0.875rem', borderRadius: '1rem', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer', background: leaseType === 'property' ? 'var(--surface-container-highest)' : 'transparent', color: leaseType === 'property' ? 'white' : 'var(--on-surface-variant)', transition: '0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}>Private Asset</button>
+                <button type="button" className={`toggle-btn ${leaseType === 'hostel' ? 'active' : ''}`} onClick={() => setLeaseType('hostel')} style={{ flex: 1, border: 'none', padding: '0.875rem', borderRadius: '1rem', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer', background: leaseType === 'hostel' ? 'var(--surface-container-highest)' : 'transparent', color: leaseType === 'hostel' ? 'white' : 'var(--on-surface-variant)', transition: '0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}>Shared Facility</button>
               </div>
-              <button className="icon-action-btn" onClick={closeModal}>
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-
-            <form onSubmit={handleSave}>
-              <div className="lease-modal-body">
-
-                {/* Lease type toggle */}
-                {!editingLease && (
-                  <div className="form-group">
-                    <label>Lease Type</label>
-                    <div className="type-toggle">
-                      <button type="button" className={`type-toggle-btn ${leaseType === 'property' ? 'active' : ''}`} onClick={() => onTypeSwitch('property')}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>domain</span>
-                        Property Unit
-                      </button>
-                      <button type="button" className={`type-toggle-btn ${leaseType === 'hostel' ? 'active' : ''}`} onClick={() => onTypeSwitch('hostel')}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>hotel</span>
-                        Hostel Bed
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Tenant */}
-                <div className="form-group">
-                  <label>Tenant *</label>
-                  <CustomSelect
-                    options={tenantOptions}
-                    value={form.tenant_id}
-                    onChange={v => setForm(f => ({ ...f, tenant_id: v }))}
-                    placeholder="Select tenant…"
-                    searchable={true}
-                  />
+              
+              <div className="flex flex-col gap-6">
+                <div className="form-group-modern">
+                  <label>Primary Legal Entity</label>
+                  <CustomSelect options={tenants.map(t => ({ value: t.id, label: t.full_name, sub: t.phone || t.email }))} value={form.tenant_id} onChange={v => setForm({...form, tenant_id: v})} placeholder="Search or select legal entity..." searchable />
                 </div>
-
-                {/* Property cascade */}
-                {leaseType === 'property' && (
-                  <div className="form-row cols-2">
-                    <div className="form-group">
-                      <label>Property *</label>
-                      <CustomSelect
-                        options={propertyOptions}
-                        value={selectedPropertyId}
-                        onChange={onPropertyChange}
-                        placeholder="Select property…"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Unit *</label>
-                      <CustomSelect
-                        options={unitOptions}
-                        value={form.unit_id}
-                        onChange={onUnitChange}
-                        placeholder={selectedPropertyId ? 'Select unit…' : 'Select property first'}
-                        disabled={!selectedPropertyId}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Hostel cascade */}
-                {leaseType === 'hostel' && (
-                  <div className="form-row cols-3">
-                    <div className="form-group">
-                      <label>Hostel *</label>
-                      <CustomSelect
-                        options={hostelOptions}
-                        value={selectedHostelId}
-                        onChange={onHostelChange}
-                        placeholder="Select hostel…"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Room *</label>
-                      <CustomSelect
-                        options={roomOptions}
-                        value={selectedRoomId}
-                        onChange={onRoomChange}
-                        placeholder={selectedHostelId ? 'Select room…' : 'Select hostel first'}
-                        disabled={!selectedHostelId}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Bed *</label>
-                      <CustomSelect
-                        options={bedOptions}
-                        value={form.bed_id}
-                        onChange={onBedChange}
-                        placeholder={selectedRoomId ? 'Select bed…' : 'Select room first'}
-                        disabled={!selectedRoomId}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div className="section-divider">Financials</div>
-
-                <div className="form-row cols-2">
-                  <div className="form-group">
-                    <label>Monthly Rent ({currencySymbol}) *</label>
-                    <input
-                      type="number"
-                      className={`form-input ${rentPrefilled ? 'prefilled' : ''}`}
-                      placeholder="0.00"
-                      value={form.rent_amount}
-                      onChange={e => {
-                        setForm(f => ({ ...f, rent_amount: e.target.value }));
-                        setRentPrefilled(false);
-                        firstMonthUserEdited.current = false;
-                      }}
-                      min={0}
-                      step="0.01"
-                    />
-                    {rentPrefilled && (
-                      <span style={{ fontSize: '0.65rem', color: 'var(--primary)', fontWeight: 700 }}>✦ Auto-filled from unit price</span>
-                    )}
-                  </div>
-                  <div className="form-group">
-                    <label>Security Deposit ({currencySymbol})</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      placeholder="0.00"
-                      value={form.security_deposit}
-                      onChange={e => setForm(f => ({ ...f, security_deposit: e.target.value }))}
-                      min={0}
-                      step="0.01"
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label>First Month Rent ({currencySymbol})</label>
-                  <input
-                    type="number"
-                    className={`form-input ${firstMonthPrefilled ? 'prefilled' : ''}`}
-                    placeholder="0.00"
-                    value={form.first_month_rent}
-                    onChange={e => {
-                      setForm(f => ({ ...f, first_month_rent: e.target.value }));
-                      setFirstMonthPrefilled(false);
-                      firstMonthUserEdited.current = true;
-                    }}
-                    min={0}
-                    step="0.01"
-                  />
-                  {firstMonthPrefilled && firstMonthBreakdown && (
-                    <span style={{ fontSize: '0.65rem', color: 'var(--primary)', fontWeight: 700 }}>
-                      ✦ Prorated: {firstMonthBreakdown} × {currencySymbol}{(parseFloat(form.rent_amount) / (() => { const d = new Date(form.start_date); return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); })()).toFixed(2)}/day
-                    </span>
-                  )}
-                  {firstMonthPrefilled && !firstMonthBreakdown && (
-                    <span style={{ fontSize: '0.65rem', color: 'var(--on-surface-variant)', fontWeight: 700, opacity: 0.6 }}>
-                      ✦ Full month — lease starts on the 1st
-                    </span>
-                  )}
-                  {!firstMonthPrefilled && !form.first_month_rent && (
-                    <span style={{ fontSize: '0.65rem', color: 'var(--on-surface-variant)', opacity: 0.5 }}>
-                      Set monthly rent and start date to auto-calculate
-                    </span>
-                  )}
-                </div>
-
-                <div className="section-divider">Lease Period & Status</div>
-
-                <div className="form-row cols-3">
-                  <div className="form-group">
-                    <label>Start Date *</label>
-                    <input
-                      type="date"
-                      className="form-input"
-                      value={form.start_date}
-                      onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>End Date</label>
-                    <input
-                      type="date"
-                      className="form-input"
-                      value={form.end_date}
-                      onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Status *</label>
-                    <CustomSelect
-                      options={statusOptions}
-                      value={form.status}
-                      onChange={v => setForm(f => ({ ...f, status: v as Lease['status'] }))}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label>Notes</label>
-                  <textarea
-                    className="form-input"
-                    rows={3}
-                    placeholder="Any additional terms or notes…"
-                    value={form.notes}
-                    onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                    style={{ resize: 'vertical' }}
-                  />
-                </div>
-
               </div>
 
-              <div className="lease-modal-footer">
-                <button type="button" className="primary-button glass" onClick={closeModal}>Cancel</button>
-                <button type="submit" className="primary-button" disabled={saving}>
-                  {saving ? 'Saving…' : editingLease ? 'Save Changes' : 'Create Lease'}
-                </button>
-              </div>
+              <footer className="flex justify-end gap-4 mt-8 pt-6 border-t border-white/5">
+                <button type="button" className="primary-button glass-panel" onClick={closeModal} style={{ background: 'rgba(255,255,255,0.05)' }}>Discard Draft</button>
+                <button type="submit" className="primary-button" disabled={saving} style={{ minWidth: '160px' }}>{saving ? 'Processing...' : 'Finalize Contract'}</button>
+              </footer>
             </form>
           </div>
         </div>
