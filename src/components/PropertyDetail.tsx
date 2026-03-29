@@ -485,9 +485,9 @@ const PropertyDetail: React.FC = () => {
                 </div>
               </div>
 
-              <footer className="flex justify-end gap-4 mt-8 pt-6 border-t border-white/5">
-                <button type="button" className="primary-button glass-panel" onClick={() => setIsModalOpen(false)} style={{ background: 'rgba(255,255,255,0.05)' }}>Discard</button>
-                <button type="submit" className="primary-button" disabled={saving} style={{ minWidth: '160px' }}>
+              <footer className="flex flex-wrap justify-center sm:justify-end items-center gap-4 sm:gap-8 mt-8 pt-6 border-t border-white/5">
+                <button type="button" className="primary-button glass-panel w-full sm:w-auto" onClick={() => setIsModalOpen(false)} style={{ background: 'rgba(255,255,255,0.05)' }}>Discard</button>
+                <button type="submit" className="primary-button w-full sm:w-auto sm:min-w-[200px]" disabled={saving}>
                   {saving ? 'Synchronizing...' : 'Finalize Record'}
                 </button>
               </footer>

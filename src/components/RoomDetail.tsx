@@ -237,11 +237,11 @@ const RoomDetail: React.FC = () => {
               </div>
 
               {!isStaff && (
-                <footer className="flex justify-end gap-6 mt-6 pt-10 border-t border-white/5">
+                <footer className="flex flex-wrap justify-center sm:justify-end items-center gap-4 sm:gap-8 mt-6 pt-10 border-t border-white/5">
                   <button type="button" className="text-secondary/40 font-bold uppercase tracking-widest text-xs hover:text-white transition-colors" onClick={() => navigate(`/hostels/${room.hostel_id}`)}>
                     Discard Changes
                   </button>
-                  <button type="submit" className="primary-button min-w-[220px]" disabled={saving}>
+                  <button type="submit" className="primary-button w-full sm:w-auto sm:min-w-[220px]" disabled={saving}>
                     {saving ? 'Synchronizing...' : 'Finalize Record'}
                   </button>
                 </footer>

@@ -384,9 +384,9 @@ const HostelDetail: React.FC = () => {
                   />
                 </div>
               </div>
-              <footer className="flex justify-end gap-4 mt-8 pt-6 border-t border-white/5">
-                <button type="button" className="primary-button glass-panel" onClick={() => setIsAddRoomModalOpen(false)} style={{ background: 'rgba(255,255,255,0.05)' }}>Discard</button>
-                <button type="submit" className="primary-button" style={{ minWidth: '160px' }}>Finalize Room</button>
+              <footer className="flex flex-wrap justify-center sm:justify-end items-center gap-4 sm:gap-8 mt-8 pt-6 border-t border-white/5">
+                <button type="button" className="primary-button glass-panel w-full sm:w-auto" onClick={() => setIsAddRoomModalOpen(false)} style={{ background: 'rgba(255,255,255,0.05)' }}>Discard</button>
+                <button type="submit" className="primary-button w-full sm:w-auto sm:min-w-[200px]">Finalize Room</button>
               </footer>
             </form>
           </div>
@@ -425,9 +425,9 @@ const HostelDetail: React.FC = () => {
                   />
                 </div>
               </div>
-              <footer className="flex justify-end gap-4 mt-8 pt-6 border-t border-white/5">
-                <button type="button" className="primary-button glass-panel" onClick={() => setIsAddBedModalOpen(false)} style={{ background: 'rgba(255,255,255,0.05)' }}>Discard</button>
-                <button type="submit" className="primary-button" style={{ minWidth: '160px' }}>Sync Inventory</button>
+              <footer className="flex flex-wrap justify-center sm:justify-end items-center gap-4 sm:gap-8 mt-8 pt-6 border-t border-white/5">
+                <button type="button" className="primary-button glass-panel w-full sm:w-auto" onClick={() => setIsAddBedModalOpen(false)} style={{ background: 'rgba(255,255,255,0.05)' }}>Discard</button>
+                <button type="submit" className="primary-button w-full sm:w-auto sm:min-w-[200px]">Sync Inventory</button>
               </footer>
             </form>
           </div>
