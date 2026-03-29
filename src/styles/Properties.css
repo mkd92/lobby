@@ -117,40 +117,86 @@
     gap: 1.25rem;
   }
   .property-card-visual {
-    height: 120px;
+    display: none;
   }
-  .property-icon-large .material-symbols-outlined {
-    font-size: 3.5rem;
+  .property-card {
+    border-radius: 1.5rem;
   }
-}
-
-@media (max-width: 480px) {
   .property-card-body {
+    position: relative;
     padding: 1.25rem;
   }
+  .property-card-quick-actions-mobile {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.25rem;
+  }
   .property-name-modern {
-    font-size: 1.375rem;
-    margin-bottom: 0.5rem;
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
+    padding-right: 3rem;
   }
   .property-address-modern {
-    font-size: 0.8125rem;
-    margin-bottom: 1.5rem;
+    font-size: 0.75rem;
+    margin-bottom: 1.25rem;
+    padding-right: 3rem;
+  }
+  .property-card-stats-row {
+    gap: 0.75rem;
   }
   .stat-pill {
-    padding: 0.625rem 0.875rem;
+    padding: 0.75rem;
     border-radius: 1rem;
   }
   .stat-pill-label {
     font-size: 0.5rem;
   }
   .stat-pill-value {
-    font-size: 0.9375rem;
+    font-size: 0.875rem;
   }
   .property-card-footer {
     padding: 1rem 1.25rem;
   }
   .view-link {
     font-size: 0.65rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .property-card-body {
+    padding: 1rem;
+  }
+  .property-card-quick-actions-mobile {
+    top: 1rem;
+    right: 1rem;
+  }
+  .property-name-modern {
+    font-size: 1.125rem;
+    padding-right: 2.5rem;
+    margin-bottom: 0.15rem;
+  }
+  .property-address-modern {
+    font-size: 0.7rem;
+    padding-right: 2.5rem;
+    margin-bottom: 1rem;
+  }
+  .property-card-stats-row {
+    gap: 0.5rem;
+  }
+  .stat-pill {
+    padding: 0.5rem 0.75rem;
+  }
+  .stat-pill-label {
+    font-size: 0.45rem;
+  }
+  .stat-pill-value {
+    font-size: 0.8rem;
+  }
+  .property-card-footer {
+    padding: 0.75rem 1rem;
+  }
+  .view-link {
+    font-size: 0.6rem;
   }
 }
 
