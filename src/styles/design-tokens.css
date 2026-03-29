@@ -76,8 +76,8 @@
 
   --on-surface: #000000;
   --on-surface-rgb: 0, 0, 0;
-  --on-surface-variant: #343a40;
-  --outline-variant: rgba(0, 0, 0, 0.16);
+  --on-surface-variant: #495057;
+  --outline-variant: rgba(0, 0, 0, 0.24);
 
   --shadow-ambient: 0 32px 64px rgba(0, 0, 0, 0.1);
   --shadow-elevated: 0 24px 48px rgba(0, 0, 0, 0.15);
