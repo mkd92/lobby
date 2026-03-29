@@ -1,13 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, deleteDoc } from 'firebase/firestore';
 import { useQueryClient } from '@tanstack/react-query';
 import { db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
 import { useQuery } from '@tanstack/react-query';
 import { LoadingScreen } from './layout/LoadingScreen';
 import { useDialog } from '../hooks/useDialog';
-import { useEscapeKey } from '../hooks/useEscapeKey';
 import '../styles/Properties.css';
 
 interface HostelData {
@@ -23,12 +22,7 @@ const Hostels: React.FC = () => {
   const queryClient = useQueryClient();
   const { showAlert, showConfirm, DialogMount } = useDialog();
 
-  const [editingHostel, setEditingHostel] = useState<HostelData | null>(null);
-  const [editData, setEditData] = useState({ name: '', address: '' });
-  const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
-
-  useEscapeKey(() => setEditingHostel(null), !!editingHostel);
 
   const { data: hostels = [], isLoading } = useQuery<HostelData[]>({
     queryKey: ['hostels', ownerId],
@@ -64,28 +58,6 @@ const Hostels: React.FC = () => {
   const totalRooms = useMemo(() => 
     hostels.reduce((acc, h) => acc + h.roomCount, 0), 
   [hostels]);
-
-  const openEdit = (e: React.MouseEvent, hostel: HostelData) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setEditData({ name: hostel.name, address: hostel.address });
-    setEditingHostel(hostel);
-  };
-
-  const handleEditSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingHostel) return;
-    setSaving(true);
-    try {
-      await updateDoc(doc(db, 'hostels', editingHostel.id), editData);
-      queryClient.invalidateQueries({ queryKey: ['hostels', ownerId] });
-      setEditingHostel(null);
-    } catch (err) {
-      showAlert((err as Error).message);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleDelete = async (e: React.MouseEvent, hostel: HostelData) => {
     e.preventDefault();
@@ -192,9 +164,6 @@ const Hostels: React.FC = () => {
                 </div>
                 {!isStaff && (
                   <div className="property-card-quick-actions" onClick={e => e.stopPropagation()}>
-                    <button className="prop-mini-btn" onClick={e => openEdit(e, hostel)} title="Modify Identity">
-                      <span className="material-symbols-outlined">edit</span>
-                    </button>
                     <button className="prop-mini-btn danger" onClick={e => handleDelete(e, hostel)} title="Terminate Registration">
                       <span className="material-symbols-outlined">delete</span>
                     </button>
@@ -229,32 +198,6 @@ const Hostels: React.FC = () => {
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {editingHostel && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setEditingHostel(null)}>
-          <div className="modal-content-modern">
-            <header className="modal-header-modern">
-              <h2 className="modal-title">Modify Facility</h2>
-              <p className="modal-subtitle">Update facility naming and primary operating address</p>
-            </header>
-
-            <form onSubmit={handleEditSave} className="modal-form-modern">
-              <div className="form-group-modern">
-                <label>Facility Name</label>
-                <input type="text" value={editData.name} onChange={e => setEditData(d => ({ ...d, name: e.target.value }))} placeholder="e.g. Skyline Living" required />
-              </div>
-              <div className="form-group-modern">
-                <label>Operating Address</label>
-                <input type="text" value={editData.address} onChange={e => setEditData(d => ({ ...d, address: e.target.value }))} placeholder="Full address, City, ZIP" required />
-              </div>
-              <footer className="flex justify-end gap-4 mt-4">
-                <button type="button" className="primary-button glass-panel" onClick={() => setEditingHostel(null)} style={{ background: 'rgba(255,255,255,0.05)' }}>Discard</button>
-                <button type="submit" className="primary-button" disabled={saving}>{saving ? 'Syncing...' : 'Confirm Changes'}</button>
-              </footer>
-            </form>
-          </div>
         </div>
       )}
     </div>

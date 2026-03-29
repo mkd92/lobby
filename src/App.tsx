@@ -11,6 +11,7 @@ const Auth = lazy(() => import('./components/Auth'));
 const Properties = lazy(() => import('./components/Properties'));
 const AddProperty = lazy(() => import('./components/AddProperty'));
 const PropertyDetail = lazy(() => import('./components/PropertyDetail'));
+const UnitDetail = lazy(() => import('./components/UnitDetail'));
 const Payments = lazy(() => import('./components/Payments'));
 const PaymentDetail = lazy(() => import('./components/PaymentDetail'));
 const Settings = lazy(() => import('./components/Settings'));
@@ -20,6 +21,7 @@ const CustomerDetail = lazy(() => import('./components/CustomerDetail'));
 const Hostels = lazy(() => import('./components/Hostels'));
 const AddHostel = lazy(() => import('./components/AddHostel'));
 const HostelDetail = lazy(() => import('./components/HostelDetail'));
+const RoomDetail = lazy(() => import('./components/RoomDetail'));
 const Leases = lazy(() => import('./components/Leases'));
 const LeaseDetail = lazy(() => import('./components/LeaseDetail'));
 
@@ -29,6 +31,7 @@ export const prefetchMap = {
   properties: () => import('./components/Properties'),
   addProperty: () => import('./components/AddProperty'),
   propertyDetail: () => import('./components/PropertyDetail'),
+  unitDetail: () => import('./components/UnitDetail'),
   payments: () => import('./components/Payments'),
   paymentDetail: () => import('./components/PaymentDetail'),
   settings: () => import('./components/Settings'),
@@ -38,6 +41,7 @@ export const prefetchMap = {
   hostels: () => import('./components/Hostels'),
   addHostel: () => import('./components/AddHostel'),
   hostelDetail: () => import('./components/HostelDetail'),
+  roomDetail: () => import('./components/RoomDetail'),
   leases: () => import('./components/Leases'),
   leaseDetail: () => import('./components/LeaseDetail'),
 };
@@ -70,12 +74,14 @@ function App() {
               <Route path="/properties" element={<Properties />} />
               <Route path="/properties/new" element={<AddProperty />} />
               <Route path="/properties/:id" element={<PropertyDetail />} />
+              <Route path="/units/:id" element={<UnitDetail />} />
               <Route path="/customers" element={<Customers />} />
               <Route path="/customers/new" element={<AddCustomer />} />
               <Route path="/customers/:id" element={<CustomerDetail />} />
               <Route path="/hostels" element={<Hostels />} />
               <Route path="/hostels/new" element={<AddHostel />} />
               <Route path="/hostels/:id" element={<HostelDetail />} />
+              <Route path="/rooms/:id" element={<RoomDetail />} />
               <Route path="/leases" element={<Leases />} />
               <Route path="/leases/:id" element={<LeaseDetail />} />
               <Route path="/payments" element={<Payments />} />
