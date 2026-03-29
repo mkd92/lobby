@@ -234,3 +234,16 @@
     font-size: 1rem; /* prevents iOS zoom */
   }
 }
+
+@media (max-width: 480px) {
+  .payment-mobile-card {
+    padding: 1rem;
+  }
+  .payment-card-header {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+  .payment-card-amount {
+    font-size: 0.9rem;
+  }
+}

@@ -370,6 +370,10 @@
     gap: 1.25rem;
   }
 
+  .hostel-title-group h1 {
+    font-size: 1.75rem;
+  }
+
   .hostel-header-stats {
     gap: 1.25rem;
     flex-wrap: wrap;
@@ -377,6 +381,15 @@
 
   .stat-block .value {
     font-size: 1.25rem;
+  }
+
+  .vacancy-filter-btn {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.7rem;
+  }
+
+  .vacancy-count {
+    padding: 0.05rem 0.35rem;
   }
 
   .add-room-section {
@@ -451,4 +464,10 @@
   /* Hide desktop table, show bed cards */
   .beds-table-scroll { display: none; }
   .bed-cards-list    { display: flex; }
+}
+
+@media (max-width: 480px) {
+  .hostel-title-group h1 {
+    font-size: 1.5rem;
+  }
 }

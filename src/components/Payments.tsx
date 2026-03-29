@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
-  collection, query, where, getDocs, doc, getDoc,
+  collection, query, where, getDocs, doc, getDoc, deleteDoc,
 } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -96,6 +96,19 @@ const Payments: React.FC = () => {
       showAlert((err as Error).message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent, paymentId: string) => {
+    e.stopPropagation();
+    const ok = await showConfirm('Are you sure you want to delete this payment record? This action cannot be undone.', { danger: true });
+    if (!ok) return;
+    try {
+      await deleteDoc(doc(db, 'payments', paymentId));
+      queryClient.invalidateQueries({ queryKey: ['payments', ownerId] });
+      showAlert('Record successfully removed from ledger.');
+    } catch (err) {
+      showAlert((err as Error).message);
     }
   };
 
@@ -206,7 +219,14 @@ const Payments: React.FC = () => {
                           <span className={`badge-modern ${p.status === 'Paid' ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.55rem' }}>{p.status}</span>
                         </td>
                         <td style={{ textAlign: 'right' }}>
-                          <span className="material-symbols-outlined opacity-20 group-hover:opacity-100 transition-opacity" style={{ fontSize: '1.25rem' }}>arrow_forward_ios</span>
+                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                            {!isStaff && (
+                              <button className="btn-icon danger" onClick={(e) => handleDelete(e, p.id)} title="Delete Record" style={{ color: 'var(--error)' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span>
+                              </button>
+                            )}
+                            <span className="material-symbols-outlined opacity-20 group-hover:opacity-100 transition-opacity" style={{ fontSize: '1.25rem' }}>arrow_forward_ios</span>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -223,7 +243,14 @@ const Payments: React.FC = () => {
                       <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 800 }}>{p.tenant_name}</h3>
                       <div style={{ fontSize: '0.8125rem', opacity: 0.6, fontWeight: 700, color: 'var(--primary)' }}>{p.month_for}</div>
                     </div>
-                    <span className={`badge-modern ${p.status === 'Paid' ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.55rem' }}>{p.status}</span>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      {!isStaff && (
+                        <button className="btn-icon danger" onClick={(e) => handleDelete(e, p.id)} style={{ padding: '0.4rem', color: 'var(--error)' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span>
+                        </button>
+                      )}
+                      <span className={`badge-modern ${p.status === 'Paid' ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.55rem' }}>{p.status}</span>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-6 mb-6">
                     <div>

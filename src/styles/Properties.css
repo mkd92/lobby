@@ -109,10 +109,27 @@
 @media (max-width: 768px) {
   .properties-grid {
     grid-template-columns: 1fr;
+    gap: 1.5rem;
   }
   .properties-toolbar {
     flex-direction: column;
     align-items: stretch;
+    gap: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .property-card-body {
+    padding: 1.5rem;
+  }
+  .property-name-modern {
+    font-size: 1.5rem;
+  }
+  .stat-pill {
+    padding: 0.75rem;
+  }
+  .stat-pill-value {
+    font-size: 1rem;
   }
 }
 
