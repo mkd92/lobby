@@ -164,7 +164,7 @@ const Settings: React.FC = () => {
                   </div>
                   
                   {isDropdownOpen && (
-                    <div className="custom-options absolute top-full left-0 right-0 mt-2 z-50 glass-panel overflow-hidden animate-in fade-in zoom-in-95 duration-200" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                    <div className="custom-options absolute top-full left-0 right-0 mt-2 z-[100] glass-panel overflow-hidden animate-in fade-in zoom-in-95 duration-200" style={{ maxHeight: '300px', overflowY: 'auto', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
                       {currencies.map(c => (
                         <div
                           key={c.code}

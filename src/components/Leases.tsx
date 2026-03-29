@@ -144,9 +144,9 @@ const CustomSelect: React.FC<{
       </div>
 
       {open && (
-        <div className="custom-options glass-panel" style={{ top: 'calc(100% + 0.5rem)', background: 'rgba(40, 42, 44, 0.95)', backdropFilter: 'blur(32px)', borderRadius: '1.25rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+        <div className="custom-options glass-panel" style={{ top: 'calc(100% + 0.5rem)', background: 'var(--surface)', backdropFilter: 'blur(32px)', borderRadius: '1.25rem', border: '1px solid var(--outline-variant)', boxShadow: 'var(--shadow-elevated)', zIndex: 100 }}>
           {searchable && (
-            <div className="select-search-box" style={{ padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <div className="select-search-box" style={{ padding: '0.75rem', borderBottom: '1px solid var(--outline-variant)' }}>
               <input 
                 ref={searchInputRef}
                 type="text" 
@@ -154,7 +154,7 @@ const CustomSelect: React.FC<{
                 value={searchTerm} 
                 onChange={e => setSearchTerm(e.target.value)}
                 onClick={e => e.stopPropagation()}
-                style={{ background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '0.75rem', padding: '0.5rem 0.75rem', width: '100%', color: 'white', fontSize: '0.875rem' }}
+                style={{ background: 'var(--surface-container-low)', border: 'none', borderRadius: '0.75rem', padding: '0.5rem 0.75rem', width: '100%', color: 'var(--on-surface)', fontSize: '0.875rem' }}
               />
             </div>
           )}

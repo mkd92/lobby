@@ -55,32 +55,32 @@
 
 /* Force dark mode as base for "Vault" obsidian environment */
 [data-theme="light"] {
-  --surface: #f8f9fa;
-  --surface-rgb: 248, 249, 250;
+  --surface: #ffffff;
+  --surface-rgb: 255, 255, 255;
   
   --surface-container-lowest: #ffffff;
-  --surface-container-low: #f1f3f5;
-  --surface-container: #e9ecef;
-  --surface-container-high: #dee2e6;
-  --surface-container-highest: #ced4da;
-  --surface-container-highest-rgb: 206, 212, 218;
+  --surface-container-low: #f8f9fa;
+  --surface-container: #f1f3f5;
+  --surface-container-high: #e9ecef;
+  --surface-container-highest: #dee2e6;
+  --surface-container-highest-rgb: 222, 226, 230;
 
   --primary: #121416;
   --on-primary: #ffffff;
-  --primary-container: #e9ecef;
+  --primary-container: #f1f3f5;
   --on-primary-container: #121416;
 
   --secondary: #495057;
-  --secondary-container: #dee2e6;
+  --secondary-container: #e9ecef;
   --on-secondary-container: #212529;
 
   --on-surface: #121416;
   --on-surface-rgb: 18, 20, 22;
   --on-surface-variant: #495057;
-  --outline-variant: rgba(0, 0, 0, 0.08);
+  --outline-variant: rgba(0, 0, 0, 0.12);
 
-  --shadow-ambient: 0 32px 64px rgba(0, 0, 0, 0.04);
-  --shadow-elevated: 0 24px 48px rgba(0, 0, 0, 0.08);
+  --shadow-ambient: 0 32px 64px rgba(0, 0, 0, 0.08);
+  --shadow-elevated: 0 24px 48px rgba(0, 0, 0, 0.12);
 
   --color-success: #2b8a3e;
   --color-success-bg: rgba(43, 138, 62, 0.1);

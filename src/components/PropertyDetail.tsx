@@ -69,7 +69,7 @@ const CustomSelect: React.FC<{
       </div>
 
       {open && (
-        <div className="custom-options glass-panel" style={{ top: 'calc(100% + 0.5rem)', background: 'rgba(40, 42, 44, 0.95)', backdropFilter: 'blur(32px)', borderRadius: '1.25rem', border: '1px solid rgba(255,255,255,0.05)', position: 'absolute', width: '100%', zIndex: 100 }}>
+        <div className="custom-options glass-panel" style={{ top: 'calc(100% + 0.5rem)', background: 'var(--surface)', backdropFilter: 'blur(32px)', borderRadius: '1.25rem', border: '1px solid var(--outline-variant)', position: 'absolute', width: '100%', zIndex: 100, boxShadow: 'var(--shadow-elevated)' }}>
           <div className="options-list-scroll custom-scrollbar" style={{ maxHeight: '200px', overflowY: 'auto' }}>
             {options.map((o) => (
               <div 
