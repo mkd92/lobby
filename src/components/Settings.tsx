@@ -164,15 +164,15 @@ const Settings: React.FC = () => {
                   </div>
                   
                   {isDropdownOpen && (
-                    <div className="custom-options absolute top-full left-0 right-0 mt-2 z-[100] glass-panel overflow-hidden animate-in fade-in zoom-in-95 duration-200" style={{ maxHeight: '300px', overflowY: 'auto', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
+                    <div className="custom-options absolute top-full left-0 right-0 mt-2 z-[100] glass-panel overflow-hidden animate-in fade-in zoom-in-95 duration-200" style={{ maxHeight: '300px', overflowY: 'auto', background: 'var(--surface)', boxShadow: 'var(--shadow-elevated)', border: '1px solid var(--outline-variant)' }}>
                       {currencies.map(c => (
                         <div
                           key={c.code}
-                          className={`custom-option p-4 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors ${profile.currency === c.code ? 'bg-primary/5 text-primary' : 'text-white/60'}`}
+                          className={`custom-option p-4 flex justify-between items-center cursor-pointer hover:bg-surface-container-high transition-colors ${profile.currency === c.code ? 'bg-primary/10 text-primary' : 'text-on-surface'}`}
                           onClick={() => selectCurrency(c.code)}
                         >
                           <span className="flex items-center gap-4">
-                            <span className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg font-black text-sm">{c.symbol}</span>
+                            <span className="w-8 h-8 flex items-center justify-center bg-surface-container-highest rounded-lg font-black text-sm">{c.symbol}</span>
                             <span className="font-bold">{c.code} <span className="opacity-40 font-medium text-xs ml-1">— {c.name}</span></span>
                           </span>
                           {profile.currency === c.code && <span className="material-symbols-outlined text-primary">check</span>}
