@@ -271,12 +271,12 @@ const Settings: React.FC = () => {
                   <div className="text-secondary/40 text-sm italic py-4">No authorized stakeholders identified.</div>
                 ) : (
                   staffList.map((s: any) => (
-                    <div key={s.id} className="flex justify-between items-center p-6 rounded-3xl bg-surface-container-low border border-white/5">
-                      <div className="flex flex-col gap-1">
-                        <div className="text-white font-bold">{s.staff_email}</div>
+                    <div key={s.id} className="flex justify-between items-center p-6 rounded-3xl bg-surface-container-low border border-white/5 gap-4">
+                      <div className="flex flex-col gap-1 min-w-0">
+                        <div className="text-white font-bold truncate" title={s.staff_email}>{s.staff_email}</div>
                         <div className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${s.status === 'active' ? 'bg-success' : 'bg-warning animate-pulse'}`}></span>
-                          <span className="text-[0.6rem] uppercase tracking-widest font-black opacity-40">{s.status} access</span>
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${s.status === 'active' ? 'bg-success' : 'bg-warning animate-pulse'}`}></span>
+                          <span className="text-[0.6rem] uppercase tracking-widest font-black opacity-40 truncate">{s.status} access</span>
                         </div>
                       </div>
                       <button 
