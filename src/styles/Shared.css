@@ -46,6 +46,10 @@ body {
   border: none !important; /* Enforce no-line rule */
 }
 
+[data-theme="light"] .modern-card {
+  border: 1px solid var(--outline-variant) !important;
+}
+
 .modern-card:hover {
   background-color: var(--surface-container-high);
   transform: translateY(-4px);

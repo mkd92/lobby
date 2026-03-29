@@ -20,7 +20,7 @@ export const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boole
   };
 
   return (
-    <aside className={`tonal-sidebar glass-panel ${isCollapsed ? 'collapsed' : ''}`} style={{ border: 'none' }}>
+    <aside className={`tonal-sidebar glass-panel ${isCollapsed ? 'collapsed' : ''}`} style={{ borderRight: '1px solid var(--outline-variant)' }}>
       <div className="sidebar-header">
         {!isCollapsed && (
           <div className="logo-wordmark">
