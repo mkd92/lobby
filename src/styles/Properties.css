@@ -109,27 +109,48 @@
 @media (max-width: 768px) {
   .properties-grid {
     grid-template-columns: 1fr;
-    gap: 1.5rem;
+    gap: 1.25rem;
   }
   .properties-toolbar {
     flex-direction: column;
     align-items: stretch;
-    gap: 1.5rem;
+    gap: 1.25rem;
+  }
+  .property-card-visual {
+    height: 120px;
+  }
+  .property-icon-large .material-symbols-outlined {
+    font-size: 3.5rem;
   }
 }
 
 @media (max-width: 480px) {
   .property-card-body {
-    padding: 1.5rem;
+    padding: 1.25rem;
   }
   .property-name-modern {
-    font-size: 1.5rem;
+    font-size: 1.375rem;
+    margin-bottom: 0.5rem;
+  }
+  .property-address-modern {
+    font-size: 0.8125rem;
+    margin-bottom: 1.5rem;
   }
   .stat-pill {
-    padding: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    border-radius: 1rem;
+  }
+  .stat-pill-label {
+    font-size: 0.5rem;
   }
   .stat-pill-value {
-    font-size: 1rem;
+    font-size: 0.9375rem;
+  }
+  .property-card-footer {
+    padding: 1rem 1.25rem;
+  }
+  .view-link {
+    font-size: 0.65rem;
   }
 }
 

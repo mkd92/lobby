@@ -157,9 +157,9 @@ const Hostels: React.FC = () => {
         <div className="properties-grid">
           {filteredHostels.map(hostel => (
             <div key={hostel.id} className="property-card" onClick={() => navigate(`/hostels/${hostel.id}`)}>
-              <div className="property-card-visual" style={{ background: 'linear-gradient(135deg, rgba(197, 197, 216, 0.05) 0%, rgba(208, 228, 255, 0.02) 100%)' }}>
+              <div className="property-card-visual">
                 <div className="property-type-chip">Shared Asset</div>
-                <div className="property-icon-large" style={{ color: 'var(--secondary)' }}>
+                <div className="property-icon-large">
                   <span className="material-symbols-outlined">hotel</span>
                 </div>
                 {!isStaff && (
@@ -174,7 +174,7 @@ const Hostels: React.FC = () => {
               <div className="property-card-body">
                 <h3 className="property-name-modern">{hostel.name}</h3>
                 <div className="property-address-modern">
-                  <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', color: 'var(--secondary)', opacity: 0.5 }}>location_on</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', opacity: 0.5 }}>location_on</span>
                   {hostel.address}
                 </div>
                 
@@ -191,7 +191,7 @@ const Hostels: React.FC = () => {
               </div>
               
               <div className="property-card-footer">
-                <span className="view-link" style={{ color: 'var(--secondary)' }}>
+                <span className="view-link">
                   Manage Room & Bed Inventory
                   <span className="material-symbols-outlined">arrow_forward_ios</span>
                 </span>
