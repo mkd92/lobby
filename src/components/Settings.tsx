@@ -98,7 +98,6 @@ const Settings: React.FC = () => {
     if (!staffEmail || !ownerId) return;
     setAddingStaff(true);
     try {
-      // Check if already exists
       const q = query(collection(db, 'staff'), where('staff_email', '==', staffEmail), where('owner_id', '==', ownerId));
       const existing = await getDocs(q);
       if (!existing.empty) throw new Error('Identity already has access or pending invite.');
@@ -144,13 +143,13 @@ const Settings: React.FC = () => {
       {/* Editorial Header */}
       <header className="view-header">
         <p className="view-eyebrow">System Configuration</p>
-        <h1 className="text-white font-display font-black text-4xl md:text-6xl tracking-tighter leading-none mt-2">
+        <h1 className="text-on-surface font-display font-black text-4xl md:text-6xl tracking-tighter leading-none mt-2">
           Preferences
         </h1>
       </header>
 
       {message && (
-        <div className={`mb-10 p-6 rounded-[2rem] border transition-all duration-500 animate-in fade-in slide-in-from-top-4 ${message.type === 'success' ? 'bg-primary/10 border-primary/20 text-white' : 'bg-error/10 border-error/20 text-error'}`}>
+        <div className={`mb-10 p-6 rounded-[2rem] border transition-all duration-500 animate-in fade-in slide-in-from-top-4 ${message.type === 'success' ? 'bg-primary/5 border-primary/20 text-on-surface' : 'bg-error/10 border-error/20 text-error'}`}>
           <div className="flex items-center gap-3">
             <span className="material-symbols-outlined">{message.type === 'success' ? 'check_circle' : 'error'}</span>
             <span className="font-bold tracking-tight">{message.text}</span>
@@ -162,16 +161,16 @@ const Settings: React.FC = () => {
         {/* Left Column: Profile (8 cols) */}
         <div className="lg:col-span-8">
           <div className="glass-panel p-10 md:p-16 rounded-[48px]">
-            <h2 className="text-white font-display font-bold text-3xl tracking-tight mb-12">Registry Profile</h2>
+            <h2 className="text-on-surface font-display font-bold text-3xl tracking-tight mb-12">Registry Profile</h2>
             
             <form onSubmit={handleSave} className="flex flex-col gap-10">
               <div className="form-group-modern">
-                <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Legal Entity Name</label>
+                <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-on-surface-variant opacity-60 block mb-3">Legal Entity Name</label>
                 <input
                   type="text"
                   value={profile.name}
                   onChange={e => setProfile(prev => ({ ...prev, name: e.target.value }))}
-                  className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-display font-bold text-xl"
+                  className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-display font-bold text-xl text-on-surface"
                   placeholder="Registry designation"
                   required
                 />
@@ -179,38 +178,38 @@ const Settings: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                 <div className="form-group-modern">
-                  <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Digital Correspondence</label>
+                  <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-on-surface-variant opacity-60 block mb-3">Digital Correspondence</label>
                   <input
                     type="email"
                     value={profile.email}
                     disabled
-                    className="auth-input w-full bg-surface-container-low opacity-40 cursor-not-allowed border-none rounded-2xl p-5 font-medium"
+                    className="auth-input w-full bg-surface-container-low opacity-40 cursor-not-allowed border-none rounded-2xl p-5 font-medium text-on-surface"
                   />
                 </div>
                 <div className="form-group-modern">
-                  <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Primary Tele-Channel</label>
+                  <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-on-surface-variant opacity-60 block mb-3">Primary Tele-Channel</label>
                   <input
                     type="tel"
                     value={profile.phone}
                     onChange={e => setProfile(prev => ({ ...prev, phone: e.target.value }))}
-                    className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-medium"
+                    className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-medium text-on-surface"
                     placeholder="Registry contact"
                   />
                 </div>
               </div>
 
               <div className="form-group-modern">
-                <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Operational Currency</label>
+                <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-on-surface-variant opacity-60 block mb-3">Operational Currency</label>
                 <div className="custom-select-container relative" ref={dropdownRef}>
                   <div
                     className={`custom-select-trigger flex justify-between items-center bg-surface-container-low p-5 rounded-2xl cursor-pointer hover:bg-surface-container-high transition-colors ${isDropdownOpen ? 'open' : ''}`}
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                   >
-                    <span className="flex items-center gap-4 text-white">
-                      <span className="w-10 h-10 flex items-center justify-center bg-primary/10 rounded-xl text-primary font-black text-lg">{currentCurrency.symbol}</span>
+                    <span className="flex items-center gap-4 text-on-surface">
+                      <span className="w-10 h-10 flex items-center justify-center bg-surface-container-highest rounded-xl text-primary font-black text-lg">{currentCurrency.symbol}</span>
                       <span className="font-bold">{currentCurrency.code} <span className="opacity-40 font-medium ml-2">— {currentCurrency.name}</span></span>
                     </span>
-                    <span className="material-symbols-outlined transition-transform duration-300" style={{ transform: isDropdownOpen ? 'rotate(180deg)' : 'none' }}>expand_more</span>
+                    <span className="material-symbols-outlined transition-transform duration-300 text-on-surface-variant" style={{ transform: isDropdownOpen ? 'rotate(180deg)' : 'none' }}>expand_more</span>
                   </div>
                   
                   {isDropdownOpen && (
@@ -233,8 +232,8 @@ const Settings: React.FC = () => {
                 </div>
               </div>
 
-              <footer className="flex flex-wrap justify-center sm:justify-end items-center gap-4 sm:gap-8 mt-6 pt-10 border-t border-white/5">
-                <button type="submit" className="primary-button w-full sm:w-auto sm:min-w-[220px]" disabled={saving}>
+              <footer className="flex flex-wrap justify-center sm:justify-end items-center gap-4 sm:gap-8 mt-6 pt-10 border-t border-outline-variant">
+                <button type="submit" className="primary-button w-full sm:w-auto sm:min-w-[200px]" disabled={saving}>
                   {saving ? 'Synchronizing...' : 'Finalize Profile'}
                 </button>
               </footer>
@@ -244,8 +243,8 @@ const Settings: React.FC = () => {
           {/* Staff Access Control */}
           {!isLoading && (
             <div className="glass-panel p-10 md:p-16 rounded-[48px] mt-10">
-              <h2 className="text-white font-display font-bold text-3xl tracking-tight mb-4">Staff Access Control</h2>
-              <p className="text-secondary/60 text-sm font-medium leading-relaxed mb-12">
+              <h2 className="text-on-surface font-display font-bold text-3xl tracking-tight mb-4">Staff Access Control</h2>
+              <p className="text-on-surface-variant opacity-70 text-sm font-medium leading-relaxed mb-12">
                 Authorize secondary stakeholders to access registry data with read-only permissions.
               </p>
 
@@ -255,7 +254,7 @@ const Settings: React.FC = () => {
                     type="email"
                     value={staffEmail}
                     onChange={e => setStaffEmail(e.target.value)}
-                    className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-medium"
+                    className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-medium text-on-surface"
                     placeholder="stakeholder@entity.com"
                     required
                   />
@@ -268,15 +267,15 @@ const Settings: React.FC = () => {
               <div className="flex flex-col gap-4">
                 <h3 className="view-eyebrow text-[0.625rem] opacity-40 mb-2">Active Authorized Personell</h3>
                 {staffList.length === 0 ? (
-                  <div className="text-secondary/40 text-sm italic py-4">No authorized stakeholders identified.</div>
+                  <div className="text-on-surface-variant opacity-40 text-sm italic py-4">No authorized stakeholders identified.</div>
                 ) : (
                   staffList.map((s: any) => (
-                    <div key={s.id} className="flex justify-between items-center p-6 rounded-3xl bg-surface-container-low border border-white/5 gap-4">
+                    <div key={s.id} className="flex justify-between items-center p-6 rounded-3xl bg-surface-container-low border border-outline-variant gap-4">
                       <div className="flex flex-col gap-1 min-w-0">
-                        <div className="text-white font-bold truncate" title={s.staff_email}>{s.staff_email}</div>
+                        <div className="text-on-surface font-bold truncate" title={s.staff_email}>{s.staff_email}</div>
                         <div className="flex items-center gap-2">
                           <span className={`w-2 h-2 rounded-full shrink-0 ${s.status === 'active' ? 'bg-success' : 'bg-warning animate-pulse'}`}></span>
-                          <span className="text-[0.6rem] uppercase tracking-widest font-black opacity-40 truncate">{s.status} access</span>
+                          <span className="text-[0.6rem] uppercase tracking-widest font-black opacity-40 text-on-surface-variant truncate">{s.status} access</span>
                         </div>
                       </div>
                       <button 
@@ -298,11 +297,11 @@ const Settings: React.FC = () => {
         <div className="lg:col-span-4 flex flex-col gap-8">
           {/* Theme Switcher */}
           <div className="glass-panel p-10 rounded-[40px]">
-            <h3 className="view-eyebrow text-[0.625rem] opacity-40 mb-8">Environment Appearance</h3>
+            <h3 className="view-eyebrow text-[0.625rem] opacity-40 mb-8 text-on-surface-variant">Environment Appearance</h3>
             <div className="flex flex-col gap-4">
               <button
                 onClick={() => setTheme('light')}
-                className={`flex items-center justify-between p-6 rounded-3xl transition-all duration-300 ${theme === 'light' ? 'bg-white text-black scale-[1.02] shadow-xl' : 'bg-surface-container-low text-secondary/40 hover:text-white'}`}
+                className={`flex items-center justify-between p-6 rounded-3xl transition-all duration-300 ${theme === 'light' ? 'bg-primary text-on-primary scale-[1.02] shadow-xl' : 'bg-surface-container-low text-on-surface-variant opacity-60 hover:text-on-surface hover:opacity-100'}`}
               >
                 <div className="flex items-center gap-4">
                   <span className="material-symbols-outlined">light_mode</span>
@@ -312,7 +311,7 @@ const Settings: React.FC = () => {
               </button>
               <button
                 onClick={() => setTheme('dark')}
-                className={`flex items-center justify-between p-6 rounded-3xl transition-all duration-300 ${theme === 'dark' ? 'bg-white text-black scale-[1.02] shadow-xl' : 'bg-surface-container-low text-secondary/40 hover:text-white'}`}
+                className={`flex items-center justify-between p-6 rounded-3xl transition-all duration-300 ${theme === 'dark' ? 'bg-primary text-on-primary scale-[1.02] shadow-xl' : 'bg-surface-container-low text-on-surface-variant opacity-60 hover:text-on-surface hover:opacity-100'}`}
               >
                 <div className="flex items-center gap-4">
                   <span className="material-symbols-outlined">dark_mode</span>
@@ -326,7 +325,7 @@ const Settings: React.FC = () => {
           {/* Session Management */}
           <div className="glass-panel p-10 rounded-[40px] border border-error/10 bg-error/5">
             <h3 className="view-eyebrow text-[0.625rem] text-error/60 mb-8">Session Integrity</h3>
-            <p className="text-secondary/60 text-xs font-medium leading-relaxed mb-8">
+            <p className="text-on-surface-variant opacity-70 text-xs font-medium leading-relaxed mb-8">
               Terminating the current session will revoke access on this device. Registry parameters will persist.
             </p>
             <button
