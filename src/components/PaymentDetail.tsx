@@ -62,9 +62,10 @@ const PaymentDetail: React.FC = () => {
 
   useEffect(() => {
     if (payment) {
+      const savedDate = localStorage.getItem('lastPaymentDate') || '';
       setForm({
         amount: String(payment.amount),
-        payment_date: payment.payment_date,
+        payment_date: payment.payment_date || savedDate,
         month_for: payment.month_for,
         payment_method: payment.payment_method || 'Cash',
         status: payment.status,
@@ -77,6 +78,7 @@ const PaymentDetail: React.FC = () => {
     if (isStaff) return;
     setSaving(true);
     try {
+      if (form.payment_date) localStorage.setItem('lastPaymentDate', form.payment_date);
       await updateDoc(doc(db, 'payments', id!), {
         amount: parseFloat(form.amount),
         payment_date: form.payment_date,
