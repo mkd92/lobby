@@ -33,6 +33,7 @@ interface Payment {
 }
 
 type FilterTab = 'All' | 'Paid' | 'Pending';
+type SortOption = 'date_desc' | 'date_asc' | 'name_asc' | 'name_desc' | 'amount_desc' | 'amount_asc' | 'unit_asc';
 
 const Payments: React.FC = () => {
   const { ownerId, isStaff } = useOwner();
@@ -42,6 +43,7 @@ const Payments: React.FC = () => {
 
   const [filter, setFilter] = useState<FilterTab>('All');
   const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<SortOption>('date_desc');
   const [saving, setSaving] = useState(false);
   const [currencySymbol, setCurrencySymbol] = useState('$');
 
@@ -62,7 +64,7 @@ const Payments: React.FC = () => {
   });
 
   const filtered = useMemo(() => {
-    return payments.filter(p => {
+    const list = payments.filter(p => {
       const matchFilter = filter === 'All' || p.status === filter;
       const q = search.toLowerCase();
       const matchSearch = p.tenant_name.toLowerCase().includes(q) ||
@@ -72,7 +74,18 @@ const Payments: React.FC = () => {
         (p.month_for && p.month_for.toLowerCase().includes(q));
       return matchFilter && matchSearch;
     });
-  }, [payments, filter, search]);
+    return [...list].sort((a, b) => {
+      switch (sort) {
+        case 'date_asc':  return a.month_for.localeCompare(b.month_for) || a.payment_date.localeCompare(b.payment_date);
+        case 'name_asc':  return a.tenant_name.localeCompare(b.tenant_name);
+        case 'name_desc': return b.tenant_name.localeCompare(a.tenant_name);
+        case 'amount_desc': return b.amount - a.amount;
+        case 'amount_asc':  return a.amount - b.amount;
+        case 'unit_asc': return (a.unit_number || a.bed_number || '').localeCompare(b.unit_number || b.bed_number || '');
+        default: return b.month_for.localeCompare(a.month_for) || b.payment_date.localeCompare(a.payment_date);
+      }
+    });
+  }, [payments, filter, search, sort]);
 
   const stats = useMemo(() => {
     const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -168,6 +181,22 @@ const Payments: React.FC = () => {
               {filter === tab && <div className="tab-indicator" />}
             </button>
           ))}
+        </div>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <span className="material-symbols-outlined" style={{ position: 'absolute', left: '0.75rem', fontSize: '1rem', opacity: 0.5, pointerEvents: 'none' }}>sort</span>
+          <select
+            value={sort}
+            onChange={e => setSort(e.target.value as SortOption)}
+            style={{ background: 'var(--surface-container-low)', border: 'none', borderRadius: '1rem', padding: '0.625rem 1rem 0.625rem 2.25rem', color: 'var(--on-surface)', fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}
+          >
+            <option value="date_desc">Newest First</option>
+            <option value="date_asc">Oldest First</option>
+            <option value="name_asc">Tenant A–Z</option>
+            <option value="name_desc">Tenant Z–A</option>
+            <option value="amount_desc">Amount High–Low</option>
+            <option value="amount_asc">Amount Low–High</option>
+            <option value="unit_asc">Unit / Bed</option>
+          </select>
         </div>
       </div>
 

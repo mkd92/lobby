@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   collection, query, where, getDocs, doc, getDoc,
   writeBatch, serverTimestamp,
@@ -42,6 +42,7 @@ interface Lease {
 
 type LeaseType = 'property' | 'hostel';
 type FilterTab  = 'All' | 'Active' | 'Expired' | 'Terminated';
+type SortOption = 'date_desc' | 'date_asc' | 'name_asc' | 'name_desc' | 'unit_asc' | 'rent_desc' | 'rent_asc';
 
 interface SelectOption {
   value: string;
@@ -189,6 +190,7 @@ const Leases: React.FC = () => {
   const { showAlert, showConfirm, DialogMount } = useDialog();
 
   const [filter, setFilter] = useState<FilterTab>('All');
+  const [sort, setSort] = useState<SortOption>('date_desc');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [leaseType, setLeaseType] = useState<LeaseType>('property');
   const [form, setForm] = useState(EMPTY_FORM);
@@ -210,8 +212,25 @@ const Leases: React.FC = () => {
       const symbols: any = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
       setCurrencySymbol(symbols[curr] || '$');
 
-      return snap.docs.map(d => ({ id: d.id, ...d.data() } as Lease))
-        .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const allLeases = snap.docs.map(d => ({ id: d.id, ...d.data() } as Lease));
+
+      // Auto-expire leases whose end_date has passed and free up the unit/bed
+      const expiredBatch = writeBatch(db);
+      let hasExpired = false;
+      for (const lease of allLeases) {
+        if (lease.status === 'Active' && lease.end_date && new Date(lease.end_date) < today) {
+          expiredBatch.update(doc(db, 'leases', lease.id), { status: 'Expired' });
+          if (lease.unit_id) expiredBatch.update(doc(db, 'units', lease.unit_id), { status: 'Vacant' });
+          if (lease.bed_id)  expiredBatch.update(doc(db, 'beds',  lease.bed_id),  { status: 'Vacant' });
+          lease.status = 'Expired';
+          hasExpired = true;
+        }
+      }
+      if (hasExpired) await expiredBatch.commit();
+
+      return allLeases.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
     },
     enabled: !!ownerId,
   });
@@ -352,7 +371,20 @@ const Leases: React.FC = () => {
   };
 
   // ── Derived ────────────────────────────────────────────────────────
-  const filtered = leases.filter(l => filter === 'All' || l.status === filter);
+  const filtered = useMemo(() => {
+    const list = leases.filter(l => filter === 'All' || l.status === filter);
+    return [...list].sort((a, b) => {
+      switch (sort) {
+        case 'date_asc':  return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
+        case 'name_asc':  return a.tenant_name.localeCompare(b.tenant_name);
+        case 'name_desc': return b.tenant_name.localeCompare(a.tenant_name);
+        case 'unit_asc':  return (a.unit_number || a.room_number || '').localeCompare(b.unit_number || b.room_number || '');
+        case 'rent_desc': return b.rent_amount - a.rent_amount;
+        case 'rent_asc':  return a.rent_amount - b.rent_amount;
+        default: return new Date(b.start_date).getTime() - new Date(a.start_date).getTime();
+      }
+    });
+  }, [leases, filter, sort]);
   const stats = {
     total:      leases.length,
     active:     leases.filter(l => l.status === 'Active').length,
@@ -403,9 +435,9 @@ const Leases: React.FC = () => {
       <div className="view-toolbar">
         <div className="filter-tabs-modern">
           {(['All', 'Active', 'Expired', 'Terminated'] as FilterTab[]).map(tab => (
-            <button 
-              key={tab} 
-              className={`tab-btn ${filter === tab ? 'active' : ''}`} 
+            <button
+              key={tab}
+              className={`tab-btn ${filter === tab ? 'active' : ''}`}
               onClick={() => setFilter(tab)}
             >
               {tab}
@@ -413,8 +445,26 @@ const Leases: React.FC = () => {
             </button>
           ))}
         </div>
-        <div className="prop-filter-count">
-          {filtered.length} / {leases.length} Legal Agreements Identified
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <span className="material-symbols-outlined" style={{ position: 'absolute', left: '0.75rem', fontSize: '1rem', opacity: 0.5, pointerEvents: 'none' }}>sort</span>
+            <select
+              value={sort}
+              onChange={e => setSort(e.target.value as SortOption)}
+              style={{ background: 'var(--surface-container-low)', border: 'none', borderRadius: '1rem', padding: '0.625rem 1rem 0.625rem 2.25rem', color: 'var(--on-surface)', fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}
+            >
+              <option value="date_desc">Newest First</option>
+              <option value="date_asc">Oldest First</option>
+              <option value="name_asc">Tenant A–Z</option>
+              <option value="name_desc">Tenant Z–A</option>
+              <option value="unit_asc">Unit / Room</option>
+              <option value="rent_desc">Rent High–Low</option>
+              <option value="rent_asc">Rent Low–High</option>
+            </select>
+          </div>
+          <div className="prop-filter-count">
+            {filtered.length} / {leases.length} Legal Agreements Identified
+          </div>
         </div>
       </div>
 
