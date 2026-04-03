@@ -13,6 +13,8 @@ interface Customer {
   full_name: string;
   email: string;
   phone: string;
+  aadhar_number?: string;
+  aadhar_drive_link?: string;
   created_at: any;
   owner_id: string;
 }
@@ -36,6 +38,8 @@ const CustomerDetail: React.FC = () => {
     full_name: '',
     email: '',
     phone: '',
+    aadhar_number: '',
+    aadhar_drive_link: '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -65,6 +69,8 @@ const CustomerDetail: React.FC = () => {
         full_name: customer.full_name,
         email: customer.email || '',
         phone: customer.phone || '',
+        aadhar_number: customer.aadhar_number || '',
+        aadhar_drive_link: customer.aadhar_drive_link || '',
       });
     }
   }, [customer]);
@@ -148,6 +154,19 @@ const CustomerDetail: React.FC = () => {
                 <label className="text-[0.6rem] uppercase tracking-[0.2em] font-black text-secondary/40 block mb-2">Trust Standing</label>
                 <div className="text-success font-display font-bold text-lg">Exemplary Standing</div>
               </div>
+              {customer.aadhar_number && (
+                <div>
+                  <label className="text-[0.6rem] uppercase tracking-[0.2em] font-black text-secondary/40 block mb-2">Aadhaar</label>
+                  <div className="text-white/80 font-medium" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span>{customer.aadhar_number}</span>
+                    {customer.aadhar_drive_link && (
+                      <a href={customer.aadhar_drive_link} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center' }} title="View Aadhaar PDF">
+                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>picture_as_pdf</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -216,6 +235,39 @@ const CustomerDetail: React.FC = () => {
                     className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-medium text-white"
                     placeholder="+1 (000) 000-0000"
                     disabled={isStaff} 
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div className="form-group-modern">
+                  <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Aadhaar Number</label>
+                  <input
+                    type="text"
+                    value={form.aadhar_number}
+                    onChange={e => setForm({...form, aadhar_number: e.target.value})}
+                    className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-medium text-white"
+                    placeholder="XXXX XXXX XXXX"
+                    maxLength={14}
+                    disabled={isStaff}
+                  />
+                </div>
+                <div className="form-group-modern">
+                  <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">
+                    Aadhaar PDF
+                    {form.aadhar_drive_link && (
+                      <a href={form.aadhar_drive_link} target="_blank" rel="noopener noreferrer" style={{ marginLeft: '0.5rem', color: 'var(--primary)', fontWeight: 700, textDecoration: 'none' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '0.875rem', verticalAlign: 'middle' }}>open_in_new</span>
+                      </a>
+                    )}
+                  </label>
+                  <input
+                    type="url"
+                    value={form.aadhar_drive_link}
+                    onChange={e => setForm({...form, aadhar_drive_link: e.target.value})}
+                    className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-medium text-white"
+                    placeholder="https://drive.google.com/..."
+                    disabled={isStaff}
                   />
                 </div>
               </div>

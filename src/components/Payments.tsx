@@ -1,14 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import {
   collection, query, where, getDocs, doc, getDoc, deleteDoc,
+  updateDoc, addDoc, serverTimestamp,
 } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
-import { generateMonthlyPayments } from '../utils/generateMonthlyPayments';
+import { generateMonthlyPayments, previewMonthlyPayments } from '../utils/generateMonthlyPayments';
 import { LoadingScreen } from './layout/LoadingScreen';
+import PaymentSlideOver from './PaymentSlideOver';
 import '../styles/Units.css';
 import '../styles/Leases.css';
 import '../styles/Payments.css';
@@ -29,22 +30,43 @@ interface Payment {
   payment_date: string;
   month_for: string;
   payment_method: string | null;
-  status: 'Paid' | 'Pending';
+  status: 'Paid' | 'Partial' | 'Pending';
 }
 
-type FilterTab = 'All' | 'Paid' | 'Pending';
+type FilterTab = 'All' | 'Paid' | 'Partial' | 'Pending';
 type SortOption = 'date_desc' | 'date_asc' | 'name_asc' | 'name_desc' | 'amount_desc' | 'amount_asc' | 'unit_asc';
+type MetricPeriod = 'month' | 'quarter' | 'all';
+
+// ── Overdue helpers ────────────────────────────────────────────────────
+const now = new Date();
+const isPastMonth = (monthFor: string) => {
+  const d = new Date(monthFor);
+  return d.getFullYear() < now.getFullYear() ||
+    (d.getFullYear() === now.getFullYear() && d.getMonth() < now.getMonth());
+};
+const monthsOverdue = (monthFor: string) => {
+  const d = new Date(monthFor);
+  return (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+};
+const isOverdue = (p: Payment) => p.status !== 'Paid' && isPastMonth(p.month_for);
 
 const Payments: React.FC = () => {
   const { ownerId, isStaff } = useOwner();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { showAlert, showConfirm, DialogMount } = useDialog();
 
-  const [filter, setFilter] = useState<FilterTab>('All');
-  const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<SortOption>('date_desc');
-  const [saving, setSaving] = useState(false);
+  const [filter, setFilter]           = useState<FilterTab>('All');
+  const [search, setSearch]           = useState('');
+  const [sort, setSort]               = useState<SortOption>('date_desc');
+  const [saving, setSaving]           = useState(false);
+  const [metricPeriod, setMetricPeriod] = useState<MetricPeriod>('month');
+  const [selectedId, setSelectedId]   = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Receive payment modal
+  const [receiveModal, setReceiveModal] = useState<{ open: boolean; payment: Payment | null }>({ open: false, payment: null });
+  const [receiveForm, setReceiveForm]   = useState({ amount: '', payment_date: '', payment_method: 'Cash' });
+  const [receiveSaving, setReceiveSaving] = useState(false);
 
   const { data: ownerProfile } = useQuery({
     queryKey: ['owner-profile', ownerId],
@@ -77,31 +99,53 @@ const Payments: React.FC = () => {
     });
     return [...list].sort((a, b) => {
       switch (sort) {
-        case 'date_asc':  return a.month_for.localeCompare(b.month_for) || a.payment_date.localeCompare(b.payment_date);
-        case 'name_asc':  return a.tenant_name.localeCompare(b.tenant_name);
-        case 'name_desc': return b.tenant_name.localeCompare(a.tenant_name);
+        case 'date_asc':    return a.month_for.localeCompare(b.month_for) || a.payment_date.localeCompare(b.payment_date);
+        case 'name_asc':    return a.tenant_name.localeCompare(b.tenant_name);
+        case 'name_desc':   return b.tenant_name.localeCompare(a.tenant_name);
         case 'amount_desc': return b.amount - a.amount;
         case 'amount_asc':  return a.amount - b.amount;
-        case 'unit_asc': return (a.unit_number || a.bed_number || '').localeCompare(b.unit_number || b.bed_number || '');
-        default: return b.month_for.localeCompare(a.month_for) || b.payment_date.localeCompare(a.payment_date);
+        case 'unit_asc':    return (a.unit_number || a.bed_number || '').localeCompare(b.unit_number || b.bed_number || '');
+        default:            return b.month_for.localeCompare(a.month_for) || b.payment_date.localeCompare(a.payment_date);
       }
     });
   }, [payments, filter, search, sort]);
 
+  // ── Metrics ────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
-    const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-    const thisMonth = payments.filter(p => p.month_for === currentMonth);
-    return {
-      totalPaid: payments.filter(p => p.status === 'Paid').reduce((sum, p) => sum + p.amount, 0),
-      thisMonthPending: thisMonth.filter(p => p.status === 'Pending').reduce((sum, p) => sum + p.amount, 0),
-      thisMonthPaid: thisMonth.filter(p => p.status === 'Paid').reduce((sum, p) => sum + p.amount, 0),
+    const inPeriod = (monthFor: string) => {
+      const d = new Date(monthFor);
+      if (metricPeriod === 'month') {
+        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      } else if (metricPeriod === 'quarter') {
+        return d.getFullYear() === now.getFullYear() &&
+          Math.floor(d.getMonth() / 3) === Math.floor(now.getMonth() / 3);
+      }
+      return true;
     };
-  }, [payments]);
+    const period = payments.filter(p => inPeriod(p.month_for));
+    return {
+      settled:     period.filter(p => p.status === 'Paid').reduce((s, p) => s + p.amount, 0),
+      outstanding: period.filter(p => p.status !== 'Paid').reduce((s, p) => s + (p.rent_amount - p.amount), 0),
+      collected:   payments.filter(p => p.status === 'Paid').reduce((s, p) => s + p.amount, 0),
+      overdue:     payments.filter(p => isOverdue(p)).reduce((s, p) => s + (p.rent_amount - p.amount), 0),
+    };
+  }, [payments, metricPeriod]);
 
+  // ── Handlers ────────────────────────────────────────────────────────────
   const handleSync = async () => {
-    const ok = await showConfirm('Sync will generate pending payments for all active leases for the current month. Proceed with batch generation?');
-    if (!ok) return;
     try {
+      setSaving(true);
+      const preview = await previewMonthlyPayments(ownerId!);
+      setSaving(false);
+      if (preview.toCreate.length === 0) {
+        showAlert(`All ${preview.existing} active lease${preview.existing !== 1 ? 's' : ''} already have records for this month. Nothing to generate.`);
+        return;
+      }
+      const lines = preview.toCreate.slice(0, 8).map(r => `• ${r.tenant_name} (${r.unit}) — ${currencySymbol}${r.rent_amount.toLocaleString()}`).join('\n');
+      const more  = preview.toCreate.length > 8 ? `\n• …and ${preview.toCreate.length - 8} more` : '';
+      const msg   = `${preview.toCreate.length} new record${preview.toCreate.length !== 1 ? 's' : ''} will be created:\n${lines}${more}${preview.existing ? `\n\n${preview.existing} existing record${preview.existing !== 1 ? 's' : ''} will be left unchanged.` : ''}`;
+      const ok = await showConfirm(msg);
+      if (!ok) return;
       setSaving(true);
       await generateMonthlyPayments(ownerId!);
       queryClient.invalidateQueries({ queryKey: ['payments', ownerId] });
@@ -126,12 +170,219 @@ const Payments: React.FC = () => {
     }
   };
 
+  const handleBulkPaid = async () => {
+    if (selectedIds.size === 0) return;
+    const toUpdate = payments.filter(p => selectedIds.has(p.id) && p.status !== 'Paid');
+    if (toUpdate.length === 0) {
+      showAlert('All selected records are already marked as Paid.');
+      setSelectedIds(new Set());
+      return;
+    }
+    const ok = await showConfirm(`Mark ${toUpdate.length} payment${toUpdate.length !== 1 ? 's' : ''} as Paid?`);
+    if (!ok) return;
+    setSaving(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      await Promise.all(toUpdate.map(p => updateDoc(doc(db, 'payments', p.id), {
+        status: 'Paid',
+        amount: p.rent_amount,
+        payment_date: p.payment_date || today,
+        updated_at: serverTimestamp(),
+      })));
+      queryClient.invalidateQueries({ queryKey: ['payments', ownerId] });
+      setSelectedIds(new Set());
+      showAlert(`${toUpdate.length} payment${toUpdate.length !== 1 ? 's' : ''} marked as Paid.`);
+    } catch (err) {
+      showAlert((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleSelect = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const openReceiveModal = (payment: Payment) => {
+    const remaining = payment.status === 'Partial' ? payment.rent_amount - payment.amount : payment.rent_amount;
+    const savedDate = localStorage.getItem('lastPaymentDate') || new Date().toISOString().split('T')[0];
+    setReceiveForm({ amount: String(remaining), payment_date: savedDate, payment_method: 'Cash' });
+    setReceiveModal({ open: true, payment });
+  };
+
+  const handleReceiveSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!receiveModal.payment) return;
+    const p = receiveModal.payment;
+    const newAmount = parseFloat(receiveForm.amount);
+    if (!newAmount || newAmount <= 0) return;
+    const alreadyReceived = p.status === 'Partial' ? p.amount : 0;
+    const totalReceived   = alreadyReceived + newAmount;
+    if (totalReceived > p.rent_amount) return;
+    const newStatus: Payment['status'] = totalReceived >= p.rent_amount ? 'Paid' : 'Partial';
+    setReceiveSaving(true);
+    try {
+      if (receiveForm.payment_date) localStorage.setItem('lastPaymentDate', receiveForm.payment_date);
+      const storedAmount = newStatus === 'Paid' ? p.rent_amount : totalReceived;
+      await updateDoc(doc(db, 'payments', p.id), {
+        amount: storedAmount,
+        payment_date: receiveForm.payment_date,
+        payment_method: receiveForm.payment_method,
+        status: newStatus,
+        updated_at: serverTimestamp(),
+      });
+      // Write transaction log
+      await addDoc(collection(db, 'payments', p.id, 'transactions'), {
+        amount:           newAmount,
+        payment_date:     receiveForm.payment_date,
+        payment_method:   receiveForm.payment_method,
+        cumulative_total: storedAmount,
+        recorded_at:      serverTimestamp(),
+      });
+      queryClient.invalidateQueries({ queryKey: ['payments', ownerId] });
+      setReceiveModal({ open: false, payment: null });
+      showAlert(
+        newStatus === 'Paid'
+          ? 'Payment received in full. Record marked as Paid.'
+          : `Partial payment recorded. ${currencySymbol}${(p.rent_amount - totalReceived).toLocaleString()} still outstanding.`
+      );
+    } catch (err) {
+      showAlert((err as Error).message);
+    } finally {
+      setReceiveSaving(false);
+    }
+  };
+
   if (isLoading) return <LoadingScreen message="Accessing Ledger Vault" />;
+
+  const periodLabel = metricPeriod === 'month' ? 'This Month' : metricPeriod === 'quarter' ? 'This Quarter' : 'All Time';
 
   return (
     <div className="view-container page-fade-in">
       {DialogMount}
-      
+
+      {/* Slide-over */}
+      {selectedId && (
+        <PaymentSlideOver
+          id={selectedId}
+          currencySymbol={currencySymbol}
+          onClose={() => setSelectedId(null)}
+          onUpdated={() => setSelectedId(null)}
+        />
+      )}
+
+      {/* Receive Payment Modal */}
+      {receiveModal.open && receiveModal.payment && (() => {
+        const p = receiveModal.payment!;
+        const alreadyReceived = p.status === 'Partial' ? p.amount : 0;
+        const entered      = parseFloat(receiveForm.amount) || 0;
+        const totalWouldBe = alreadyReceived + entered;
+        const isOver       = totalWouldBe > p.rent_amount;
+        const isFull       = !isOver && totalWouldBe > 0 && totalWouldBe >= p.rent_amount;
+        const remaining    = p.rent_amount - totalWouldBe;
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+               onClick={() => setReceiveModal({ open: false, payment: null })}>
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }} />
+            <div className="glass-panel" style={{ position: 'relative', borderRadius: '2.5rem', padding: '2.5rem', width: '100%', maxWidth: '480px', boxShadow: 'var(--shadow-ambient)' }}
+                 onClick={e => e.stopPropagation()}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <p style={{ fontSize: '0.625rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.15em', opacity: 0.4, marginBottom: '0.5rem' }}>Receive Payment</p>
+                <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.75rem', margin: 0, lineHeight: 1.1 }}>{p.tenant_name}</h2>
+                <p style={{ fontSize: '0.8125rem', opacity: 0.5, fontWeight: 600, marginTop: '0.35rem' }}>{p.property_name || p.hostel_name} · {p.month_for}</p>
+              </div>
+
+              <div style={{ background: 'var(--surface-container-low)', borderRadius: '1.25rem', padding: '1rem 1.25rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', fontWeight: 700 }}>
+                  <span style={{ opacity: 0.5 }}>Contracted Rent</span>
+                  <span>{currencySymbol}{p.rent_amount.toLocaleString()}</span>
+                </div>
+                {p.status === 'Partial' && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', fontWeight: 700 }}>
+                      <span style={{ opacity: 0.5 }}>Already Received</span>
+                      <span style={{ color: 'var(--color-success)' }}>{currencySymbol}{p.amount.toLocaleString()}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', fontWeight: 700 }}>
+                      <span style={{ opacity: 0.5 }}>Balance Due</span>
+                      <span style={{ color: '#fb923c' }}>{currencySymbol}{(p.rent_amount - p.amount).toLocaleString()}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <form onSubmit={handleReceiveSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="form-group-modern">
+                  <label style={{ fontSize: '0.625rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.15em', opacity: 0.4, display: 'block', marginBottom: '0.5rem' }}>Amount ({currencySymbol})</label>
+                  <input type="number" step="0.01" min="0.01" max={p.rent_amount - alreadyReceived} value={receiveForm.amount}
+                    onChange={e => setReceiveForm({ ...receiveForm, amount: e.target.value })}
+                    className="auth-input w-full" style={{ borderRadius: '1rem', padding: '0.875rem 1rem', fontWeight: 700, fontSize: '1.125rem', background: 'var(--surface-container-low)', border: 'none', width: '100%', boxSizing: 'border-box' }} required />
+                  {entered > 0 && (
+                    <p style={{ fontSize: '0.75rem', fontWeight: 700, marginTop: '0.5rem', color: isOver ? 'var(--error)' : isFull ? 'var(--color-success)' : '#fb923c' }}>
+                      {isOver
+                        ? `Exceeds contracted rent by ${currencySymbol}${(totalWouldBe - p.rent_amount).toLocaleString()}`
+                        : isFull
+                        ? 'Full payment — record will be marked Paid'
+                        : `Partial — ${currencySymbol}${remaining.toLocaleString()} will still be outstanding`}
+                    </p>
+                  )}
+                </div>
+
+                <div className="form-group-modern">
+                  <label style={{ fontSize: '0.625rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.15em', opacity: 0.4, display: 'block', marginBottom: '0.5rem' }}>Date</label>
+                  <input type="date" value={receiveForm.payment_date}
+                    onChange={e => setReceiveForm({ ...receiveForm, payment_date: e.target.value })}
+                    className="auth-input w-full" style={{ borderRadius: '1rem', padding: '0.875rem 1rem', fontWeight: 600, background: 'var(--surface-container-low)', border: 'none', width: '100%', boxSizing: 'border-box', color: 'var(--on-surface)' }} required />
+                </div>
+
+                <div className="form-group-modern">
+                  <label style={{ fontSize: '0.625rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.15em', opacity: 0.4, display: 'block', marginBottom: '0.5rem' }}>Payment Channel</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                    {['Cash', 'Bank Transfer', 'Online', 'Check'].map(m => (
+                      <button key={m} type="button" onClick={() => setReceiveForm({ ...receiveForm, payment_method: m })}
+                        style={{ padding: '0.625rem 0.25rem', borderRadius: '0.75rem', fontWeight: 700, fontSize: '0.625rem', textTransform: 'uppercase', letterSpacing: '0.05em', border: 'none', cursor: 'pointer', transition: 'all 0.15s', background: receiveForm.payment_method === m ? 'white' : 'var(--surface-container-low)', color: receiveForm.payment_method === m ? '#111' : 'var(--on-surface-variant)' }}>
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                  <button type="button" onClick={() => setReceiveModal({ open: false, payment: null })}
+                    style={{ flex: 1, padding: '0.875rem', borderRadius: '1rem', fontWeight: 700, fontSize: '0.8125rem', background: 'var(--surface-container-low)', border: 'none', cursor: 'pointer', color: 'var(--on-surface-variant)' }}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="primary-button" style={{ flex: 2 }} disabled={receiveSaving || isOver || entered <= 0}>
+                    {receiveSaving ? 'Processing...' : 'Receive Payment'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Bulk action toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="bulk-action-bar">
+          <span style={{ fontSize: '0.8125rem', fontWeight: 700, opacity: 0.8 }}>
+            {selectedIds.size} selected
+          </span>
+          <button className="primary-button" style={{ padding: '0.5rem 1.25rem', fontSize: '0.8125rem' }} onClick={handleBulkPaid} disabled={saving}>
+            <span className="material-symbols-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle', marginRight: '0.35rem' }}>check_circle</span>
+            Mark as Paid
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="btn-icon" style={{ color: 'var(--on-surface-variant)' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>close</span>
+          </button>
+        </div>
+      )}
+
       <header className="view-header">
         <p className="view-eyebrow">Financial Ledger</p>
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
@@ -147,19 +398,42 @@ const Payments: React.FC = () => {
 
       {/* Metrics Bar */}
       {payments.length > 0 && (
-        <div className="properties-metrics-bar custom-scrollbar">
-          <div className="prop-metric">
-            <span className="prop-metric-label">Gross Realized</span>
-            <span className="prop-metric-value" style={{ color: 'var(--primary)' }}>{currencySymbol}{stats.totalPaid.toLocaleString()}</span>
+        <div className="properties-metrics-bar custom-scrollbar" style={{ alignItems: 'center' }}>
+          {/* Period selector */}
+          <div className="prop-metric" style={{ borderRight: '1px solid var(--outline-variant)', paddingRight: '1.5rem' }}>
+            <span className="prop-metric-label" style={{ marginBottom: '0.5rem' }}>Period</span>
+            <div style={{ display: 'flex', gap: '0.25rem' }}>
+              {(['month', 'quarter', 'all'] as MetricPeriod[]).map(p => (
+                <button key={p} onClick={() => setMetricPeriod(p)} style={{
+                  padding: '0.3rem 0.625rem', borderRadius: '0.5rem', fontWeight: 700, fontSize: '0.6rem',
+                  textTransform: 'uppercase', letterSpacing: '0.05em', border: 'none', cursor: 'pointer',
+                  background: metricPeriod === p ? 'var(--primary)' : 'transparent',
+                  color: metricPeriod === p ? 'var(--on-primary)' : 'var(--on-surface-variant)',
+                  transition: 'all 0.15s',
+                }}>
+                  {p === 'month' ? 'Month' : p === 'quarter' ? 'QTD' : 'All'}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="prop-metric">
-            <span className="prop-metric-label">Settled (Cycle)</span>
-            <span className="prop-metric-value" style={{ color: 'var(--color-success)' }}>{currencySymbol}{stats.thisMonthPaid.toLocaleString()}</span>
+            <span className="prop-metric-label">Total Collected</span>
+            <span className="prop-metric-value" style={{ color: 'var(--primary)' }}>{currencySymbol}{stats.collected.toLocaleString()}</span>
           </div>
           <div className="prop-metric">
-            <span className="prop-metric-label">Outstanding (Cycle)</span>
-            <span className="prop-metric-value" style={{ color: 'var(--error)' }}>{currencySymbol}{stats.thisMonthPending.toLocaleString()}</span>
+            <span className="prop-metric-label">Settled ({periodLabel})</span>
+            <span className="prop-metric-value" style={{ color: 'var(--color-success)' }}>{currencySymbol}{stats.settled.toLocaleString()}</span>
           </div>
+          <div className="prop-metric">
+            <span className="prop-metric-label">Outstanding ({periodLabel})</span>
+            <span className="prop-metric-value" style={{ color: 'var(--error)' }}>{currencySymbol}{stats.outstanding.toLocaleString()}</span>
+          </div>
+          {stats.overdue > 0 && (
+            <div className="prop-metric">
+              <span className="prop-metric-label" style={{ color: 'var(--error)' }}>Overdue</span>
+              <span className="prop-metric-value" style={{ color: 'var(--error)' }}>{currencySymbol}{stats.overdue.toLocaleString()}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -167,16 +441,16 @@ const Payments: React.FC = () => {
       <div className="properties-toolbar">
         <div className="prop-search-wrapper">
           <span className="material-symbols-outlined search-icon">search</span>
-          <input 
-            type="text" 
-            placeholder="Search by payee entity, asset, or period..." 
+          <input
+            type="text"
+            placeholder="Search by payee entity, asset, or period..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="prop-search-input"
           />
         </div>
         <div className="filter-tabs-modern">
-          {(['All', 'Paid', 'Pending'] as FilterTab[]).map(tab => (
+          {(['All', 'Paid', 'Partial', 'Pending'] as FilterTab[]).map(tab => (
             <button key={tab} className={`tab-btn ${filter === tab ? 'active' : ''}`} onClick={() => setFilter(tab)}>
               {tab}
               {filter === tab && <div className="tab-indicator" />}
@@ -212,10 +486,12 @@ const Payments: React.FC = () => {
           </div>
         ) : (
           <>
+            {/* Desktop table */}
             <div className="modern-table-wrap desktop-only" style={{ background: 'var(--surface-container-lowest)', borderRadius: '2rem', border: 'none', boxShadow: 'var(--shadow-ambient)' }}>
               <table className="modern-table">
                 <thead>
                   <tr>
+                    {!isStaff && <th style={{ width: '2.5rem' }}></th>}
                     <th>Payee Entity</th>
                     <th>Asset Inventory</th>
                     <th>Service Period</th>
@@ -227,9 +503,27 @@ const Payments: React.FC = () => {
                 </thead>
                 <tbody>
                   {filtered.map(p => {
-                    const isHostel = !!p.bed_number;
+                    const isHostel  = !!p.bed_number;
+                    const overdue   = isOverdue(p);
+                    const months    = overdue ? monthsOverdue(p.month_for) : 0;
+                    const isChecked = selectedIds.has(p.id);
                     return (
-                      <tr key={p.id} onClick={() => navigate(`/payments/${p.id}`)} style={{ cursor: 'pointer' }}>
+                      <tr
+                        key={p.id}
+                        onClick={() => setSelectedId(p.id)}
+                        style={{ cursor: 'pointer', ...(overdue ? { borderLeft: '3px solid var(--error)' } : {}) }}
+                        className={overdue ? 'row-overdue' : ''}
+                      >
+                        {!isStaff && (
+                          <td onClick={e => toggleSelect(e, p.id)} style={{ width: '2.5rem', padding: '0 0.75rem' }}>
+                            <div style={{
+                              width: '1.125rem', height: '1.125rem', borderRadius: '0.375rem', border: `2px solid ${isChecked ? 'var(--primary)' : 'var(--outline-variant)'}`,
+                              background: isChecked ? 'var(--primary)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s',
+                            }}>
+                              {isChecked && <span className="material-symbols-outlined" style={{ fontSize: '0.75rem', color: 'var(--on-primary)', fontVariationSettings: '"wght" 700' }}>check</span>}
+                            </div>
+                          </td>
+                        )}
                         <td><span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{p.tenant_name}</span></td>
                         <td>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
@@ -237,8 +531,24 @@ const Payments: React.FC = () => {
                             <span style={{ fontSize: '0.75rem', opacity: 0.5, fontWeight: 600 }}>{isHostel ? `Shared · Bed ${p.bed_number}` : `Private · Unit ${p.unit_number}`}</span>
                           </div>
                         </td>
-                        <td><span style={{ fontSize: '0.875rem', fontWeight: 500 }}>{p.month_for}</span></td>
-                        <td style={{ fontWeight: 800, color: 'var(--primary)', fontFamily: 'var(--font-display)', fontSize: '1rem' }}>{currencySymbol}{p.amount.toLocaleString()}</td>
+                        <td>
+                          <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>{p.month_for}</span>
+                          {overdue && (
+                            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 800, color: 'var(--error)', marginTop: '0.15rem' }}>
+                              {months}mo overdue
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <div>
+                            <span style={{ fontWeight: 800, color: 'var(--primary)', fontFamily: 'var(--font-display)', fontSize: '1rem' }}>{currencySymbol}{p.amount.toLocaleString()}</span>
+                            {p.status === 'Partial' && (
+                              <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, color: '#fb923c', marginTop: '0.1rem' }}>
+                                of {currencySymbol}{p.rent_amount.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                             <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{p.payment_method || '—'}</span>
@@ -246,16 +556,21 @@ const Payments: React.FC = () => {
                           </div>
                         </td>
                         <td>
-                          <span className={`badge-modern ${p.status === 'Paid' ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.55rem' }}>{p.status}</span>
+                          <span className={`badge-modern ${p.status === 'Paid' ? 'badge-success' : p.status === 'Partial' ? 'badge-partial' : 'badge-warning'}`}>{p.status}</span>
                         </td>
                         <td style={{ textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                            {!isStaff && (p.status === 'Pending' || p.status === 'Partial') && (
+                              <button className="btn-icon" onClick={(e) => { e.stopPropagation(); openReceiveModal(p); }} title="Receive Payment" style={{ color: 'var(--primary)' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>payments</span>
+                              </button>
+                            )}
                             {!isStaff && (
                               <button className="btn-icon danger" onClick={(e) => handleDelete(e, p.id)} title="Delete Record" style={{ color: 'var(--error)' }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span>
                               </button>
                             )}
-                            <span className="material-symbols-outlined opacity-20 group-hover:opacity-100 transition-opacity" style={{ fontSize: '1.25rem' }}>arrow_forward_ios</span>
+                            <span className="material-symbols-outlined opacity-20" style={{ fontSize: '1.25rem' }}>arrow_forward_ios</span>
                           </div>
                         </td>
                       </tr>
@@ -265,39 +580,52 @@ const Payments: React.FC = () => {
               </table>
             </div>
 
+            {/* Mobile cards */}
             <div className="mobile-only flex flex-col gap-5">
-              {filtered.map(p => (
-                <div key={p.id} className="modern-card glass-panel" style={{ padding: '1.5rem', cursor: 'pointer' }} onClick={() => navigate(`/payments/${p.id}`)}>
-                  <div className="flex justify-between items-start mb-6">
-                    <div>
-                      <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 800 }}>{p.tenant_name}</h3>
-                      <div style={{ fontSize: '0.8125rem', opacity: 0.6, fontWeight: 700, color: 'var(--primary)' }}>{p.month_for}</div>
+              {filtered.map(p => {
+                const overdue = isOverdue(p);
+                const months  = overdue ? monthsOverdue(p.month_for) : 0;
+                return (
+                  <div key={p.id} className="modern-card glass-panel" style={{ padding: '1.5rem', cursor: 'pointer', ...(overdue ? { borderLeft: '3px solid var(--error)' } : {}) }} onClick={() => setSelectedId(p.id)}>
+                    <div className="flex justify-between items-start mb-6">
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 800 }}>{p.tenant_name}</h3>
+                        <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: overdue ? 'var(--error)' : 'var(--primary)', opacity: overdue ? 1 : 0.6 }}>
+                          {p.month_for}{overdue ? ` · ${months}mo overdue` : ''}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        {!isStaff && (p.status === 'Pending' || p.status === 'Partial') && (
+                          <button className="btn-icon" onClick={(e) => { e.stopPropagation(); openReceiveModal(p); }} style={{ padding: '0.4rem', color: 'var(--primary)' }} title="Receive Payment">
+                            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>payments</span>
+                          </button>
+                        )}
+                        {!isStaff && (
+                          <button className="btn-icon danger" onClick={(e) => handleDelete(e, p.id)} style={{ padding: '0.4rem', color: 'var(--error)' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span>
+                          </button>
+                        )}
+                        <span className={`badge-modern ${p.status === 'Paid' ? 'badge-success' : p.status === 'Partial' ? 'badge-partial' : 'badge-warning'}`}>{p.status}</span>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      {!isStaff && (
-                        <button className="btn-icon danger" onClick={(e) => handleDelete(e, p.id)} style={{ padding: '0.4rem', color: 'var(--error)' }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span>
-                        </button>
-                      )}
-                      <span className={`badge-modern ${p.status === 'Paid' ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.55rem' }}>{p.status}</span>
+                    <div className="grid grid-cols-2 gap-6 mb-6">
+                      <div>
+                        <div style={{ fontSize: '0.625rem', textTransform: 'uppercase', fontWeight: 800, opacity: 0.4, letterSpacing: '0.1em', marginBottom: '0.25rem' }}>Received</div>
+                        <div style={{ fontWeight: 900, fontSize: '1.25rem', color: 'var(--on-surface)', fontFamily: 'var(--font-display)' }}>{currencySymbol}{p.amount.toLocaleString()}</div>
+                        {p.status === 'Partial' && <div style={{ fontSize: '0.65rem', color: '#fb923c', fontWeight: 700 }}>of {currencySymbol}{p.rent_amount.toLocaleString()}</div>}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.625rem', textTransform: 'uppercase', fontWeight: 800, opacity: 0.4, letterSpacing: '0.1em', marginBottom: '0.25rem' }}>Channel</div>
+                        <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{p.payment_method || 'Unset'}</div>
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t border-white/5 flex justify-between items-center">
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Receipted: {p.payment_date || 'N/A'}</span>
+                      <span className="material-symbols-outlined opacity-40" style={{ fontSize: '1.125rem' }}>arrow_forward_ios</span>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-6 mb-6">
-                    <div>
-                      <div style={{ fontSize: '0.625rem', textTransform: 'uppercase', fontWeight: 800, opacity: 0.4, letterSpacing: '0.1em', marginBottom: '0.25rem' }}>Value Received</div>
-                      <div style={{ fontWeight: 900, fontSize: '1.25rem', color: 'var(--on-surface)', fontFamily: 'var(--font-display)' }}>{currencySymbol}{p.amount.toLocaleString()}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.625rem', textTransform: 'uppercase', fontWeight: 800, opacity: 0.4, letterSpacing: '0.1em', marginBottom: '0.25rem' }}>Channel</div>
-                      <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{p.payment_method || 'Unset'}</div>
-                    </div>
-                  </div>
-                  <div className="pt-4 border-t border-white/5 flex justify-between items-center">
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Receipted: {p.payment_date || 'N/A'}</span>
-                    <span className="material-symbols-outlined opacity-40" style={{ fontSize: '1.125rem' }}>arrow_forward_ios</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}

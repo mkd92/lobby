@@ -10,7 +10,7 @@ const AddCustomer: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState({ full_name: '', email: '', phone: '' });
+  const [formData, setFormData] = useState({ full_name: '', email: '', phone: '', aadhar_number: '', aadhar_drive_link: '' });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -66,6 +66,17 @@ const AddCustomer: React.FC = () => {
             <div className="form-group-modern">
               <label>Primary Phone Number</label>
               <input name="phone" type="tel" placeholder="+1 (555) 000-0000" value={formData.phone} onChange={handleChange} />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            <div className="form-group-modern">
+              <label>Aadhaar Number</label>
+              <input name="aadhar_number" type="text" placeholder="XXXX XXXX XXXX" maxLength={14} value={formData.aadhar_number} onChange={handleChange} />
+            </div>
+            <div className="form-group-modern">
+              <label>Aadhaar PDF (Drive Link)</label>
+              <input name="aadhar_drive_link" type="url" placeholder="https://drive.google.com/..." value={formData.aadhar_drive_link} onChange={handleChange} />
             </div>
           </div>
 
