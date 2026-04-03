@@ -38,7 +38,7 @@ const PaymentDetail: React.FC = () => {
     payment_date: '',
     month_for: '',
     payment_method: 'Cash',
-    status: 'Paid' as 'Paid' | 'Pending',
+    status: 'Paid' as 'Paid' | 'Partial' | 'Pending',
   });
   const [saving, setSaving] = useState(false);
   const [currencySymbol, setCurrencySymbol] = useState('$');

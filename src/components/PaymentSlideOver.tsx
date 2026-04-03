@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  doc, getDoc, updateDoc, addDoc, collection, getDocs, query, orderBy, serverTimestamp,
+  doc, getDoc, updateDoc, collection, getDocs, query, orderBy, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
