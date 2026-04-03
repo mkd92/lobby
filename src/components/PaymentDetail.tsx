@@ -78,7 +78,7 @@ const PaymentDetail: React.FC = () => {
     if (isStaff) return;
     setSaving(true);
     try {
-      if (form.payment_date) localStorage.setItem('lastPaymentDate', form.payment_date);
+      if (form.payment_date && !payment?.payment_date) localStorage.setItem('lastPaymentDate', form.payment_date);
       await updateDoc(doc(db, 'payments', id!), {
         amount: parseFloat(form.amount),
         payment_date: form.payment_date,
