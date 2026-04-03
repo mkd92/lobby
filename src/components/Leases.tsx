@@ -196,6 +196,9 @@ const Leases: React.FC = () => {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const expiredRef = useRef(false);
+  // Intermediate selectors (not stored in lease — used to drive dependent dropdowns)
+  const [propertyId, setPropertyId] = useState('');   // drives units query
+  const [roomId, setRoomId] = useState('');            // drives beds query
 
   useEscapeKey(() => closeModal(), isModalOpen);
 
@@ -259,13 +262,13 @@ const Leases: React.FC = () => {
   });
 
   const { data: units = [] } = useQuery({
-    queryKey: ['units', ownerId, form.unit_id],
+    queryKey: ['units', ownerId, propertyId],
     queryFn: async () => {
-      const q = query(collection(db, 'units'), where('property_id', '==', form.unit_id), where('status', '==', 'Vacant'));
+      const q = query(collection(db, 'units'), where('property_id', '==', propertyId), where('status', '==', 'Vacant'));
       const snap = await getDocs(q);
       return snap.docs.map(d => ({ id: d.id, ...d.data() } as Unit));
     },
-    enabled: isModalOpen && leaseType === 'property' && !!form.unit_id,
+    enabled: isModalOpen && leaseType === 'property' && !!propertyId,
   });
 
   const { data: hostels = [] } = useQuery({
@@ -287,12 +290,12 @@ const Leases: React.FC = () => {
   });
 
   const { data: beds = [] } = useQuery({
-    queryKey: ['beds', ownerId, form.bed_id],
+    queryKey: ['beds', ownerId, roomId],
     queryFn: async () => {
-      const snap = await getDocs(query(collection(db, 'beds'), where('room_id', '==', form.bed_id), where('status', '==', 'Vacant')));
+      const snap = await getDocs(query(collection(db, 'beds'), where('room_id', '==', roomId), where('status', '==', 'Vacant')));
       return snap.docs.map(d => ({ id: d.id, ...d.data() } as Bed));
     },
-    enabled: isModalOpen && leaseType === 'hostel' && !!form.bed_id,
+    enabled: isModalOpen && leaseType === 'hostel' && !!roomId,
   });
 
   // ── Modal Actions ──────────────────────────────────────────────────
@@ -305,6 +308,8 @@ const Leases: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setForm(EMPTY_FORM);
+    setPropertyId('');
+    setRoomId('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -337,16 +342,43 @@ const Leases: React.FC = () => {
         batch.update(doc(db, 'units', form.unit_id), { status: 'Occupied' });
       } else {
         const bed = beds.find(b => b.id === form.bed_id);
-        const room = rooms.find(r => r.id === form.bed_id);
+        const room = rooms.find(r => r.id === roomId);
         payload.bed_id = form.bed_id;
         payload.bed_number = bed?.bed_number || '';
         payload.room_number = room?.room_number || '';
         payload.hostel_name = hostels.find(h => h.id === form.unit_id)?.name || '';
+        payload.unit_id = null;
+        payload.unit_number = null;
+        payload.property_name = null;
         batch.update(doc(db, 'beds', form.bed_id), { status: 'Occupied' });
       }
 
       payload.created_at = serverTimestamp();
-      batch.set(doc(collection(db, 'leases')), payload);
+      const leaseRef = doc(collection(db, 'leases'));
+      batch.set(leaseRef, payload);
+
+      // Create first-month payment record if first_month_rent is provided
+      if (form.first_month_rent) {
+        const firstMonthDate = new Date(form.start_date);
+        const monthFor = firstMonthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        batch.set(doc(collection(db, 'payments')), {
+          owner_id: ownerId,
+          lease_id: leaseRef.id,
+          tenant_name: payload.tenant_name,
+          unit_number: payload.unit_number || null,
+          property_name: payload.property_name || null,
+          bed_number: payload.bed_number || null,
+          room_number: payload.room_number || null,
+          hostel_name: payload.hostel_name || null,
+          rent_amount: payload.rent_amount,
+          amount: parseFloat(form.first_month_rent),
+          payment_date: form.start_date,
+          month_for: monthFor,
+          payment_method: null,
+          status: 'Pending',
+          created_at: serverTimestamp(),
+        });
+      }
 
       await batch.commit();
       invalidateLeases();
@@ -603,10 +635,119 @@ const Leases: React.FC = () => {
               </div>
               
               <div className="flex flex-col gap-6">
+
+                {/* Tenant */}
                 <div className="form-group-modern">
                   <label>Primary Legal Entity</label>
-                  <CustomSelect options={tenants.map(t => ({ value: t.id, label: t.full_name, sub: t.phone || t.email }))} value={form.tenant_id} onChange={v => setForm({...form, tenant_id: v})} placeholder="Search or select legal entity..." searchable />
+                  <CustomSelect
+                    options={tenants.map(t => ({ value: t.id, label: t.full_name, sub: t.phone || t.email }))}
+                    value={form.tenant_id}
+                    onChange={v => setForm({...form, tenant_id: v})}
+                    placeholder="Search or select tenant..."
+                    searchable
+                  />
                 </div>
+
+                {/* Property type: Property → Unit */}
+                {leaseType === 'property' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="form-group-modern">
+                      <label>Property</label>
+                      <CustomSelect
+                        options={properties.map(p => ({ value: p.id, label: p.name }))}
+                        value={propertyId}
+                        onChange={v => { setPropertyId(v); setForm({...form, unit_id: '', rent_amount: ''}); }}
+                        placeholder="Select property..."
+                      />
+                    </div>
+                    <div className="form-group-modern">
+                      <label>Vacant Unit</label>
+                      <CustomSelect
+                        options={units.map(u => ({ value: u.id, label: `Unit ${u.unit_number}`, sub: u.base_rent ? `${currencySymbol}${u.base_rent.toLocaleString()}/mo` : undefined }))}
+                        value={form.unit_id}
+                        onChange={v => {
+                          const u = units.find(u => u.id === v);
+                          setForm({...form, unit_id: v, rent_amount: u?.base_rent ? String(u.base_rent) : form.rent_amount});
+                        }}
+                        placeholder={propertyId ? 'Select unit...' : 'Select property first'}
+                        disabled={!propertyId}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Hostel type: Hostel → Room → Bed */}
+                {leaseType === 'hostel' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                    <div className="form-group-modern">
+                      <label>Hostel</label>
+                      <CustomSelect
+                        options={hostels.map(h => ({ value: h.id, label: h.name }))}
+                        value={form.unit_id}
+                        onChange={v => { setForm({...form, unit_id: v, bed_id: '', rent_amount: ''}); setRoomId(''); }}
+                        placeholder="Select hostel..."
+                      />
+                    </div>
+                    <div className="form-group-modern">
+                      <label>Room</label>
+                      <CustomSelect
+                        options={rooms.map(r => ({ value: r.id, label: `Room ${r.room_number}` }))}
+                        value={roomId}
+                        onChange={v => { setRoomId(v); setForm({...form, bed_id: ''}); }}
+                        placeholder={form.unit_id ? 'Select room...' : 'Select hostel first'}
+                        disabled={!form.unit_id}
+                      />
+                    </div>
+                    <div className="form-group-modern">
+                      <label>Vacant Bed</label>
+                      <CustomSelect
+                        options={beds.map(b => ({ value: b.id, label: `Bed ${b.bed_number}`, sub: b.price ? `${currencySymbol}${b.price.toLocaleString()}/mo` : undefined }))}
+                        value={form.bed_id}
+                        onChange={v => {
+                          const b = beds.find(b => b.id === v);
+                          setForm({...form, bed_id: v, rent_amount: b?.price ? String(b.price) : form.rent_amount});
+                        }}
+                        placeholder={roomId ? 'Select bed...' : 'Select room first'}
+                        disabled={!roomId}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Financials */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group-modern">
+                    <label>Monthly Rent ({currencySymbol})</label>
+                    <input type="number" step="0.01" placeholder="0.00" value={form.rent_amount} onChange={e => setForm({...form, rent_amount: e.target.value})} required />
+                  </div>
+                  <div className="form-group-modern">
+                    <label>First Month Rent ({currencySymbol})</label>
+                    <input type="number" step="0.01" placeholder="Optional" value={form.first_month_rent} onChange={e => setForm({...form, first_month_rent: e.target.value})} />
+                  </div>
+                  <div className="form-group-modern">
+                    <label>Security Deposit ({currencySymbol})</label>
+                    <input type="number" step="0.01" placeholder="Optional" value={form.security_deposit} onChange={e => setForm({...form, security_deposit: e.target.value})} />
+                  </div>
+                </div>
+
+                {/* Dates */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group-modern">
+                    <label>Start Date</label>
+                    <input type="date" value={form.start_date} onChange={e => setForm({...form, start_date: e.target.value})} required />
+                  </div>
+                  <div className="form-group-modern">
+                    <label>End Date <span style={{ opacity: 0.4, fontWeight: 500 }}>(optional)</span></label>
+                    <input type="date" value={form.end_date} onChange={e => setForm({...form, end_date: e.target.value})} />
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div className="form-group-modern">
+                  <label>Notes <span style={{ opacity: 0.4, fontWeight: 500 }}>(optional)</span></label>
+                  <input type="text" placeholder="Special terms, conditions..." value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
+                </div>
+
               </div>
 
               <footer className="flex justify-end gap-4 mt-8 pt-6 border-t border-white/5">
