@@ -10,14 +10,18 @@ const PullToRefresh: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const refreshingRef = useRef(false);
 
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const trigger = useCallback(async () => {
     refreshingRef.current = true;
     setRefreshing(true);
     setPullDistance(0);
     await queryClient.invalidateQueries();
-    setTimeout(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
       refreshingRef.current = false;
       setRefreshing(false);
+      timeoutRef.current = null;
     }, 700);
   }, [queryClient]);
 

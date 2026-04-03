@@ -38,11 +38,10 @@ const updateSW = registerSW({
   },
   onRegisteredSW(_swUrl, r) {
     if (r) {
-      // Periodic update check every 30 mins
-      setInterval(() => {
-        console.log('Checking for updates...');
-        r.update();
-      }, 30 * 60 * 1000);
+      // Check for updates when user returns to the tab instead of polling
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') r.update();
+      });
     }
   }
 })

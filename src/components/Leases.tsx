@@ -195,40 +195,45 @@ const Leases: React.FC = () => {
   const [leaseType, setLeaseType] = useState<LeaseType>('property');
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [currencySymbol, setCurrencySymbol] = useState('$');
+  const expiredRef = useRef(false);
 
   useEscapeKey(() => closeModal(), isModalOpen);
 
   const invalidateLeases = () => queryClient.invalidateQueries({ queryKey: ['leases', ownerId] });
 
   // ── Data Fetching ──────────────────────────────────────────────────
+  const { data: ownerProfile } = useQuery({
+    queryKey: ['owner-profile', ownerId],
+    queryFn: async () => { const s = await getDoc(doc(db, 'owners', ownerId!)); return s.data(); },
+    enabled: !!ownerId,
+  });
+  const SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
+  const currencySymbol = SYMBOLS[ownerProfile?.currency] || '$';
+
   const { data: leases = [], isLoading } = useQuery({
     queryKey: ['leases', ownerId],
     queryFn: async () => {
       const snap = await getDocs(query(collection(db, 'leases'), where('owner_id', '==', ownerId)));
-      const ownerSnap = await getDoc(doc(db, 'owners', ownerId!));
-      const ownerData = ownerSnap.data();
-      const curr = ownerData?.currency || 'USD';
-      const symbols: any = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
-      setCurrencySymbol(symbols[curr] || '$');
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
       const allLeases = snap.docs.map(d => ({ id: d.id, ...d.data() } as Lease));
 
-      // Auto-expire leases whose end_date has passed and free up the unit/bed
-      const expiredBatch = writeBatch(db);
-      let hasExpired = false;
-      for (const lease of allLeases) {
-        if (lease.status === 'Active' && lease.end_date && new Date(lease.end_date) < today) {
-          expiredBatch.update(doc(db, 'leases', lease.id), { status: 'Expired' });
-          if (lease.unit_id) expiredBatch.update(doc(db, 'units', lease.unit_id), { status: 'Vacant' });
-          if (lease.bed_id)  expiredBatch.update(doc(db, 'beds',  lease.bed_id),  { status: 'Vacant' });
-          lease.status = 'Expired';
-          hasExpired = true;
+      // Auto-expire once per session (not on every background refetch)
+      if (!expiredRef.current) {
+        expiredRef.current = true;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const expiredBatch = writeBatch(db);
+        let hasExpired = false;
+        for (const lease of allLeases) {
+          if (lease.status === 'Active' && lease.end_date && new Date(lease.end_date) < today) {
+            expiredBatch.update(doc(db, 'leases', lease.id), { status: 'Expired' });
+            if (lease.unit_id) expiredBatch.update(doc(db, 'units', lease.unit_id), { status: 'Vacant' });
+            if (lease.bed_id)  expiredBatch.update(doc(db, 'beds',  lease.bed_id),  { status: 'Vacant' });
+            lease.status = 'Expired';
+            hasExpired = true;
+          }
         }
+        if (hasExpired) await expiredBatch.commit();
       }
-      if (hasExpired) await expiredBatch.commit();
 
       return allLeases.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
     },

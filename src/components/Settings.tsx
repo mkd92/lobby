@@ -34,7 +34,10 @@ const Settings: React.FC = () => {
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const messageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW();
+
+  useEffect(() => () => { if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current); }, []);
 
   const [staffEmail, setStaffEmail] = useState('');
   const [addingStaff, setAddingStaff] = useState(false);
@@ -87,7 +90,8 @@ const Settings: React.FC = () => {
       await updateDoc(doc(db, 'owners', ownerId!), profile);
       queryClient.invalidateQueries({ queryKey: ['owner-profile', ownerId] });
       setMessage({ text: 'System parameters synchronized.', type: 'success' });
-      setTimeout(() => setMessage(null), 3000);
+      if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+      messageTimeoutRef.current = setTimeout(() => setMessage(null), 3000);
     } catch (err) {
       setMessage({ text: (err as Error).message, type: 'error' });
     } finally {

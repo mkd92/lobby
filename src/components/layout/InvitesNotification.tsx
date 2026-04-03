@@ -21,7 +21,8 @@ export const InvitesNotification: React.FC = () => {
   const handleAccept = async (inviteId: string) => {
     try {
       await updateDoc(doc(db, 'staff', inviteId), { status: 'active' });
-      queryClient.invalidateQueries(); // Refresh everything
+      queryClient.invalidateQueries({ queryKey: ['pending-invites'] });
+      queryClient.invalidateQueries({ queryKey: ['staff-list'] });
       refetch();
     } catch (err) {
       console.error('Failed to accept invite:', err);

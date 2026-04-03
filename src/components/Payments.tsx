@@ -45,17 +45,18 @@ const Payments: React.FC = () => {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortOption>('date_desc');
   const [saving, setSaving] = useState(false);
-  const [currencySymbol, setCurrencySymbol] = useState('$');
+
+  const { data: ownerProfile } = useQuery({
+    queryKey: ['owner-profile', ownerId],
+    queryFn: async () => { const s = await getDoc(doc(db, 'owners', ownerId!)); return s.data(); },
+    enabled: !!ownerId,
+  });
+  const SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
+  const currencySymbol = SYMBOLS[ownerProfile?.currency] || '$';
 
   const { data: payments = [], isLoading } = useQuery({
     queryKey: ['payments', ownerId],
     queryFn: async () => {
-      const ownerSnap = await getDoc(doc(db, 'owners', ownerId!));
-      const ownerData = ownerSnap.data();
-      const curr = ownerData?.currency || 'USD';
-      const symbols: any = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
-      setCurrencySymbol(symbols[curr] || '$');
-
       const snap = await getDocs(query(collection(db, 'payments'), where('owner_id', '==', ownerId)));
       return snap.docs.map(d => ({ id: d.id, ...d.data() } as Payment))
         .sort((a, b) => b.month_for.localeCompare(a.month_for) || b.payment_date.localeCompare(a.payment_date));
