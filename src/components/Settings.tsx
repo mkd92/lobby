@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
+import { useRegisterSW } from 'virtual:pwa-register/react';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { auth, db } from '../firebaseClient';
@@ -33,6 +34,7 @@ const Settings: React.FC = () => {
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW();
 
   const [staffEmail, setStaffEmail] = useState('');
   const [addingStaff, setAddingStaff] = useState(false);
@@ -320,6 +322,21 @@ const Settings: React.FC = () => {
                 {theme === 'dark' && <span className="material-symbols-outlined">check_circle</span>}
               </button>
             </div>
+          </div>
+
+          {/* App Update */}
+          <div className="glass-panel p-10 rounded-[40px]">
+            <h3 className="view-eyebrow text-[0.625rem] opacity-40 mb-8 text-on-surface-variant">Application Build</h3>
+            <p className="text-on-surface-variant opacity-50 text-[0.7rem] font-medium mb-6 leading-relaxed">
+              Built {new Date(__BUILD_TIME__).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+            </p>
+            <button
+              onClick={() => needRefresh ? updateServiceWorker(true) : navigator.serviceWorker?.getRegistration().then(r => r?.update())}
+              className={`w-full py-3 rounded-2xl font-black uppercase tracking-[0.15em] text-[0.62rem] flex items-center justify-center gap-2 transition-all ${needRefresh ? 'bg-primary text-on-primary hover:opacity-90 shadow-lg shadow-primary/20' : 'bg-surface-container-low text-on-surface-variant opacity-60 hover:opacity-100'}`}
+            >
+              <span className="material-symbols-outlined text-sm">{needRefresh ? 'system_update' : 'check_circle'}</span>
+              {needRefresh ? 'Update Available — Install' : 'Check for Update'}
+            </button>
           </div>
 
           {/* Session Management */}
