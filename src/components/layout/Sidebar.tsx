@@ -105,6 +105,16 @@ export const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boole
           <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>payments</span>
           {!isCollapsed && <span style={{ fontWeight: 700 }}>Financial Ledger</span>}
         </Link>
+        <Link
+          to="/reports"
+          className={`nav-item ${isActive('/reports') ? 'active' : ''}`}
+          title="Reports"
+          onMouseEnter={() => prefetch('reports')}
+          style={{ padding: '1rem 1.25rem', borderRadius: '1.25rem' }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>assessment</span>
+          {!isCollapsed && <span style={{ fontWeight: 700 }}>Reports</span>}
+        </Link>
 
         <div style={{ marginTop: 'auto' }}>
           {!isCollapsed && <div className="nav-section-label" style={{ opacity: 0.3 }}>System</div>}
