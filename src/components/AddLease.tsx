@@ -100,7 +100,8 @@ const AddLease: React.FC = () => {
     enabled: !!ownerId && leaseType === 'hostel',
   });
 
-  const { data: rooms = [] } = useQuery({
+  // Fetch rooms for the selected hostel, then filter to only rooms with vacant beds
+  const { data: allRooms = [] } = useQuery({
     queryKey: ['rooms', form.unit_id],
     queryFn: async () => {
       const snap = await getDocs(query(collection(db, 'rooms'), where('hostel_id', '==', form.unit_id)));
@@ -108,6 +109,22 @@ const AddLease: React.FC = () => {
     },
     enabled: !!form.unit_id && leaseType === 'hostel',
   });
+
+  // IDs of rooms that have at least one vacant bed
+  const { data: vacantRoomIds = [] } = useQuery({
+    queryKey: ['vacant-room-ids', form.unit_id],
+    queryFn: async () => {
+      const snap = await getDocs(query(
+        collection(db, 'beds'),
+        where('hostel_id', '==', form.unit_id),
+        where('status', '==', 'Vacant'),
+      ));
+      return [...new Set(snap.docs.map(d => d.data().room_id as string))];
+    },
+    enabled: !!form.unit_id && leaseType === 'hostel',
+  });
+
+  const rooms = allRooms.filter(r => vacantRoomIds.includes(r.id));
 
   const { data: beds = [] } = useQuery({
     queryKey: ['beds-vacant', roomId],
@@ -234,11 +251,25 @@ const AddLease: React.FC = () => {
     cursor: 'pointer',
     appearance: 'none',
     WebkitAppearance: 'none',
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: 'right 1rem center',
     paddingRight: '2.75rem',
   };
+
+  // Wraps a <select> with a styled container + Material chevron icon
+  const SelectWrap: React.FC<{ children: React.ReactNode; disabled?: boolean }> = ({ children, disabled }) => (
+    <div style={{ position: 'relative', opacity: disabled ? 0.45 : 1 }}>
+      {children}
+      <span
+        className="material-symbols-outlined"
+        style={{
+          position: 'absolute', right: '0.875rem', top: '50%',
+          transform: 'translateY(-50%)', pointerEvents: 'none',
+          fontSize: '1.25rem', color: 'var(--on-surface-variant)', opacity: 0.55,
+        }}
+      >
+        expand_more
+      </span>
+    </div>
+  );
 
   const sectionDivider = (label: string) => (
     <div style={{
@@ -305,17 +336,19 @@ const AddLease: React.FC = () => {
           <div>
             {sectionDivider('Tenant')}
             <label style={labelCls}>Select Tenant *</label>
-            <select
-              required
-              value={form.tenant_id}
-              onChange={e => set('tenant_id', e.target.value)}
-              style={selectCls}
-            >
-              <option value="">— choose tenant —</option>
-              {tenants.map(t => (
-                <option key={t.id} value={t.id}>{t.full_name}{t.phone ? ` · ${t.phone}` : ''}</option>
-              ))}
-            </select>
+            <SelectWrap>
+              <select
+                required
+                value={form.tenant_id}
+                onChange={e => set('tenant_id', e.target.value)}
+                style={selectCls}
+              >
+                <option value="">— choose tenant —</option>
+                {tenants.map(t => (
+                  <option key={t.id} value={t.id}>{t.full_name}{t.phone ? ` · ${t.phone}` : ''}</option>
+                ))}
+              </select>
+            </SelectWrap>
           </div>
 
           {/* ── Asset ── */}
@@ -325,36 +358,40 @@ const AddLease: React.FC = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                 <div>
                   <label style={labelCls}>Property *</label>
-                  <select
-                    required
-                    value={propertyId}
-                    onChange={e => { setPropertyId(e.target.value); set('unit_id', ''); set('rent_amount', ''); }}
-                    style={selectCls}
-                  >
-                    <option value="">— choose property —</option>
-                    {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
+                  <SelectWrap>
+                    <select
+                      required
+                      value={propertyId}
+                      onChange={e => { setPropertyId(e.target.value); set('unit_id', ''); set('rent_amount', ''); }}
+                      style={selectCls}
+                    >
+                      <option value="">— choose property —</option>
+                      {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </SelectWrap>
                 </div>
                 <div>
                   <label style={labelCls}>Vacant Unit *</label>
-                  <select
-                    required
-                    value={form.unit_id}
-                    disabled={!propertyId}
-                    onChange={e => {
-                      const u = units.find(u => u.id === e.target.value);
-                      set('unit_id', e.target.value);
-                      if (u?.base_rent) set('rent_amount', String(u.base_rent));
-                    }}
-                    style={{ ...selectCls, opacity: !propertyId ? 0.4 : 1 }}
-                  >
-                    <option value="">{propertyId ? '— choose unit —' : 'Select property first'}</option>
-                    {units.map(u => (
-                      <option key={u.id} value={u.id}>
-                        Unit {u.unit_number}{u.base_rent ? ` — ${sym}${u.base_rent.toLocaleString()}/mo` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <SelectWrap disabled={!propertyId}>
+                    <select
+                      required
+                      value={form.unit_id}
+                      disabled={!propertyId}
+                      onChange={e => {
+                        const u = units.find(u => u.id === e.target.value);
+                        set('unit_id', e.target.value);
+                        if (u?.base_rent) set('rent_amount', String(u.base_rent));
+                      }}
+                      style={selectCls}
+                    >
+                      <option value="">{propertyId ? '— choose unit —' : 'Select property first'}</option>
+                      {units.map(u => (
+                        <option key={u.id} value={u.id}>
+                          Unit {u.unit_number}{u.base_rent ? ` — ${sym}${u.base_rent.toLocaleString()}/mo` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </SelectWrap>
                 </div>
               </div>
             </div>
@@ -364,49 +401,55 @@ const AddLease: React.FC = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem' }}>
                 <div>
                   <label style={labelCls}>Hostel *</label>
-                  <select
-                    required
-                    value={form.unit_id}
-                    onChange={e => { set('unit_id', e.target.value); set('bed_id', ''); set('rent_amount', ''); setRoomId(''); }}
-                    style={selectCls}
-                  >
-                    <option value="">— choose hostel —</option>
-                    {hostels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-                  </select>
+                  <SelectWrap>
+                    <select
+                      required
+                      value={form.unit_id}
+                      onChange={e => { set('unit_id', e.target.value); set('bed_id', ''); set('rent_amount', ''); setRoomId(''); }}
+                      style={selectCls}
+                    >
+                      <option value="">— choose hostel —</option>
+                      {hostels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                    </select>
+                  </SelectWrap>
                 </div>
                 <div>
-                  <label style={labelCls}>Room *</label>
-                  <select
-                    required
-                    value={roomId}
-                    disabled={!form.unit_id}
-                    onChange={e => { setRoomId(e.target.value); set('bed_id', ''); }}
-                    style={{ ...selectCls, opacity: !form.unit_id ? 0.4 : 1 }}
-                  >
-                    <option value="">{form.unit_id ? '— choose room —' : 'Select hostel first'}</option>
-                    {rooms.map(r => <option key={r.id} value={r.id}>Room {r.room_number}</option>)}
-                  </select>
+                  <label style={labelCls}>Room (vacant beds only) *</label>
+                  <SelectWrap disabled={!form.unit_id}>
+                    <select
+                      required
+                      value={roomId}
+                      disabled={!form.unit_id}
+                      onChange={e => { setRoomId(e.target.value); set('bed_id', ''); }}
+                      style={selectCls}
+                    >
+                      <option value="">{form.unit_id ? '— choose room —' : 'Select hostel first'}</option>
+                      {rooms.map(r => <option key={r.id} value={r.id}>Room {r.room_number}</option>)}
+                    </select>
+                  </SelectWrap>
                 </div>
                 <div>
                   <label style={labelCls}>Vacant Bed *</label>
-                  <select
-                    required
-                    value={form.bed_id}
-                    disabled={!roomId}
-                    onChange={e => {
-                      const b = beds.find(b => b.id === e.target.value);
-                      set('bed_id', e.target.value);
-                      if (b?.price) set('rent_amount', String(b.price));
-                    }}
-                    style={{ ...selectCls, opacity: !roomId ? 0.4 : 1 }}
-                  >
-                    <option value="">{roomId ? '— choose bed —' : 'Select room first'}</option>
-                    {beds.map(b => (
-                      <option key={b.id} value={b.id}>
-                        Bed {b.bed_number}{b.price ? ` — ${sym}${b.price.toLocaleString()}/mo` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <SelectWrap disabled={!roomId}>
+                    <select
+                      required
+                      value={form.bed_id}
+                      disabled={!roomId}
+                      onChange={e => {
+                        const b = beds.find(b => b.id === e.target.value);
+                        set('bed_id', e.target.value);
+                        if (b?.price) set('rent_amount', String(b.price));
+                      }}
+                      style={selectCls}
+                    >
+                      <option value="">{roomId ? '— choose bed —' : 'Select room first'}</option>
+                      {beds.map(b => (
+                        <option key={b.id} value={b.id}>
+                          Bed {b.bed_number}{b.price ? ` — ${sym}${b.price.toLocaleString()}/mo` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </SelectWrap>
                 </div>
               </div>
             </div>
