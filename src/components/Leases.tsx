@@ -623,12 +623,18 @@ const Leases: React.FC = () => {
 
       {isModalOpen && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && closeModal()}>
-          <div className="modal-content-modern" style={{ maxWidth: '680px' }}>
+          <div className="modal-content-modern">
             <header className="modal-header-modern">
-              <h2 className="modal-title">Executive Agreement</h2>
-              <p className="modal-subtitle">Establish legal terms and financial obligations for this entity</p>
+              <div>
+                <h2 className="modal-title">Executive Agreement</h2>
+                <p className="modal-subtitle">Establish legal terms and financial obligations for this entity</p>
+              </div>
+              <button className="modal-close-btn" type="button" onClick={closeModal}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>close</span>
+              </button>
             </header>
-            <form onSubmit={handleSubmit} className="modal-form-modern">
+            <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
+            <div className="modal-form-modern">
               <div className="lease-type-toggle" style={{ display: 'flex', gap: '0.5rem', background: 'var(--surface-container-low)', padding: '0.4rem', borderRadius: '1.25rem', marginBottom: '1.5rem' }}>
                 <button type="button" className={`toggle-btn ${leaseType === 'property' ? 'active' : ''}`} onClick={() => setLeaseType('property')} style={{ flex: 1, border: 'none', padding: '0.875rem', borderRadius: '1rem', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer', background: leaseType === 'property' ? 'var(--surface-container-highest)' : 'transparent', color: leaseType === 'property' ? 'white' : 'var(--on-surface-variant)', transition: '0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}>Private Asset</button>
                 <button type="button" className={`toggle-btn ${leaseType === 'hostel' ? 'active' : ''}`} onClick={() => setLeaseType('hostel')} style={{ flex: 1, border: 'none', padding: '0.875rem', borderRadius: '1rem', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer', background: leaseType === 'hostel' ? 'var(--surface-container-highest)' : 'transparent', color: leaseType === 'hostel' ? 'white' : 'var(--on-surface-variant)', transition: '0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}>Shared Facility</button>
@@ -750,10 +756,11 @@ const Leases: React.FC = () => {
 
               </div>
 
-              <footer className="flex justify-end gap-4 mt-8 pt-6 border-t border-white/5">
-                <button type="button" className="primary-button glass-panel" onClick={closeModal} style={{ background: 'rgba(255,255,255,0.05)' }}>Discard Draft</button>
-                <button type="submit" className="primary-button" disabled={saving} style={{ minWidth: '160px' }}>{saving ? 'Processing...' : 'Finalize Contract'}</button>
-              </footer>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="modal-discard-btn" onClick={closeModal}>Discard Draft</button>
+              <button type="submit" className="primary-button" disabled={saving} style={{ minWidth: '160px' }}>{saving ? 'Processing...' : 'Finalize Contract'}</button>
+            </div>
             </form>
           </div>
         </div>
