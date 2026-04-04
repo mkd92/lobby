@@ -5,22 +5,15 @@
   position: fixed;
   inset: 0;
   z-index: 1000;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 1.5rem;
   overflow-y: auto;
-  animation: dialogFadeIn 0.18s ease-out;
-}
-
-.modal-overlay::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.82);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  z-index: -1;
+  animation: dialogFadeIn 0.2s ease-out;
 }
 
 /* ── Modal Grid Helpers ── */

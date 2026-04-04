@@ -387,13 +387,13 @@
 }
 
 .modal-content-modern {
-  background: var(--surface-container-lowest);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--surface-container);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 2rem;
   box-shadow:
-    0 32px 80px rgba(0, 0, 0, 0.7),
-    0 8px 24px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 40px 100px rgba(0, 0, 0, 0.8),
+    0 8px 32px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
   width: 100%;
   max-width: 640px;
   max-height: 90vh;
@@ -408,7 +408,8 @@
   padding: 1.75rem 2rem 1.25rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
-  align-items: center;
+  flex-direction: row;
+  align-items: flex-start;
   justify-content: space-between;
   flex-shrink: 0;
   gap: 1rem;
@@ -467,7 +468,7 @@
   justify-content: flex-end;
   gap: 1rem;
   flex-shrink: 0;
-  background: var(--surface-container-lowest);
+  background: var(--surface-container);
 }
 
 .modal-discard-btn {
@@ -501,20 +502,28 @@
 .form-group-modern input,
 .form-group-modern select,
 .form-group-modern textarea {
-  background: var(--surface-container-low);
-  border: none;
+  background: var(--surface-container-high);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   padding: 0.875rem 1.125rem;
   border-radius: 0.875rem;
   font-family: var(--font-main);
   font-size: 0.9375rem;
   color: var(--on-surface);
   width: 100%;
-  transition: background 0.2s ease, outline 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, outline 0.2s ease;
+}
+
+.form-group-modern input::placeholder,
+.form-group-modern textarea::placeholder {
+  color: var(--on-surface-variant);
+  opacity: 0.4;
 }
 
 .form-group-modern input:focus,
 .form-group-modern select:focus,
 .form-group-modern textarea:focus {
   outline: 2px solid var(--primary);
-  background: var(--surface-container-high);
+  outline-offset: -1px;
+  background: var(--surface-container-highest);
+  border-color: transparent;
 }
