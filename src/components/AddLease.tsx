@@ -308,27 +308,31 @@ const AddLease: React.FC = () => {
       const leaseRef = doc(collection(db, 'leases'));
       batch.set(leaseRef, payload);
 
-      if (form.first_month_rent) {
-        const firstMonthDate = new Date(form.start_date);
-        const monthFor = firstMonthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-        batch.set(doc(collection(db, 'payments')), {
-          owner_id: ownerId,
-          lease_id: leaseRef.id,
-          tenant_name: payload.tenant_name,
-          unit_number: payload.unit_number || null,
-          property_name: payload.property_name || null,
-          bed_number: payload.bed_number || null,
-          room_number: payload.room_number || null,
-          hostel_name: payload.hostel_name || null,
-          rent_amount: payload.rent_amount,
-          amount: parseFloat(form.first_month_rent),
-          payment_date: form.start_date,
-          month_for: monthFor,
-          payment_method: null,
-          status: 'Pending',
-          created_at: serverTimestamp(),
-        });
-      }
+      // Always create a move-in pending payment: first month rent + security deposit
+      const firstRent      = form.first_month_rent ? parseFloat(form.first_month_rent) : payload.rent_amount;
+      const depositAmount  = form.security_deposit  ? parseFloat(form.security_deposit) : 0;
+      const totalDue       = firstRent + depositAmount;
+      const firstMonthDate = new Date(form.start_date);
+      const baseLabel      = firstMonthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const monthFor       = depositAmount > 0 ? `${baseLabel} + Deposit` : baseLabel;
+
+      batch.set(doc(collection(db, 'payments')), {
+        owner_id: ownerId,
+        lease_id: leaseRef.id,
+        tenant_name: payload.tenant_name,
+        unit_number: payload.unit_number || null,
+        property_name: payload.property_name || null,
+        bed_number: payload.bed_number || null,
+        room_number: payload.room_number || null,
+        hostel_name: payload.hostel_name || null,
+        rent_amount: totalDue,
+        amount: 0,
+        payment_date: form.start_date,
+        month_for: monthFor,
+        payment_method: null,
+        status: 'Pending',
+        created_at: serverTimestamp(),
+      });
 
       await batch.commit();
       queryClient.invalidateQueries({ queryKey: ['leases', ownerId] });
