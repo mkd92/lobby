@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   collection, query, where, getDocs, doc, getDoc,
   writeBatch, serverTimestamp,
@@ -13,14 +13,12 @@ import '../styles/Leases.css';
 // ── Types ──────────────────────────────────────────────────────────────
 interface Tenant   { id: string; full_name: string; email: string; phone: string; }
 interface Property { id: string; name: string; }
-interface Unit     { id: string; unit_number: string; type: string; base_rent: number; status: string; property_id: string; }
+interface Unit     { id: string; unit_number: string; base_rent: number; status: string; property_id: string; }
 interface Hostel   { id: string; name: string; }
-interface Room     { id: string; room_number: string; floor: number; }
+interface Room     { id: string; room_number: string; }
 interface Bed      { id: string; bed_number: string; price: number; status: string; room_id: string; hostel_id: string; }
 
 type LeaseType = 'property' | 'hostel';
-
-interface SelectOption { value: string; label: string; sub?: string; }
 
 const EMPTY_FORM = {
   tenant_id: '',
@@ -34,155 +32,7 @@ const EMPTY_FORM = {
   notes: '',
 };
 
-// ── CustomSelect ────────────────────────────────────────────────────────
-const CustomSelect: React.FC<{
-  options: SelectOption[];
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  disabled?: boolean;
-  searchable?: boolean;
-}> = ({ options, value, onChange, placeholder = 'Select…', disabled = false, searchable = false }) => {
-  const [open, setOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [highlightedIdx, setHighlightedIdx] = useState(-1);
-  const ref = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const selected = options.find(o => o.value === value);
-  const filtered = searchable
-    ? options.filter(o =>
-        o.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (o.sub && o.sub.toLowerCase().includes(searchTerm.toLowerCase())))
-    : options;
-
-  useEffect(() => {
-    if (open && searchable && searchInputRef.current) {
-      searchInputRef.current.focus();
-      setSearchTerm('');
-    }
-    setHighlightedIdx(-1);
-  }, [open, searchable]);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (disabled) return;
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      if (!open) { setOpen(true); return; }
-      setHighlightedIdx(p => Math.min(p + 1, filtered.length - 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setHighlightedIdx(p => Math.max(p - 1, 0));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (open && highlightedIdx >= 0) { onChange(filtered[highlightedIdx].value); setOpen(false); }
-      else setOpen(!open);
-    } else if (e.key === 'Escape') {
-      setOpen(false);
-    }
-  };
-
-  return (
-    <div
-      className={`custom-select-container${disabled ? ' disabled' : ''}`}
-      ref={ref}
-      onKeyDown={handleKeyDown}
-      style={{ position: 'relative' }}
-    >
-      <div
-        className={`custom-select-trigger${open ? ' open' : ''}`}
-        onClick={() => !disabled && setOpen(!open)}
-        tabIndex={disabled ? -1 : 0}
-        style={{
-          background: 'var(--surface-container-high)',
-          border: '1px solid rgba(255,255,255,0.06)',
-          padding: '0.875rem 1.125rem',
-          borderRadius: '0.875rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          opacity: disabled ? 0.4 : 1,
-        }}
-      >
-        <div style={{ overflow: 'hidden', flex: 1 }}>
-          {selected ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
-              <span style={{ color: 'var(--on-surface)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected.label}</span>
-              {selected.sub && <span style={{ opacity: 0.45, fontSize: '0.75rem', flexShrink: 0 }}>{selected.sub}</span>}
-            </div>
-          ) : (
-            <span style={{ color: 'var(--on-surface-variant)', opacity: 0.45, fontSize: '0.9375rem' }}>{placeholder}</span>
-          )}
-        </div>
-        <span className="material-symbols-outlined" style={{ fontSize: '1.25rem', opacity: 0.5, transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'none', flexShrink: 0, marginLeft: '0.5rem' }}>
-          keyboard_arrow_down
-        </span>
-      </div>
-
-      {open && (
-        <div
-          className="glass-panel"
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 0.5rem)',
-            left: 0, right: 0,
-            background: 'var(--surface-container-highest)',
-            borderRadius: '1rem',
-            border: '1px solid rgba(255,255,255,0.08)',
-            boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
-            zIndex: 200,
-            overflow: 'hidden',
-          }}
-        >
-          {searchable && (
-            <div style={{ padding: '0.625rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Type to filter..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                onClick={e => e.stopPropagation()}
-                style={{ background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '0.625rem', padding: '0.5rem 0.75rem', width: '100%', color: 'var(--on-surface)', fontSize: '0.875rem' }}
-              />
-            </div>
-          )}
-          <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
-            {filtered.length === 0 ? (
-              <div style={{ padding: '1rem', textAlign: 'center', opacity: 0.4, fontSize: '0.875rem' }}>No matches</div>
-            ) : filtered.map((o, i) => (
-              <div
-                key={o.value}
-                onClick={() => { onChange(o.value); setOpen(false); }}
-                style={{
-                  padding: '0.875rem 1.125rem',
-                  cursor: 'pointer',
-                  background: o.value === value ? 'rgba(255,255,255,0.06)' : highlightedIdx === i ? 'rgba(255,255,255,0.04)' : 'transparent',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={() => setHighlightedIdx(i)}
-              >
-                <div style={{ fontWeight: o.value === value ? 800 : 600, color: o.value === value ? 'var(--primary)' : 'var(--on-surface)', fontSize: '0.9375rem' }}>{o.label}</div>
-                {o.sub && <div style={{ fontSize: '0.7rem', opacity: 0.4, marginTop: '0.125rem' }}>{o.sub}</div>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ── Main Component ──────────────────────────────────────────────────────
+// ── Component ───────────────────────────────────────────────────────────
 const AddLease: React.FC = () => {
   const navigate = useNavigate();
   const { ownerId } = useOwner();
@@ -192,8 +42,12 @@ const AddLease: React.FC = () => {
   const [leaseType, setLeaseType] = useState<LeaseType>('property');
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  // Cascade state (not stored in lease doc)
   const [propertyId, setPropertyId] = useState('');
   const [roomId, setRoomId] = useState('');
+
+  const set = (key: keyof typeof EMPTY_FORM, val: string) =>
+    setForm(f => ({ ...f, [key]: val }));
 
   // ── Currency ────────────────────────────────────────────────────────
   const { data: ownerProfile } = useQuery({
@@ -202,14 +56,15 @@ const AddLease: React.FC = () => {
     enabled: !!ownerId,
   });
   const SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
-  const currencySymbol = SYMBOLS[ownerProfile?.currency] || '$';
+  const sym = SYMBOLS[ownerProfile?.currency] || '₹';
 
-  // ── Queries ─────────────────────────────────────────────────────────
+  // ── Lookup Queries ───────────────────────────────────────────────────
   const { data: tenants = [] } = useQuery({
     queryKey: ['tenants', ownerId],
     queryFn: async () => {
       const snap = await getDocs(query(collection(db, 'tenants'), where('owner_id', '==', ownerId)));
-      return snap.docs.map(d => ({ id: d.id, ...d.data() } as Tenant)).sort((a, b) => a.full_name.localeCompare(b.full_name));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as Tenant))
+        .sort((a, b) => a.full_name.localeCompare(b.full_name));
     },
     enabled: !!ownerId,
   });
@@ -224,12 +79,16 @@ const AddLease: React.FC = () => {
   });
 
   const { data: units = [] } = useQuery({
-    queryKey: ['units', ownerId, propertyId],
+    queryKey: ['units-vacant', propertyId],
     queryFn: async () => {
-      const snap = await getDocs(query(collection(db, 'units'), where('property_id', '==', propertyId), where('status', '==', 'Vacant')));
+      const snap = await getDocs(query(
+        collection(db, 'units'),
+        where('property_id', '==', propertyId),
+        where('status', '==', 'Vacant'),
+      ));
       return snap.docs.map(d => ({ id: d.id, ...d.data() } as Unit));
     },
-    enabled: !!ownerId && leaseType === 'property' && !!propertyId,
+    enabled: !!propertyId,
   });
 
   const { data: hostels = [] } = useQuery({
@@ -242,96 +101,103 @@ const AddLease: React.FC = () => {
   });
 
   const { data: rooms = [] } = useQuery({
-    queryKey: ['rooms', ownerId, form.unit_id],
+    queryKey: ['rooms', form.unit_id],
     queryFn: async () => {
       const snap = await getDocs(query(collection(db, 'rooms'), where('hostel_id', '==', form.unit_id)));
       return snap.docs.map(d => ({ id: d.id, ...d.data() } as Room));
     },
-    enabled: !!ownerId && leaseType === 'hostel' && !!form.unit_id,
+    enabled: !!form.unit_id && leaseType === 'hostel',
   });
 
   const { data: beds = [] } = useQuery({
-    queryKey: ['beds', ownerId, roomId],
+    queryKey: ['beds-vacant', roomId],
     queryFn: async () => {
-      const snap = await getDocs(query(collection(db, 'beds'), where('room_id', '==', roomId), where('status', '==', 'Vacant')));
+      const snap = await getDocs(query(
+        collection(db, 'beds'),
+        where('room_id', '==', roomId),
+        where('status', '==', 'Vacant'),
+      ));
       return snap.docs.map(d => ({ id: d.id, ...d.data() } as Bed));
     },
-    enabled: !!ownerId && leaseType === 'hostel' && !!roomId,
+    enabled: !!roomId,
   });
 
   // ── Submit ───────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.tenant_id || !form.start_date || !form.rent_amount) return;
+    if (leaseType === 'property' && !form.unit_id) { showAlert('Please select a unit.'); return; }
+    if (leaseType === 'hostel' && !form.bed_id) { showAlert('Please select a bed.'); return; }
+
     setSaving(true);
     try {
       const tenant = tenants.find(t => t.id === form.tenant_id);
-      let payload: any = {
-        owner_id: ownerId,
-        tenant_id: form.tenant_id,
-        tenant_name: tenant?.full_name || '',
-        rent_amount: parseFloat(form.rent_amount),
-        security_deposit: form.security_deposit ? parseFloat(form.security_deposit) : null,
-        start_date: form.start_date,
-        end_date: form.end_date || null,
-        status: 'Active',
-        notes: form.notes || null,
-        created_at: serverTimestamp(),
-        updated_at: serverTimestamp(),
-      };
+      const batch  = writeBatch(db);
 
-      const batch = writeBatch(db);
+      const payload: Record<string, unknown> = {
+        owner_id:         ownerId,
+        tenant_id:        form.tenant_id,
+        tenant_name:      tenant?.full_name || '',
+        rent_amount:      parseFloat(form.rent_amount),
+        security_deposit: form.security_deposit ? parseFloat(form.security_deposit) : null,
+        start_date:       form.start_date,
+        end_date:         form.end_date || null,
+        status:           'Active',
+        notes:            form.notes || null,
+        created_at:       serverTimestamp(),
+        updated_at:       serverTimestamp(),
+      };
 
       if (leaseType === 'property') {
         const unit = units.find(u => u.id === form.unit_id);
         const prop = properties.find(p => p.id === unit?.property_id);
-        payload.unit_id = form.unit_id;
-        payload.unit_number = unit?.unit_number || '';
-        payload.property_name = prop?.name || '';
-        payload.bed_id = null;
-        payload.bed_number = null;
-        payload.room_number = null;
-        payload.hostel_name = null;
+        Object.assign(payload, {
+          unit_id:      form.unit_id,
+          unit_number:  unit?.unit_number || '',
+          property_name: prop?.name || '',
+          bed_id: null, bed_number: null, room_number: null, hostel_name: null,
+        });
         batch.update(doc(db, 'units', form.unit_id), { status: 'Occupied' });
       } else {
-        const bed = beds.find(b => b.id === form.bed_id);
+        const bed  = beds.find(b => b.id === form.bed_id);
         const room = rooms.find(r => r.id === roomId);
-        payload.bed_id = form.bed_id;
-        payload.bed_number = bed?.bed_number || '';
-        payload.room_number = room?.room_number || '';
-        payload.hostel_name = hostels.find(h => h.id === form.unit_id)?.name || '';
-        payload.unit_id = null;
-        payload.unit_number = null;
-        payload.property_name = null;
+        Object.assign(payload, {
+          bed_id:      form.bed_id,
+          bed_number:  bed?.bed_number || '',
+          room_number: room?.room_number || '',
+          hostel_name: hostels.find(h => h.id === form.unit_id)?.name || '',
+          unit_id: null, unit_number: null, property_name: null,
+        });
         batch.update(doc(db, 'beds', form.bed_id), { status: 'Occupied' });
       }
 
       const leaseRef = doc(collection(db, 'leases'));
       batch.set(leaseRef, payload);
 
-      // Always create a move-in pending payment: first month rent + security deposit
-      const firstRent      = form.first_month_rent ? parseFloat(form.first_month_rent) : payload.rent_amount;
-      const depositAmount  = form.security_deposit  ? parseFloat(form.security_deposit) : 0;
-      const totalDue       = firstRent + depositAmount;
-      const firstMonthDate = new Date(form.start_date);
-      const baseLabel      = firstMonthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-      const monthFor       = depositAmount > 0 ? `${baseLabel} + Deposit` : baseLabel;
+      // Move-in pending payment: first month + deposit
+      const firstRent     = form.first_month_rent ? parseFloat(form.first_month_rent) : parseFloat(form.rent_amount);
+      const depositAmt    = form.security_deposit  ? parseFloat(form.security_deposit) : 0;
+      const totalDue      = firstRent + depositAmt;
+      const startDate     = new Date(form.start_date);
+      const baseLabel     = startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const monthFor      = depositAmt > 0 ? `${baseLabel} + Deposit` : baseLabel;
 
       batch.set(doc(collection(db, 'payments')), {
-        owner_id: ownerId,
-        lease_id: leaseRef.id,
-        tenant_name: payload.tenant_name,
-        unit_number: payload.unit_number || null,
-        property_name: payload.property_name || null,
-        bed_number: payload.bed_number || null,
-        room_number: payload.room_number || null,
-        hostel_name: payload.hostel_name || null,
-        rent_amount: totalDue,
-        amount: 0,
-        payment_date: form.start_date,
-        month_for: monthFor,
+        owner_id:      ownerId,
+        lease_id:      leaseRef.id,
+        tenant_name:   payload.tenant_name,
+        unit_number:   payload.unit_number   ?? null,
+        property_name: payload.property_name ?? null,
+        bed_number:    payload.bed_number    ?? null,
+        room_number:   payload.room_number   ?? null,
+        hostel_name:   payload.hostel_name   ?? null,
+        rent_amount:   totalDue,
+        amount:        0,
+        payment_date:  form.start_date,
+        month_for:     monthFor,
         payment_method: null,
-        status: 'Pending',
-        created_at: serverTimestamp(),
+        status:        'Pending',
+        created_at:    serverTimestamp(),
       });
 
       await batch.commit();
@@ -343,202 +209,313 @@ const AddLease: React.FC = () => {
     }
   };
 
-  const section = (label: string) => (
-    <div style={{ fontSize: '0.625rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--on-surface-variant)', opacity: 0.4, paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '0.25rem' }}>
+  // ── Helpers ──────────────────────────────────────────────────────────
+  const labelCls: React.CSSProperties = {
+    fontSize: '0.6875rem', fontWeight: 800, textTransform: 'uppercase',
+    letterSpacing: '0.12em', color: 'var(--on-surface-variant)',
+    marginBottom: '0.625rem', display: 'block', opacity: 0.6,
+  };
+
+  const inputCls: React.CSSProperties = {
+    background: 'var(--surface-container-high)',
+    border: '1px solid rgba(255,255,255,0.06)',
+    padding: '0.875rem 1.125rem',
+    borderRadius: '0.875rem',
+    fontFamily: 'var(--font-main)',
+    fontSize: '0.9375rem',
+    color: 'var(--on-surface)',
+    width: '100%',
+    outline: 'none',
+    transition: 'background 0.2s',
+  };
+
+  const selectCls: React.CSSProperties = {
+    ...inputCls,
+    cursor: 'pointer',
+    appearance: 'none',
+    WebkitAppearance: 'none',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 1rem center',
+    paddingRight: '2.75rem',
+  };
+
+  const sectionDivider = (label: string) => (
+    <div style={{
+      fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase',
+      letterSpacing: '0.16em', color: 'var(--on-surface-variant)', opacity: 0.35,
+      paddingBottom: '0.875rem', borderBottom: '1px solid rgba(255,255,255,0.05)',
+      marginBottom: '1.25rem',
+    }}>
       {label}
     </div>
   );
 
+  // ── Render ───────────────────────────────────────────────────────────
   return (
     <div className="view-container page-fade-in">
       {DialogMount}
 
+      {/* Page Header */}
       <header className="view-header">
         <div>
           <div
-            className="view-eyebrow flex items-center gap-2 cursor-pointer group"
             onClick={() => navigate('/leases')}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginBottom: '1rem', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.08em' }}
           >
-            <span className="material-symbols-outlined transition-transform group-hover:-translate-x-1" style={{ fontSize: '1.125rem' }}>arrow_back</span>
+            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>arrow_back</span>
             Lease Portfolio
           </div>
-          <h1 className="text-white font-display font-black text-4xl md:text-6xl tracking-tighter leading-none mt-2">
-            New Agreement
-          </h1>
-          <p className="text-secondary/60 font-medium mt-4">
-            Establish legal terms and financial obligations for this entity
+          <h1 className="view-title">New Agreement</h1>
+          <p style={{ color: 'var(--on-surface-variant)', opacity: 0.6, marginTop: '0.5rem', fontWeight: 500 }}>
+            Set up a new lease — tenant, unit, financials and dates.
           </p>
         </div>
       </header>
 
-      <div className="glass-panel rounded-[2.5rem] overflow-hidden">
+      {/* Card */}
+      <div className="modern-card" style={{ padding: '2.5rem' }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '2.25rem' }}>
 
-        {/* Lease Type Toggle */}
-        <div style={{ padding: '1.75rem 2rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(255,255,255,0.04)', padding: '0.375rem', borderRadius: '1.25rem', width: 'fit-content' }}>
+          {/* ── Lease Type ── */}
+          <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(255,255,255,0.04)', padding: '0.375rem', borderRadius: '1rem', width: 'fit-content' }}>
             {(['property', 'hostel'] as LeaseType[]).map(t => (
               <button
                 key={t}
                 type="button"
                 onClick={() => { setLeaseType(t); setForm(EMPTY_FORM); setPropertyId(''); setRoomId(''); }}
                 style={{
-                  padding: '0.75rem 2rem',
-                  borderRadius: '1rem',
+                  padding: '0.625rem 1.75rem',
+                  borderRadius: '0.75rem',
                   border: 'none',
                   fontWeight: 800,
                   fontSize: '0.8125rem',
                   cursor: 'pointer',
                   background: leaseType === t ? 'var(--surface-container-highest)' : 'transparent',
                   color: leaseType === t ? 'var(--on-surface)' : 'var(--on-surface-variant)',
-                  transition: 'all 0.25s ease',
-                  textTransform: 'capitalize',
+                  transition: 'all 0.2s ease',
                 }}
               >
-                {t === 'property' ? 'Private Asset' : 'Shared Facility'}
+                {t === 'property' ? '🏠 Private Asset' : '🏨 Shared Facility'}
               </button>
             ))}
           </div>
-        </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit}>
-          <div style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          {/* ── Tenant ── */}
+          <div>
+            {sectionDivider('Tenant')}
+            <label style={labelCls}>Select Tenant *</label>
+            <select
+              required
+              value={form.tenant_id}
+              onChange={e => set('tenant_id', e.target.value)}
+              style={selectCls}
+            >
+              <option value="">— choose tenant —</option>
+              {tenants.map(t => (
+                <option key={t.id} value={t.id}>{t.full_name}{t.phone ? ` · ${t.phone}` : ''}</option>
+              ))}
+            </select>
+          </div>
 
-            {/* Tenant */}
+          {/* ── Asset ── */}
+          {leaseType === 'property' ? (
             <div>
-              {section('Primary Legal Entity')}
-              <div className="form-group-modern" style={{ marginBottom: 0 }}>
-                <label>Tenant</label>
-                <CustomSelect
-                  options={tenants.map(t => ({ value: t.id, label: t.full_name, sub: t.phone || t.email }))}
-                  value={form.tenant_id}
-                  onChange={v => setForm({ ...form, tenant_id: v })}
-                  placeholder="Search or select tenant..."
-                  searchable
+              {sectionDivider('Property & Unit')}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                <div>
+                  <label style={labelCls}>Property *</label>
+                  <select
+                    required
+                    value={propertyId}
+                    onChange={e => { setPropertyId(e.target.value); set('unit_id', ''); set('rent_amount', ''); }}
+                    style={selectCls}
+                  >
+                    <option value="">— choose property —</option>
+                    {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={labelCls}>Vacant Unit *</label>
+                  <select
+                    required
+                    value={form.unit_id}
+                    disabled={!propertyId}
+                    onChange={e => {
+                      const u = units.find(u => u.id === e.target.value);
+                      set('unit_id', e.target.value);
+                      if (u?.base_rent) set('rent_amount', String(u.base_rent));
+                    }}
+                    style={{ ...selectCls, opacity: !propertyId ? 0.4 : 1 }}
+                  >
+                    <option value="">{propertyId ? '— choose unit —' : 'Select property first'}</option>
+                    {units.map(u => (
+                      <option key={u.id} value={u.id}>
+                        Unit {u.unit_number}{u.base_rent ? ` — ${sym}${u.base_rent.toLocaleString()}/mo` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div>
+              {sectionDivider('Hostel · Room · Bed')}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem' }}>
+                <div>
+                  <label style={labelCls}>Hostel *</label>
+                  <select
+                    required
+                    value={form.unit_id}
+                    onChange={e => { set('unit_id', e.target.value); set('bed_id', ''); set('rent_amount', ''); setRoomId(''); }}
+                    style={selectCls}
+                  >
+                    <option value="">— choose hostel —</option>
+                    {hostels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={labelCls}>Room *</label>
+                  <select
+                    required
+                    value={roomId}
+                    disabled={!form.unit_id}
+                    onChange={e => { setRoomId(e.target.value); set('bed_id', ''); }}
+                    style={{ ...selectCls, opacity: !form.unit_id ? 0.4 : 1 }}
+                  >
+                    <option value="">{form.unit_id ? '— choose room —' : 'Select hostel first'}</option>
+                    {rooms.map(r => <option key={r.id} value={r.id}>Room {r.room_number}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={labelCls}>Vacant Bed *</label>
+                  <select
+                    required
+                    value={form.bed_id}
+                    disabled={!roomId}
+                    onChange={e => {
+                      const b = beds.find(b => b.id === e.target.value);
+                      set('bed_id', e.target.value);
+                      if (b?.price) set('rent_amount', String(b.price));
+                    }}
+                    style={{ ...selectCls, opacity: !roomId ? 0.4 : 1 }}
+                  >
+                    <option value="">{roomId ? '— choose bed —' : 'Select room first'}</option>
+                    {beds.map(b => (
+                      <option key={b.id} value={b.id}>
+                        Bed {b.bed_number}{b.price ? ` — ${sym}${b.price.toLocaleString()}/mo` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Financials ── */}
+          <div>
+            {sectionDivider('Financial Terms')}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem' }}>
+              <div>
+                <label style={labelCls}>Monthly Rent ({sym}) *</label>
+                <input
+                  type="number" step="0.01" min="0" placeholder="0.00" required
+                  value={form.rent_amount}
+                  onChange={e => set('rent_amount', e.target.value)}
+                  style={inputCls}
+                />
+              </div>
+              <div>
+                <label style={labelCls}>First Month ({sym})</label>
+                <input
+                  type="number" step="0.01" min="0" placeholder="same as monthly"
+                  value={form.first_month_rent}
+                  onChange={e => set('first_month_rent', e.target.value)}
+                  style={inputCls}
+                />
+              </div>
+              <div>
+                <label style={labelCls}>Security Deposit ({sym})</label>
+                <input
+                  type="number" step="0.01" min="0" placeholder="0.00"
+                  value={form.security_deposit}
+                  onChange={e => set('security_deposit', e.target.value)}
+                  style={inputCls}
                 />
               </div>
             </div>
 
-            {/* Asset */}
-            <div>
-              {section(leaseType === 'property' ? 'Property & Unit' : 'Hostel, Room & Bed')}
-              {leaseType === 'property' ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-                  <div className="form-group-modern" style={{ marginBottom: 0 }}>
-                    <label>Property</label>
-                    <CustomSelect
-                      options={properties.map(p => ({ value: p.id, label: p.name }))}
-                      value={propertyId}
-                      onChange={v => { setPropertyId(v); setForm({ ...form, unit_id: '', rent_amount: '' }); }}
-                      placeholder="Select property..."
-                    />
-                  </div>
-                  <div className="form-group-modern" style={{ marginBottom: 0 }}>
-                    <label>Vacant Unit</label>
-                    <CustomSelect
-                      options={units.map(u => ({ value: u.id, label: `Unit ${u.unit_number}`, sub: u.base_rent ? `${currencySymbol}${u.base_rent.toLocaleString()}/mo` : undefined }))}
-                      value={form.unit_id}
-                      onChange={v => {
-                        const u = units.find(u => u.id === v);
-                        setForm({ ...form, unit_id: v, rent_amount: u?.base_rent ? String(u.base_rent) : form.rent_amount });
-                      }}
-                      placeholder={propertyId ? 'Select unit...' : 'Select property first'}
-                      disabled={!propertyId}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem' }}>
-                  <div className="form-group-modern" style={{ marginBottom: 0 }}>
-                    <label>Hostel</label>
-                    <CustomSelect
-                      options={hostels.map(h => ({ value: h.id, label: h.name }))}
-                      value={form.unit_id}
-                      onChange={v => { setForm({ ...form, unit_id: v, bed_id: '', rent_amount: '' }); setRoomId(''); }}
-                      placeholder="Select hostel..."
-                    />
-                  </div>
-                  <div className="form-group-modern" style={{ marginBottom: 0 }}>
-                    <label>Room</label>
-                    <CustomSelect
-                      options={rooms.map(r => ({ value: r.id, label: `Room ${r.room_number}` }))}
-                      value={roomId}
-                      onChange={v => { setRoomId(v); setForm({ ...form, bed_id: '' }); }}
-                      placeholder={form.unit_id ? 'Select room...' : 'Select hostel first'}
-                      disabled={!form.unit_id}
-                    />
-                  </div>
-                  <div className="form-group-modern" style={{ marginBottom: 0 }}>
-                    <label>Vacant Bed</label>
-                    <CustomSelect
-                      options={beds.map(b => ({ value: b.id, label: `Bed ${b.bed_number}`, sub: b.price ? `${currencySymbol}${b.price.toLocaleString()}/mo` : undefined }))}
-                      value={form.bed_id}
-                      onChange={v => {
-                        const b = beds.find(b => b.id === v);
-                        setForm({ ...form, bed_id: v, rent_amount: b?.price ? String(b.price) : form.rent_amount });
-                      }}
-                      placeholder={roomId ? 'Select bed...' : 'Select room first'}
-                      disabled={!roomId}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Financials */}
-            <div>
-              {section('Financial Terms')}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem' }}>
-                <div className="form-group-modern" style={{ marginBottom: 0 }}>
-                  <label>Monthly Rent ({currencySymbol})</label>
-                  <input type="number" step="0.01" placeholder="0.00" value={form.rent_amount} onChange={e => setForm({ ...form, rent_amount: e.target.value })} required />
-                </div>
-                <div className="form-group-modern" style={{ marginBottom: 0 }}>
-                  <label>First Month Rent ({currencySymbol})</label>
-                  <input type="number" step="0.01" placeholder="Optional" value={form.first_month_rent} onChange={e => setForm({ ...form, first_month_rent: e.target.value })} />
-                </div>
-                <div className="form-group-modern" style={{ marginBottom: 0 }}>
-                  <label>Security Deposit ({currencySymbol})</label>
-                  <input type="number" step="0.01" placeholder="Optional" value={form.security_deposit} onChange={e => setForm({ ...form, security_deposit: e.target.value })} />
-                </div>
+            {/* Live move-in total hint */}
+            {form.rent_amount && (
+              <div style={{ marginTop: '0.875rem', padding: '0.75rem 1rem', background: 'rgba(var(--primary-rgb, 100,180,120), 0.08)', borderRadius: '0.75rem', fontSize: '0.8125rem', color: 'var(--on-surface-variant)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: 'var(--primary)' }}>payments</span>
+                Move-in amount pending: <strong style={{ color: 'var(--on-surface)', marginLeft: '0.25rem' }}>
+                  {sym}{(
+                    (form.first_month_rent ? parseFloat(form.first_month_rent) : parseFloat(form.rent_amount)) +
+                    (form.security_deposit  ? parseFloat(form.security_deposit) : 0)
+                  ).toLocaleString()}
+                </strong>
               </div>
-            </div>
-
-            {/* Dates */}
-            <div>
-              {section('Contract Duration')}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-                <div className="form-group-modern" style={{ marginBottom: 0 }}>
-                  <label>Start Date</label>
-                  <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} required />
-                </div>
-                <div className="form-group-modern" style={{ marginBottom: 0 }}>
-                  <label>End Date <span style={{ opacity: 0.35, fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>(optional)</span></label>
-                  <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} />
-                </div>
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div>
-              {section('Additional Terms')}
-              <div className="form-group-modern" style={{ marginBottom: 0 }}>
-                <label>Notes <span style={{ opacity: 0.35, fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>(optional)</span></label>
-                <input type="text" placeholder="Special conditions, clauses..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
-              </div>
-            </div>
-
+            )}
           </div>
 
-          {/* Sticky Footer */}
-          <div style={{ padding: '1.5rem 2rem', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.02)' }}>
-            <button type="button" className="modal-discard-btn" onClick={() => navigate('/leases')}>
+          {/* ── Dates ── */}
+          <div>
+            {sectionDivider('Contract Duration')}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+              <div>
+                <label style={labelCls}>Start Date *</label>
+                <input
+                  type="date" required
+                  value={form.start_date}
+                  onChange={e => set('start_date', e.target.value)}
+                  style={inputCls}
+                />
+              </div>
+              <div>
+                <label style={labelCls}>End Date <span style={{ opacity: 0.45, textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>(leave blank for rolling)</span></label>
+                <input
+                  type="date"
+                  value={form.end_date}
+                  onChange={e => set('end_date', e.target.value)}
+                  style={inputCls}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Notes ── */}
+          <div>
+            {sectionDivider('Notes')}
+            <label style={labelCls}>Special Terms <span style={{ opacity: 0.45, textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>(optional)</span></label>
+            <textarea
+              placeholder="Any special conditions, clauses, or remarks..."
+              rows={3}
+              value={form.notes}
+              onChange={e => set('notes', e.target.value)}
+              style={{ ...inputCls, resize: 'vertical', lineHeight: 1.6 }}
+            />
+          </div>
+
+          {/* ── Footer ── */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <button
+              type="button"
+              onClick={() => navigate('/leases')}
+              style={{ background: 'transparent', border: 'none', color: 'var(--on-surface-variant)', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', padding: '0.75rem 1.25rem', borderRadius: '0.75rem' }}
+            >
               Discard
             </button>
-            <button type="submit" className="primary-button" disabled={saving} style={{ minWidth: '180px' }}>
-              {saving ? 'Processing...' : 'Finalize Agreement'}
+            <button
+              type="submit"
+              className="primary-button"
+              disabled={saving}
+              style={{ minWidth: '180px' }}
+            >
+              {saving ? 'Creating...' : 'Create Lease'}
             </button>
           </div>
+
         </form>
       </div>
     </div>
