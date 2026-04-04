@@ -1,5 +1,21 @@
 /* Leases.css - Redesigned for Vault Aesthetic */
 
+/* ── Modal Overlay ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  overflow-y: auto;
+  animation: dialogFadeIn 0.18s ease-out;
+}
+
 .leases-content-area {
   margin-top: 2rem;
 }
