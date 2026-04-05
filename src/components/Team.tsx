@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  collection, query, where, getDocs, addDoc, serverTimestamp, deleteDoc, doc, getDoc, updateDoc,
+  collection, query, where, getDocs, addDoc, serverTimestamp, deleteDoc, doc, getDoc, updateDoc, setDoc,
 } from 'firebase/firestore';
 import { db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
@@ -9,6 +10,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 interface StaffMember {
   id: string;
   staff_email: string;
+  staff_uid?: string;
   status: 'active' | 'pending';
 }
 
@@ -21,7 +23,8 @@ interface PendingInvite {
 }
 
 const Team: React.FC = () => {
-  const { ownerId, isStaff, user } = useOwner();
+  const navigate = useNavigate();
+  const { ownerId, isStaff, user, switchAccount } = useOwner();
   const queryClient = useQueryClient();
 
   const [staffEmail,  setStaffEmail]  = useState('');
@@ -67,13 +70,26 @@ const Team: React.FC = () => {
     msgTimer.current = setTimeout(() => setMessage(null), 4000);
   };
 
-  const handleAcceptInvite = async (inviteId: string) => {
+  const handleAcceptInvite = async (invite: PendingInvite) => {
+    if (!user) return;
     try {
-      await updateDoc(doc(db, 'staff', inviteId), { status: 'active' });
+      // Mark invite as active and record the staff user's UID
+      await updateDoc(doc(db, 'staff', invite.id), {
+        status: 'active',
+        staff_uid: user.uid,
+      });
+      // Create the security lookup entry so Firestore rules allow access
+      // Path: /staff_lookup/{staffUid}/owners/{ownerUid}
+      await setDoc(
+        doc(db, 'staff_lookup', user.uid, 'owners', invite.owner_id),
+        { accepted_at: serverTimestamp() },
+      );
       refetchInvites();
       queryClient.invalidateQueries({ queryKey: ['pending-invites'] });
       queryClient.invalidateQueries({ queryKey: ['staff-list'] });
-      flash('Access accepted. Use the account switcher in the top bar to view the workspace.', 'success');
+      // Auto-switch to the accepted workspace
+      switchAccount(invite.owner_id);
+      navigate('/');
     } catch (err) {
       flash((err as Error).message, 'error');
     }
@@ -118,9 +134,14 @@ const Team: React.FC = () => {
     }
   };
 
-  const handleRevokeStaff = async (staffId: string) => {
+  const handleRevokeStaff = async (s: StaffMember) => {
     try {
-      await deleteDoc(doc(db, 'staff', staffId));
+      // Remove the Firestore security lookup entry (allows rules-based access)
+      if (s.staff_uid && ownerId) {
+        await deleteDoc(doc(db, 'staff_lookup', s.staff_uid, 'owners', ownerId));
+      }
+      // Remove the staff invite document
+      await deleteDoc(doc(db, 'staff', s.id));
       refetchStaff();
       flash('Access revoked.', 'success');
     } catch (err) {
@@ -218,7 +239,7 @@ const Team: React.FC = () => {
                     Decline
                   </button>
                   <button
-                    onClick={() => handleAcceptInvite(invite.id)}
+                    onClick={() => handleAcceptInvite(invite)}
                     className="primary-button"
                     style={{ padding: '0.5rem 1.125rem' }}
                   >
@@ -328,7 +349,7 @@ const Team: React.FC = () => {
                       </div>
                     </div>
                     <button
-                      onClick={() => handleRevokeStaff(s.id)}
+                      onClick={() => handleRevokeStaff(s)}
                       title="Revoke access"
                       style={{
                         padding: '0.5rem 0.625rem', borderRadius: '0.625rem',
