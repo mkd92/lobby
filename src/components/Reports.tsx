@@ -125,8 +125,8 @@ function buildReportHTML(p: ReportHTMLParams): string {
 <h2>Vacant Beds (${p.vacantBedsCount})</h2>
 <table>
   <thead><tr>
-    <th>Hostel</th><th>Room</th><th>Bed</th>
-    <th style="text-align:right">Price / mo</th>
+    <th>Hostel</th><th>Room</th><th>Vacant Beds</th>
+    <th style="text-align:center">Count</th>
   </tr></thead>
   <tbody>${p.bedRows || noData}</tbody>
 </table>
@@ -329,10 +329,19 @@ const Reports: React.FC = () => {
   const selectAll   = () => { setSelectedPropIds(new Set(properties.map(p => p.id))); setSelectedHostelIds(new Set(hostels.map(h => h.id))); };
   const deselectAll = () => { setSelectedPropIds(new Set()); setSelectedHostelIds(new Set()); };
 
-  const generatePDF = () => {
+  const generatePDF = async () => {
     setGenerating(true);
     const w = window.open('', '_blank', 'width=900,height=760');
     if (!w) { setGenerating(false); return; }
+
+    // Fetch rooms fresh so room numbers are always accurate
+    let liveRoomMap = roomMap;
+    if (hostelIds.length > 0) {
+      try {
+        const snap = await getDocs(query(collection(db, 'rooms'), where('hostel_id', 'in', hostelIds)));
+        liveRoomMap = new Map(snap.docs.map(d => [d.id, { id: d.id, ...d.data() } as Room]));
+      } catch { /* fall back to cached roomMap */ }
+    }
 
     const generatedDate = new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
     const todayMs = new Date(); todayMs.setHours(0, 0, 0, 0);
@@ -352,14 +361,24 @@ const Reports: React.FC = () => {
       </tr>`;
     }).join('');
 
-    const bedRows = vacantBeds.map(b => {
+    // Group vacant beds by room so each row = one room with its vacant bed list
+    const bedsByRoom = new Map<string, { hostelName: string; roomNumber: string; beds: Bed[] }>();
+    vacantBeds.forEach(b => {
       const hostelName = hostelMap.get(b.hostel_id)?.name || '—';
-      const room = roomMap.get(b.room_id);
+      const room = liveRoomMap.get(b.room_id);
+      const key = b.room_id || `${b.hostel_id}-unknown`;
+      if (!bedsByRoom.has(key)) {
+        bedsByRoom.set(key, { hostelName, roomNumber: room?.room_number ?? '—', beds: [] });
+      }
+      bedsByRoom.get(key)!.beds.push(b);
+    });
+    const bedRows = [...bedsByRoom.values()].map(({ hostelName, roomNumber, beds }) => {
+      const bedList = beds.map(b => `Bed ${b.bed_number}`).join(', ');
       return `<tr>
         <td>${hostelName}</td>
-        <td>${room ? 'Room ' + room.room_number : '—'}</td>
-        <td style="font-weight:700">Bed ${b.bed_number}</td>
-        <td style="text-align:right;font-weight:700">${b.price ? sym + b.price.toLocaleString() : '—'}</td>
+        <td style="font-weight:700">Room ${roomNumber}</td>
+        <td>${bedList}</td>
+        <td style="text-align:center;font-weight:800;color:#16a34a">${beds.length}</td>
       </tr>`;
     }).join('');
 
