@@ -1,5 +1,41 @@
 /* Leases.css - Redesigned for Vault Aesthetic */
 
+/* ── Modal Overlay ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  overflow-y: auto;
+  animation: dialogFadeIn 0.2s ease-out;
+}
+
+/* ── Modal Grid Helpers ── */
+.modal-financials-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.modal-hostel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1.25rem;
+}
+
+@media (max-width: 600px) {
+  .modal-financials-grid,
+  .modal-hostel-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .leases-content-area {
   margin-top: 2rem;
 }

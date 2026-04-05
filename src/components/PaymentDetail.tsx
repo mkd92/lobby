@@ -23,7 +23,7 @@ interface Payment {
   payment_date: string;
   month_for: string;
   payment_method: string | null;
-  status: 'Paid' | 'Pending';
+  status: 'Paid' | 'Partial' | 'Pending';
 }
 
 const PaymentDetail: React.FC = () => {
@@ -38,7 +38,7 @@ const PaymentDetail: React.FC = () => {
     payment_date: '',
     month_for: '',
     payment_method: 'Cash',
-    status: 'Paid' as 'Paid' | 'Pending',
+    status: 'Paid' as 'Paid' | 'Partial' | 'Pending',
   });
   const [saving, setSaving] = useState(false);
   const [currencySymbol, setCurrencySymbol] = useState('$');
@@ -125,7 +125,7 @@ const PaymentDetail: React.FC = () => {
           <span className="badge-modern bg-primary/10 text-primary border border-white/5 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest">
             {payment.month_for}
           </span>
-          <span className={`badge-modern border border-white/5 px-4 py-2 rounded-xl text-xs font-bold ${payment.status === 'Paid' ? 'bg-primary-container/20 text-primary-container' : 'bg-secondary-container/20 text-secondary'}`}>
+          <span className={`badge-modern border border-white/5 px-4 py-2 rounded-xl text-xs font-bold ${payment.status === 'Paid' ? 'bg-primary-container/20 text-primary-container' : payment.status === 'Partial' ? 'badge-partial' : 'bg-secondary-container/20 text-secondary'}`}>
             {payment.status.toUpperCase()}
           </span>
         </div>
@@ -162,6 +162,14 @@ const PaymentDetail: React.FC = () => {
                   {currencySymbol}{payment.rent_amount.toLocaleString()}
                 </div>
               </div>
+              {payment.status === 'Partial' && (
+                <div>
+                  <label className="text-[0.6rem] uppercase tracking-[0.2em] font-black text-secondary/40 block mb-2">Balance Due</label>
+                  <div className="font-display font-bold text-2xl tracking-tight" style={{ color: '#fb923c' }}>
+                    {currencySymbol}{(payment.rent_amount - payment.amount).toLocaleString()}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -194,7 +202,7 @@ const PaymentDetail: React.FC = () => {
               <div className="form-group-modern">
                 <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-4">Accounting Status</label>
                 <div className="flex gap-4">
-                  {['Paid', 'Pending'].map(s => (
+                  {['Paid', 'Partial', 'Pending'].map(s => (
                     <button key={s} type="button" onClick={() => setForm({...form, status: s as any})} className={`flex-1 py-4 rounded-2xl font-bold text-[0.7rem] uppercase tracking-widest transition-all ${form.status === s ? 'bg-white text-on-primary scale-[1.02]' : 'bg-surface-container-low text-secondary/40'}`} disabled={isStaff}>{s}</button>
                   ))}
                 </div>

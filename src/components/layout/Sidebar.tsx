@@ -4,11 +4,14 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../../firebaseClient';
 import { prefetchMap } from '../../App';
 import { LogoMark } from './LogoMark';
+import { useOwner } from '../../context/OwnerContext';
 
 export const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; isStaff: boolean }> = ({ isCollapsed, setIsCollapsed, isStaff }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const isActive = (path: string) => location.pathname === path;
+  const { availableAccounts, ownerId } = useOwner();
+  const ownerName = availableAccounts.find(a => a.id === ownerId)?.name ?? '';
 
   const handleSignOut = async () => {
     await signOut(auth);
@@ -105,6 +108,47 @@ export const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boole
           <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>payments</span>
           {!isCollapsed && <span style={{ fontWeight: 700 }}>Financial Ledger</span>}
         </Link>
+        <Link
+          to="/reports"
+          className={`nav-item ${isActive('/reports') ? 'active' : ''}`}
+          title="Reports"
+          onMouseEnter={() => prefetch('reports')}
+          style={{ padding: '1rem 1.25rem', borderRadius: '1.25rem' }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>assessment</span>
+          {!isCollapsed && <span style={{ fontWeight: 700 }}>Reports</span>}
+        </Link>
+        {!isStaff && (
+          <Link
+            to="/team"
+            className={`nav-item ${isActive('/team') ? 'active' : ''}`}
+            title="Team & Access"
+            onMouseEnter={() => prefetch('team')}
+            style={{ padding: '1rem 1.25rem', borderRadius: '1.25rem' }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>supervisor_account</span>
+            {!isCollapsed && <span style={{ fontWeight: 700 }}>Team & Access</span>}
+          </Link>
+        )}
+
+        {/* Staff mode block */}
+        {isStaff && !isCollapsed && (
+          <div style={{
+            margin: '0.5rem 0', padding: '1rem 1.25rem',
+            borderRadius: '1.25rem',
+            background: 'var(--surface-container-high)',
+            borderLeft: '3px solid #f59e0b',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: '#f59e0b' }}>visibility</span>
+              <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#f59e0b' }}>Staff Mode</span>
+            </div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 700, opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {ownerName}
+            </div>
+            <div style={{ fontSize: '0.65rem', opacity: 0.4, fontWeight: 600, marginTop: '0.15rem' }}>Read-Only Access</div>
+          </div>
+        )}
 
         <div style={{ marginTop: 'auto' }}>
           {!isCollapsed && <div className="nav-section-label" style={{ opacity: 0.3 }}>System</div>}
@@ -116,14 +160,7 @@ export const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boole
             style={{ padding: '1rem 1.25rem', borderRadius: '1.25rem' }}
           >
             <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>settings</span>
-            {!isCollapsed && (
-              <div style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 700 }}>Preferences</span>
-                {isStaff && (
-                  <span className="badge-modern bg-primary/10 text-primary" style={{ fontSize: '0.5rem', padding: '0.2rem 0.5rem' }}>STAFF</span>
-                )}
-              </div>
-            )}
+            {!isCollapsed && <span style={{ fontWeight: 700 }}>Preferences</span>}
           </Link>
         </div>
       </nav>

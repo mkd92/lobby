@@ -23,7 +23,10 @@ const AddHostel = lazy(() => import('./components/AddHostel'));
 const HostelDetail = lazy(() => import('./components/HostelDetail'));
 const RoomDetail = lazy(() => import('./components/RoomDetail'));
 const Leases = lazy(() => import('./components/Leases'));
+const AddLease = lazy(() => import('./components/AddLease'));
 const LeaseDetail = lazy(() => import('./components/LeaseDetail'));
+const Reports = lazy(() => import('./components/Reports'));
+const Team    = lazy(() => import('./components/Team'));
 
 // Prefetch Map
 export const prefetchMap = {
@@ -43,7 +46,10 @@ export const prefetchMap = {
   hostelDetail: () => import('./components/HostelDetail'),
   roomDetail: () => import('./components/RoomDetail'),
   leases: () => import('./components/Leases'),
+  addLease: () => import('./components/AddLease'),
   leaseDetail: () => import('./components/LeaseDetail'),
+  reports: () => import('./components/Reports'),
+  team:    () => import('./components/Team'),
 };
 
 function App() {
@@ -83,7 +89,10 @@ function App() {
               <Route path="/hostels/:id" element={<HostelDetail />} />
               <Route path="/rooms/:id" element={<RoomDetail />} />
               <Route path="/leases" element={<Leases />} />
+              <Route path="/leases/new" element={<AddLease />} />
               <Route path="/leases/:id" element={<LeaseDetail />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/team"    element={<Team />} />
               <Route path="/payments" element={<Payments />} />
               <Route path="/payments/:id" element={<PaymentDetail />} />
               <Route path="/settings" element={<Settings />} />

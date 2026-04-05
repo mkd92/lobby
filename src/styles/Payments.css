@@ -97,6 +97,47 @@
   border-color: var(--primary);
 }
 
+/* ── Slide-over animation ── */
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* ── Overdue row highlight ── */
+.row-overdue {
+  background: rgba(255, 180, 171, 0.03);
+}
+
+/* ── Bulk action floating bar ── */
+.bulk-action-bar {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1.5rem;
+  background: var(--surface-container-highest);
+  border-radius: 2rem;
+  box-shadow: var(--shadow-elevated), 0 0 0 1px var(--outline-variant);
+  animation: fadeUp 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(1rem); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── Partial payment badge ── */
+.badge-partial {
+  background: rgba(251, 146, 60, 0.15);
+  color: #fb923c;
+  border: 1px solid rgba(251, 146, 60, 0.2);
+}
+
 /* ── Payment status badges ── */
 .payment-status-paid {
   background: var(--color-success-bg);

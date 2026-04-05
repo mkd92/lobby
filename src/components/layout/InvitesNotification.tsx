@@ -40,37 +40,92 @@ export const InvitesNotification: React.FC = () => {
 
   if (pendingInvites.length === 0) return null;
 
+  // Show the first pending invite as a modal; rest wait in queue
+  const invite = pendingInvites[0] as any;
+
   return (
-    <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-md animate-in fade-in slide-in-from-top-4 duration-500">
-      {pendingInvites.map((invite: any) => (
-        <div key={invite.id} className="glass-panel p-6 rounded-[32px] border border-primary/20 shadow-2xl bg-surface/90 backdrop-blur-2xl">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-primary">mail</span>
-            </div>
-            <div className="flex-1">
-              <h4 className="text-white font-display font-bold text-lg tracking-tight">Access Invitation</h4>
-              <p className="text-secondary/60 text-xs font-medium mt-1 leading-relaxed">
-                <span className="text-primary font-bold">{invite.owner_name || 'An entity'}</span> has requested your secondary stakeholder oversight for their registry.
-              </p>
-              <div className="flex gap-3 mt-6">
-                <button 
-                  onClick={() => handleAccept(invite.id)}
-                  className="flex-1 py-3 rounded-xl bg-primary text-on-primary font-black uppercase tracking-widest text-[0.6rem] hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-primary/20"
-                >
-                  Accept Authorization
-                </button>
-                <button 
-                  onClick={() => handleDecline(invite.id)}
-                  className="px-4 py-3 rounded-xl bg-surface-container-low text-secondary/40 font-bold uppercase tracking-widest text-[0.6rem] hover:text-error transition-colors"
-                >
-                  Decline
-                </button>
-              </div>
-            </div>
+    <>
+      {/* Backdrop */}
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 998,
+        background: 'rgba(0,0,0,0.65)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+      }} />
+
+      {/* Modal */}
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 999,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '1.5rem',
+      }}>
+        <div style={{
+          background: 'var(--surface-container)',
+          borderRadius: '2rem',
+          padding: '2.5rem',
+          maxWidth: '420px',
+          width: '100%',
+          boxShadow: '0 32px 80px rgba(0,0,0,0.5)',
+          border: '1px solid var(--outline-variant)',
+          animation: 'dialogFadeIn 0.25s ease-out',
+        }}>
+          {/* Icon */}
+          <div style={{
+            width: '52px', height: '52px', borderRadius: '1.25rem',
+            background: 'var(--surface-container-high)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            marginBottom: '1.5rem',
+          }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '1.5rem', color: 'var(--primary)' }}>mark_email_unread</span>
+          </div>
+
+          {/* Content */}
+          <h3 style={{
+            fontFamily: 'var(--font-display)', fontWeight: 900,
+            fontSize: '1.375rem', marginBottom: '0.625rem', lineHeight: 1.2,
+          }}>
+            Workspace Invitation
+          </h3>
+          <p style={{ fontSize: '0.875rem', opacity: 0.6, lineHeight: 1.6, marginBottom: '0.25rem' }}>
+            <strong style={{ opacity: 1, color: 'var(--on-surface)' }}>
+              {invite.owner_name || 'A workspace owner'}
+            </strong>{' '}
+            has invited you to access their portfolio as a read-only viewer.
+          </p>
+          <p style={{ fontSize: '0.75rem', opacity: 0.35, marginBottom: '2rem', fontWeight: 500 }}>
+            You can view all properties, leases, and payments — but cannot make any changes.
+          </p>
+
+          {/* Queue indicator */}
+          {pendingInvites.length > 1 && (
+            <p style={{ fontSize: '0.7rem', opacity: 0.4, marginBottom: '1.25rem', fontWeight: 600 }}>
+              +{pendingInvites.length - 1} more invite{pendingInvites.length - 1 > 1 ? 's' : ''} waiting
+            </p>
+          )}
+
+          {/* Actions */}
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button
+              onClick={() => handleDecline(invite.id)}
+              style={{
+                padding: '0.875rem 1.25rem', borderRadius: '1rem',
+                border: 'none', background: 'var(--surface-container-high)',
+                color: 'var(--on-surface-variant)', fontWeight: 700,
+                fontSize: '0.8125rem', cursor: 'pointer', transition: 'opacity 0.15s',
+              }}
+            >
+              Decline
+            </button>
+            <button
+              onClick={() => handleAccept(invite.id)}
+              className="primary-button"
+              style={{ flex: 1, justifyContent: 'center' }}
+            >
+              Accept Access
+            </button>
           </div>
         </div>
-      ))}
-    </div>
+      </div>
+    </>
   );
 };

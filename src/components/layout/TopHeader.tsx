@@ -25,8 +25,19 @@ export const TopHeader: React.FC<{ isStaff: boolean }> = ({ isStaff }) => {
     <header className="fixed top-0 w-full z-50 transition-colors duration-300 h-20 border-none pointer-events-none">
       <div className="flex items-center justify-end px-8 h-full w-full pointer-events-auto">
         <div className="flex items-center gap-4 bg-surface-container-highest/40 backdrop-blur-xl p-2 rounded-2xl border border-outline-variant shadow-lg">
-          {isStaff && (
-            <span className="badge-modern bg-primary/10 text-primary" style={{ fontSize: '0.6rem', padding: '0.4rem 0.75rem' }}>Staff Access</span>
+          {isStaff && currentAccount && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '0.375rem',
+              padding: '0.4rem 0.875rem', borderRadius: '999px',
+              background: 'rgba(245,158,11,0.15)',
+              border: '1px solid rgba(245,158,11,0.35)',
+              color: '#f59e0b',
+              fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.04em',
+              whiteSpace: 'nowrap', userSelect: 'none',
+            }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>visibility</span>
+              Staff Mode · {currentAccount.name}
+            </div>
           )}
 
           {/* Account switcher — desktop only */}
