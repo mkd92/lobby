@@ -55,8 +55,13 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setOwnerLoading(true);
 
     const unsubStaff = onSnapshot(
-      query(collection(db, 'staff'), where('staff_email', '==', user.email), where('status', '==', 'active')),
+      // Single where clause — two-field compound queries require a composite
+      // index that may not exist, causing a silent failure. Filter status
+      // client-side instead so the snapshot always fires correctly.
+      query(collection(db, 'staff'), where('staff_email', '==', user.email)),
       async (staffSnap) => {
+        // Only consider accepted (active) memberships
+        const activeStaffDocs = staffSnap.docs.filter(d => d.data().status === 'active');
         try {
           // Ensure own owner doc exists
           const ownerRef = doc(db, 'owners', user.uid);
@@ -70,10 +75,10 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }
           const ownName = ownerSnap.data()?.full_name || user.displayName || user.email || 'My Account';
 
-          // Build accounts list: own account first, then staff accounts
+          // Build accounts list: own account first, then active staff accounts
           const accounts: Account[] = [
             { id: user.uid, name: ownName, isOwn: true },
-            ...staffSnap.docs.map(d => {
+            ...activeStaffDocs.map(d => {
               const data = d.data();
               return { id: data.owner_id as string, name: data.owner_name || 'Unknown', isOwn: false };
             }),
@@ -84,7 +89,7 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           // This acts as a migration for staff who accepted before the lookup
           // collection was introduced — without it Firestore rules deny reads.
           await Promise.all(
-            staffSnap.docs.map(async (staffDoc) => {
+            activeStaffDocs.map(async (staffDoc) => {
               const ownerId = staffDoc.data().owner_id as string;
               const lookupRef = doc(db, 'staff_lookup', user.uid, 'owners', ownerId);
               const lookupSnap = await getDoc(lookupRef);
