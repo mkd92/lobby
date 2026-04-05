@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, query, where, onSnapshot, doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebaseClient';
 import { generateMonthlyPayments } from '../utils/generateMonthlyPayments';
 
@@ -79,6 +79,20 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             }),
           ];
           setAvailableAccounts(accounts);
+
+          // Ensure staff_lookup entries exist for every active staff membership.
+          // This acts as a migration for staff who accepted before the lookup
+          // collection was introduced — without it Firestore rules deny reads.
+          await Promise.all(
+            staffSnap.docs.map(async (staffDoc) => {
+              const ownerId = staffDoc.data().owner_id as string;
+              const lookupRef = doc(db, 'staff_lookup', user.uid, 'owners', ownerId);
+              const lookupSnap = await getDoc(lookupRef);
+              if (!lookupSnap.exists()) {
+                await setDoc(lookupRef, { migrated_at: serverTimestamp() });
+              }
+            }),
+          );
 
           // Determine which account to activate
           const saved = localStorage.getItem(STORAGE_KEY);
