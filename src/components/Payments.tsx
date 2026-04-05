@@ -62,6 +62,8 @@ const Payments: React.FC = () => {
   const [metricPeriod, setMetricPeriod] = useState<MetricPeriod>('month');
   const [selectedId, setSelectedId]   = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [viewMode,   setViewMode]     = useState<'all' | 'property'>('all');
+  const [propSort,   setPropSort]     = useState<{ col: 'date' | 'property' | 'tenant' | 'amount'; dir: 'asc' | 'desc' }>({ col: 'date', dir: 'desc' });
 
   // Receive payment modal
   const [receiveModal, setReceiveModal] = useState<{ open: boolean; payment: Payment | null }>({ open: false, payment: null });
@@ -130,6 +132,30 @@ const Payments: React.FC = () => {
       overdue:     payments.filter(p => isOverdue(p)).reduce((s, p) => s + (p.rent_amount - p.amount), 0),
     };
   }, [payments, metricPeriod]);
+
+  // ── Property ledger grouping ────────────────────────────────────────────
+  const propertyLedger = useMemo(() => {
+    const sorted = [...filtered].sort((a, b) => {
+      let v = 0;
+      switch (propSort.col) {
+        case 'date':     v = (a.payment_date || '').localeCompare(b.payment_date || ''); break;
+        case 'tenant':   v = a.tenant_name.localeCompare(b.tenant_name); break;
+        case 'amount':   v = a.amount - b.amount; break;
+        case 'property': v = (a.property_name || a.hostel_name || '').localeCompare(b.property_name || b.hostel_name || ''); break;
+      }
+      return propSort.dir === 'asc' ? v : -v;
+    });
+    const groups = new Map<string, { name: string; items: Payment[]; collected: number; outstanding: number }>();
+    sorted.forEach(p => {
+      const key = p.property_name || p.hostel_name || 'Unassigned';
+      if (!groups.has(key)) groups.set(key, { name: key, items: [], collected: 0, outstanding: 0 });
+      const g = groups.get(key)!;
+      g.items.push(p);
+      if (p.status === 'Paid')                          g.collected   += p.amount;
+      if (p.status === 'Pending' || p.status === 'Partial') g.outstanding += (p.rent_amount - p.amount);
+    });
+    return [...groups.values()];
+  }, [filtered, propSort]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
   const handleSync = async () => {
@@ -457,21 +483,41 @@ const Payments: React.FC = () => {
             </button>
           ))}
         </div>
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-          <span className="material-symbols-outlined" style={{ position: 'absolute', left: '0.75rem', fontSize: '1rem', opacity: 0.5, pointerEvents: 'none' }}>sort</span>
-          <select
-            value={sort}
-            onChange={e => setSort(e.target.value as SortOption)}
-            style={{ background: 'var(--surface-container-low)', border: 'none', borderRadius: '1rem', padding: '0.625rem 1rem 0.625rem 2.25rem', color: 'var(--on-surface)', fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}
+        {viewMode === 'all' && (
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <span className="material-symbols-outlined" style={{ position: 'absolute', left: '0.75rem', fontSize: '1rem', opacity: 0.5, pointerEvents: 'none' }}>sort</span>
+            <select
+              value={sort}
+              onChange={e => setSort(e.target.value as SortOption)}
+              style={{ background: 'var(--surface-container-low)', border: 'none', borderRadius: '1rem', padding: '0.625rem 1rem 0.625rem 2.25rem', color: 'var(--on-surface)', fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}
+            >
+              <option value="date_desc">Newest First</option>
+              <option value="date_asc">Oldest First</option>
+              <option value="name_asc">Tenant A–Z</option>
+              <option value="name_desc">Tenant Z–A</option>
+              <option value="amount_desc">Amount High–Low</option>
+              <option value="amount_asc">Amount Low–High</option>
+              <option value="unit_asc">Unit / Bed</option>
+            </select>
+          </div>
+        )}
+
+        {/* View mode toggle */}
+        <div style={{ display: 'flex', gap: '0.25rem', background: 'var(--surface-container-low)', borderRadius: '0.875rem', padding: '0.25rem', flexShrink: 0 }}>
+          <button
+            onClick={() => setViewMode('all')}
+            title="All Transactions"
+            style={{ padding: '0.375rem 0.75rem', borderRadius: '0.625rem', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', background: viewMode === 'all' ? 'var(--surface-container-highest)' : 'transparent', color: viewMode === 'all' ? 'var(--on-surface)' : 'var(--on-surface-variant)', transition: 'all 0.15s' }}
           >
-            <option value="date_desc">Newest First</option>
-            <option value="date_asc">Oldest First</option>
-            <option value="name_asc">Tenant A–Z</option>
-            <option value="name_desc">Tenant Z–A</option>
-            <option value="amount_desc">Amount High–Low</option>
-            <option value="amount_asc">Amount Low–High</option>
-            <option value="unit_asc">Unit / Bed</option>
-          </select>
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>list</span>
+          </button>
+          <button
+            onClick={() => setViewMode('property')}
+            title="Property Ledger"
+            style={{ padding: '0.375rem 0.75rem', borderRadius: '0.625rem', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', background: viewMode === 'property' ? 'var(--surface-container-highest)' : 'transparent', color: viewMode === 'property' ? 'var(--primary)' : 'var(--on-surface-variant)', transition: 'all 0.15s' }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>table_chart</span>
+          </button>
         </div>
       </div>
 
@@ -484,7 +530,132 @@ const Payments: React.FC = () => {
             <h2>Clear Ledger</h2>
             <p className="text-on-surface-variant mb-10 max-w-md mx-auto">No transaction records found for this selection. Adjust your parameters or generate the next billing cycle.</p>
           </div>
+        ) : viewMode === 'property' ? (
+          /* ── Property Ledger view ─────────────────────────────────────── */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {propertyLedger.map(group => {
+              const thStyle: React.CSSProperties = { cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', padding: '0.875rem 1rem' };
+              const sortIcon = (col: typeof propSort.col) => {
+                const active = propSort.col === col;
+                return (
+                  <span className="material-symbols-outlined" style={{ fontSize: '0.8rem', marginLeft: '0.3rem', verticalAlign: 'middle', opacity: active ? 0.9 : 0.25, color: active ? 'var(--primary)' : undefined }}>
+                    {active && propSort.dir === 'asc' ? 'arrow_upward' : 'arrow_downward'}
+                  </span>
+                );
+              };
+              const cycleSort = (col: typeof propSort.col) =>
+                setPropSort(prev => ({ col, dir: prev.col === col && prev.dir === 'asc' ? 'desc' : 'asc' }));
+
+              return (
+                <div key={group.name} style={{ background: 'var(--surface-container-lowest)', borderRadius: '1.75rem', overflow: 'hidden', boxShadow: 'var(--shadow-ambient)' }}>
+                  {/* Property header */}
+                  <div style={{ padding: '1.25rem 1.75rem', borderBottom: '1px solid var(--outline-variant)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '1.25rem', opacity: 0.5 }}>apartment</span>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '1rem' }}>{group.name}</div>
+                        <div style={{ fontSize: '0.7rem', opacity: 0.4, fontWeight: 600, marginTop: '0.1rem' }}>
+                          {group.items.length} record{group.items.length !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '1.25rem' }}>
+                      {group.collected > 0 && (
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800, opacity: 0.4 }}>Collected</div>
+                          <div style={{ fontWeight: 800, fontSize: '0.9375rem', color: '#22c55e' }}>{currencySymbol}{group.collected.toLocaleString()}</div>
+                        </div>
+                      )}
+                      {group.outstanding > 0 && (
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800, opacity: 0.4 }}>Outstanding</div>
+                          <div style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--error)' }}>{currencySymbol}{group.outstanding.toLocaleString()}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sortable table */}
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="modern-table" style={{ margin: 0 }}>
+                      <thead>
+                        <tr>
+                          <th style={thStyle} onClick={() => cycleSort('date')}>
+                            Date {sortIcon('date')}
+                          </th>
+                          <th style={thStyle} onClick={() => cycleSort('property')}>
+                            Property {sortIcon('property')}
+                          </th>
+                          <th style={thStyle} onClick={() => cycleSort('tenant')}>
+                            Tenant {sortIcon('tenant')}
+                          </th>
+                          <th style={{ ...thStyle, textAlign: 'right' }} onClick={() => cycleSort('amount')}>
+                            Amount Paid {sortIcon('amount')}
+                          </th>
+                          <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
+                          {!isStaff && <th></th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.items.map(p => {
+                          const overdue = isOverdue(p);
+                          return (
+                            <tr key={p.id} onClick={() => setSelectedId(p.id)} style={{ cursor: 'pointer', ...(overdue ? { borderLeft: '3px solid var(--error)' } : {}) }}>
+                              <td style={{ fontSize: '0.875rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                {p.payment_date ? new Date(p.payment_date).toLocaleDateString() : <span style={{ opacity: 0.35 }}>—</span>}
+                                {overdue && (
+                                  <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'var(--error)' }}>
+                                    {monthsOverdue(p.month_for)}mo overdue
+                                  </div>
+                                )}
+                              </td>
+                              <td>
+                                <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>{p.property_name || p.hostel_name || '—'}</div>
+                                <div style={{ fontSize: '0.7rem', opacity: 0.45, fontWeight: 500 }}>
+                                  {p.unit_number ? `Unit ${p.unit_number}` : p.bed_number ? `Bed ${p.bed_number}` : '—'}
+                                  {p.room_number ? ` · Room ${p.room_number}` : ''}
+                                </div>
+                              </td>
+                              <td style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{p.tenant_name}</td>
+                              <td style={{ textAlign: 'right' }}>
+                                <span style={{ fontWeight: 800, color: 'var(--primary)', fontFamily: 'var(--font-display)', fontSize: '1rem' }}>
+                                  {currencySymbol}{p.amount.toLocaleString()}
+                                </span>
+                                {p.status === 'Partial' && (
+                                  <div style={{ fontSize: '0.65rem', color: '#fb923c', fontWeight: 700 }}>
+                                    of {currencySymbol}{p.rent_amount.toLocaleString()}
+                                  </div>
+                                )}
+                              </td>
+                              <td style={{ textAlign: 'center' }}>
+                                <span className={`badge-modern ${p.status === 'Paid' ? 'badge-success' : p.status === 'Partial' ? 'badge-partial' : 'badge-warning'}`}>{p.status}</span>
+                              </td>
+                              {!isStaff && (
+                                <td>
+                                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                    {(p.status === 'Pending' || p.status === 'Partial') && (
+                                      <button className="btn-icon" onClick={e => { e.stopPropagation(); openReceiveModal(p); }} title="Receive Payment" style={{ color: 'var(--primary)' }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>payments</span>
+                                      </button>
+                                    )}
+                                    <button className="btn-icon danger" onClick={e => handleDelete(e, p.id)} style={{ color: 'var(--error)' }}>
+                                      <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span>
+                                    </button>
+                                  </div>
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : (
+          /* ── All Transactions view (existing) ─────────────────────────── */
           <>
             {/* Desktop table */}
             <div className="modern-table-wrap desktop-only" style={{ background: 'var(--surface-container-lowest)', borderRadius: '2rem', border: 'none', boxShadow: 'var(--shadow-ambient)' }}>
@@ -635,3 +806,4 @@ const Payments: React.FC = () => {
 };
 
 export default Payments;
+
