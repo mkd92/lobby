@@ -248,9 +248,10 @@ const Reports: React.FC = () => {
       const snap = await getDocs(query(
         collection(db, 'payments'),
         where('owner_id', '==', ownerId),
-        where('status', 'in', ['Pending', 'Partial']),
       ));
-      return snap.docs.map(d => ({ id: d.id, ...d.data() })) as Payment[];
+      return snap.docs
+        .map(d => ({ id: d.id, ...d.data() }) as Payment)
+        .filter(p => p.status === 'Pending' || p.status === 'Partial');
     },
     enabled: !!ownerId,
   });
