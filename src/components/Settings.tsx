@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { useRegisterSW } from 'virtual:pwa-register/react';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { auth, db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
@@ -26,7 +26,7 @@ const currencies = [
 
 const Settings: React.FC = () => {
   const navigate = useNavigate();
-  const { ownerId } = useOwner();
+  const { ownerId, isStaff } = useOwner();
   const { theme, setTheme } = useTheme();
   const queryClient = useQueryClient();
   const [profile, setProfile] = useState({ name: '', email: '', phone: '', currency: 'USD' });
@@ -39,25 +39,12 @@ const Settings: React.FC = () => {
 
   useEffect(() => () => { if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current); }, []);
 
-  const [staffEmail, setStaffEmail] = useState('');
-  const [addingStaff, setAddingStaff] = useState(false);
-
   const { data, isLoading } = useQuery({
     queryKey: ['owner-profile', ownerId],
     enabled: !!ownerId,
     queryFn: async () => {
       const snap = await getDoc(doc(db, 'owners', ownerId!));
       return snap.data();
-    },
-  });
-
-  const { data: staffList = [], refetch: refetchStaff } = useQuery({
-    queryKey: ['staff-list', ownerId],
-    enabled: !!ownerId,
-    queryFn: async () => {
-      const q = query(collection(db, 'staff'), where('owner_id', '==', ownerId));
-      const snap = await getDocs(q);
-      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
     },
   });
 
@@ -96,42 +83,6 @@ const Settings: React.FC = () => {
       setMessage({ text: (err as Error).message, type: 'error' });
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleAddStaff = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!staffEmail || !ownerId) return;
-    setAddingStaff(true);
-    try {
-      const q = query(collection(db, 'staff'), where('staff_email', '==', staffEmail), where('owner_id', '==', ownerId));
-      const existing = await getDocs(q);
-      if (!existing.empty) throw new Error('Identity already has access or pending invite.');
-
-      await addDoc(collection(db, 'staff'), {
-        staff_email: staffEmail,
-        owner_id: ownerId,
-        owner_name: profile.name,
-        status: 'pending',
-        created_at: serverTimestamp(),
-      });
-      setStaffEmail('');
-      refetchStaff();
-      setMessage({ text: 'Invitation dispatched to stakeholder.', type: 'success' });
-    } catch (err) {
-      setMessage({ text: (err as Error).message, type: 'error' });
-    } finally {
-      setAddingStaff(false);
-    }
-  };
-
-  const handleRevokeStaff = async (staffId: string) => {
-    try {
-      await deleteDoc(doc(db, 'staff', staffId));
-      refetchStaff();
-      setMessage({ text: 'Access revoked successfully.', type: 'success' });
-    } catch (err) {
-      setMessage({ text: (err as Error).message, type: 'error' });
     }
   };
 
@@ -246,54 +197,24 @@ const Settings: React.FC = () => {
             </form>
           </div>
 
-          {/* Staff Access Control */}
-          {!isLoading && (
+          {/* Team & Access — link to dedicated page */}
+          {!isStaff && (
             <div className="glass-panel p-10 md:p-16 rounded-[48px] mt-10">
-              <h2 className="text-on-surface font-display font-bold text-3xl tracking-tight mb-4">Staff Access Control</h2>
-              <p className="text-on-surface-variant opacity-70 text-sm font-medium leading-relaxed mb-12">
-                Authorize secondary stakeholders to access registry data with read-only permissions.
-              </p>
-
-              <form onSubmit={handleAddStaff} className="flex flex-col md:flex-row gap-4 mb-12">
-                <div className="flex-1">
-                  <input
-                    type="email"
-                    value={staffEmail}
-                    onChange={e => setStaffEmail(e.target.value)}
-                    className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-medium text-on-surface"
-                    placeholder="stakeholder@entity.com"
-                    required
-                  />
+              <div className="flex items-start justify-between gap-6 flex-wrap">
+                <div>
+                  <h2 className="text-on-surface font-display font-bold text-3xl tracking-tight mb-3">Team & Access</h2>
+                  <p className="text-on-surface-variant opacity-70 text-sm font-medium leading-relaxed max-w-sm">
+                    Invite stakeholders to view your portfolio with read-only access. Manage your team from the dedicated page.
+                  </p>
                 </div>
-                <button type="submit" className="primary-button whitespace-nowrap" disabled={addingStaff}>
-                  {addingStaff ? 'Dispatching...' : 'Invite Stakeholder'}
+                <button
+                  onClick={() => navigate('/team')}
+                  className="primary-button whitespace-nowrap"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>supervisor_account</span>
+                  Manage Team
                 </button>
-              </form>
-
-              <div className="flex flex-col gap-4">
-                <h3 className="view-eyebrow text-[0.625rem] opacity-40 mb-2">Active Authorized Personell</h3>
-                {staffList.length === 0 ? (
-                  <div className="text-on-surface-variant opacity-40 text-sm italic py-4">No authorized stakeholders identified.</div>
-                ) : (
-                  staffList.map((s: any) => (
-                    <div key={s.id} className="flex justify-between items-center p-6 rounded-3xl bg-surface-container-low border border-outline-variant gap-4">
-                      <div className="flex flex-col gap-1 min-w-0">
-                        <div className="text-on-surface font-bold truncate" title={s.staff_email}>{s.staff_email}</div>
-                        <div className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${s.status === 'active' ? 'bg-success' : 'bg-warning animate-pulse'}`}></span>
-                          <span className="text-[0.6rem] uppercase tracking-widest font-black opacity-40 text-on-surface-variant truncate">{s.status} access</span>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => handleRevokeStaff(s.id)}
-                        className="btn-icon danger p-3 rounded-xl hover:bg-error/10 transition-colors"
-                        title="Revoke Access"
-                      >
-                        <span className="material-symbols-outlined text-error">person_remove</span>
-                      </button>
-                    </div>
-                  ))
-                )}
               </div>
             </div>
           )}
