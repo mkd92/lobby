@@ -4,11 +4,15 @@ import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
 import { useOwner } from "../context/OwnerContext";
 import { useDashboard } from "../hooks/useDashboard";
 import { LoadingScreen } from "./layout/LoadingScreen";
+import StaffDashboard from "./StaffDashboard";
 import "../styles/Lobby.css";
 
 const Lobby: React.FC = () => {
   const { isStaff } = useOwner();
   const { data, isLoading } = useDashboard();
+
+  // Staff get a focused operational view instead of the owner analytics dashboard
+  if (isStaff) return <StaffDashboard />;
 
   if (isLoading && !data) {
     return <LoadingScreen message="Accessing Secure Vault" />;
