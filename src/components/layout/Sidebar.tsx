@@ -118,18 +118,16 @@ export const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boole
           <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>assessment</span>
           {!isCollapsed && <span style={{ fontWeight: 700 }}>Reports</span>}
         </Link>
-        {!isStaff && (
-          <Link
-            to="/team"
-            className={`nav-item ${isActive('/team') ? 'active' : ''}`}
-            title="Team & Access"
-            onMouseEnter={() => prefetch('team')}
-            style={{ padding: '1rem 1.25rem', borderRadius: '1.25rem' }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>supervisor_account</span>
-            {!isCollapsed && <span style={{ fontWeight: 700 }}>Team & Access</span>}
-          </Link>
-        )}
+        <Link
+          to="/team"
+          className={`nav-item ${isActive('/team') ? 'active' : ''}`}
+          title="Team & Access"
+          onMouseEnter={() => prefetch('team')}
+          style={{ padding: '1rem 1.25rem', borderRadius: '1.25rem' }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>supervisor_account</span>
+          {!isCollapsed && <span style={{ fontWeight: 700 }}>Team & Access</span>}
+        </Link>
 
         {/* Staff mode block */}
         {isStaff && !isCollapsed && (
