@@ -311,11 +311,10 @@ const Reports: React.FC = () => {
     });
   }, [activeLeases, expiryDays, selectedPropertyNames, selectedHostelNames]);
 
-  const filteredOutstanding = useMemo(() => outstandingPayments.filter(p => {
-    if (p.property_name) return selectedPropertyNames.has(p.property_name);
-    if (p.hostel_name)   return selectedHostelNames.has(p.hostel_name);
-    return false;
-  }), [outstandingPayments, selectedPropertyNames, selectedHostelNames]);
+  // Outstanding payments are already owner-scoped — show all of them regardless
+  // of the property/hostel selection (name-string matching is fragile and drops
+  // payments whose stored name doesn't exactly match the collection name field).
+  const filteredOutstanding = outstandingPayments;
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
