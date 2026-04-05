@@ -1,0 +1,123 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(ownerId) {
+      return isSignedIn() && request.auth.uid == ownerId;
+    }
+
+    // Returns true when the requesting user has an accepted staff_lookup entry
+    // for the given owner. The entry is written when staff accepts an invite.
+    // Path: /staff_lookup/{staffUid}/owners/{ownerUid}
+    function isActiveStaff(ownerId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/staff_lookup/$(request.auth.uid)/owners/$(ownerId));
+    }
+
+    function canRead(ownerId) {
+      return isOwner(ownerId) || isActiveStaff(ownerId);
+    }
+
+    // ── Owner profiles ─────────────────────────────────────────────────────
+
+    match /owners/{ownerId} {
+      allow read:  if canRead(ownerId);
+      allow write: if isOwner(ownerId);
+    }
+
+    // ── Properties & units ─────────────────────────────────────────────────
+
+    match /properties/{docId} {
+      allow read:          if canRead(resource.data.owner_id);
+      allow create:        if isOwner(request.resource.data.owner_id);
+      allow update, delete: if isOwner(resource.data.owner_id);
+    }
+
+    match /units/{docId} {
+      allow read:          if canRead(resource.data.owner_id);
+      allow create:        if isOwner(request.resource.data.owner_id);
+      allow update, delete: if isOwner(resource.data.owner_id);
+    }
+
+    // ── Hostels, rooms & beds ──────────────────────────────────────────────
+
+    match /hostels/{docId} {
+      allow read:          if canRead(resource.data.owner_id);
+      allow create:        if isOwner(request.resource.data.owner_id);
+      allow update, delete: if isOwner(resource.data.owner_id);
+    }
+
+    match /rooms/{docId} {
+      allow read:          if canRead(resource.data.owner_id);
+      allow create:        if isOwner(request.resource.data.owner_id);
+      allow update, delete: if isOwner(resource.data.owner_id);
+    }
+
+    match /beds/{docId} {
+      allow read:          if canRead(resource.data.owner_id);
+      allow create:        if isOwner(request.resource.data.owner_id);
+      allow update, delete: if isOwner(resource.data.owner_id);
+    }
+
+    // ── Tenants / customers ────────────────────────────────────────────────
+
+    match /tenants/{docId} {
+      allow read:          if canRead(resource.data.owner_id);
+      allow create:        if isOwner(request.resource.data.owner_id);
+      allow update, delete: if isOwner(resource.data.owner_id);
+    }
+
+    // ── Leases ─────────────────────────────────────────────────────────────
+
+    match /leases/{docId} {
+      allow read:          if canRead(resource.data.owner_id);
+      allow create:        if isOwner(request.resource.data.owner_id);
+      allow update, delete: if isOwner(resource.data.owner_id);
+    }
+
+    // ── Payments ───────────────────────────────────────────────────────────
+
+    match /payments/{docId} {
+      allow read:          if canRead(resource.data.owner_id);
+      allow create:        if isOwner(request.resource.data.owner_id);
+      allow update, delete: if isOwner(resource.data.owner_id);
+    }
+
+    // ── Staff invites ──────────────────────────────────────────────────────
+    // Owner sees their sent invites; staff sees invites addressed to them.
+
+    match /staff/{staffId} {
+      allow read: if isSignedIn() && (
+        resource.data.owner_id == request.auth.uid ||
+        resource.data.staff_email == request.auth.token.email
+      );
+      allow create: if isOwner(request.resource.data.owner_id);
+      allow update: if isSignedIn() && (
+        resource.data.owner_id == request.auth.uid ||
+        resource.data.staff_email == request.auth.token.email
+      );
+      allow delete: if isSignedIn() && (
+        resource.data.owner_id == request.auth.uid ||
+        resource.data.staff_email == request.auth.token.email
+      );
+    }
+
+    // ── Staff lookup (used by security rules above) ────────────────────────
+    // /staff_lookup/{staffUid}/owners/{ownerUid}
+    //   • Staff writes their own lookup when accepting an invite.
+    //   • Owner can delete their entry from a staff member's lookup on revoke.
+
+    match /staff_lookup/{staffUid}/owners/{ownerId} {
+      allow read:   if request.auth.uid == staffUid || request.auth.uid == ownerId;
+      allow create, update: if request.auth.uid == staffUid;
+      allow delete: if request.auth.uid == staffUid || request.auth.uid == ownerId;
+    }
+
+  }
+}
