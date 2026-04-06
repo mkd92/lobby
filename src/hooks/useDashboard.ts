@@ -30,9 +30,8 @@ export const useDashboard = () => {
         });
       }
 
-      const [ownerSnap, unitsSnap, bedsSnap, leasesSnap, paymentsSnap] = await Promise.all([
+      const [ownerSnap, bedsSnap, leasesSnap, paymentsSnap] = await Promise.all([
         getDoc(doc(db, 'owners', ownerId!)),
-        getDocs(query(collection(db, 'units'), where('owner_id', '==', ownerId))),
         getDocs(query(collection(db, 'beds'), where('owner_id', '==', ownerId))),
         getDocs(query(collection(db, 'leases'), where('owner_id', '==', ownerId))),
         getDocs(query(collection(db, 'payments'), where('owner_id', '==', ownerId))),
@@ -41,11 +40,8 @@ export const useDashboard = () => {
       const ownerData = ownerSnap.data() as { currency?: string };
       const currency = ownerData?.currency || 'USD';
 
-      const units = unitsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as { id: string; status: string }[];
       const beds = bedsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as { id: string; status: string }[];
 
-      const totalUnits = units.length;
-      const vacantUnits = units.filter(u => u.status === 'Vacant').length;
       const totalBeds = beds.length;
       const vacantBeds = beds.filter(b => b.status === 'Vacant').length;
 
@@ -94,8 +90,6 @@ export const useDashboard = () => {
         overdueAmount: formatCompactCurrency(overdueAmount, currency),
         leaseExpirations: String(expiringCount),
         annualRevenue: formatCompactCurrency(annualRevenue, currency),
-        totalUnits,
-        vacantUnits,
         totalBeds,
         vacantBeds,
         currency,
@@ -104,4 +98,4 @@ export const useDashboard = () => {
       return { stats, revenueChart };
     },
   });
-};
+};;
