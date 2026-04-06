@@ -31,20 +31,6 @@ service cloud.firestore {
       allow write: if isOwner(ownerId);
     }
 
-    // ── Properties & units ─────────────────────────────────────────────────
-
-    match /properties/{docId} {
-      allow read:          if canRead(resource.data.owner_id);
-      allow create:        if isOwner(request.resource.data.owner_id);
-      allow update, delete: if isOwner(resource.data.owner_id);
-    }
-
-    match /units/{docId} {
-      allow read:          if canRead(resource.data.owner_id);
-      allow create:        if isOwner(request.resource.data.owner_id);
-      allow update, delete: if isOwner(resource.data.owner_id);
-    }
-
     // ── Hostels, rooms & beds ──────────────────────────────────────────────
 
     match /hostels/{docId} {

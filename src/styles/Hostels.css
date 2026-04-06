@@ -1,0 +1,240 @@
+/* Hostels.css - Shared Asset Inventory Styles */
+
+.properties-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 2.5rem;
+}
+
+@media (max-width: 768px) {
+  .properties-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+}
+
+.property-card {
+  background: var(--surface-container-low);
+  border-radius: 2.25rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: var(--transition-glass);
+  cursor: pointer;
+  border: none !important;
+}
+
+.property-card:hover {
+  background: var(--surface-container-high);
+  transform: translateY(-8px);
+  box-shadow: var(--shadow-ambient);
+}
+
+.property-card-visual {
+  height: 180px;
+  background: linear-gradient(135deg, rgba(var(--surface-container-highest-rgb), 0.1) 0%, rgba(var(--surface-container-highest-rgb), 0.05) 100%);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.property-type-chip {
+  position: absolute;
+  top: 1.5rem;
+  left: 1.5rem;
+  background: var(--surface-container-highest);
+  color: var(--primary);
+  padding: 0.5rem 1rem;
+  border-radius: 99px;
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  backdrop-filter: blur(8px);
+}
+
+.property-icon-large {
+  color: var(--primary);
+  opacity: 0.15;
+  transition: all 0.4s ease;
+}
+
+.property-card:hover .property-icon-large {
+  opacity: 0.4;
+  transform: scale(1.1);
+}
+
+.property-icon-large .material-symbols-outlined {
+  font-size: 5rem;
+  font-variation-settings: 'FILL' 0, 'wght' 100;
+}
+
+.property-card-quick-actions {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  display: flex;
+  gap: 0.75rem;
+  opacity: 0;
+  transform: translateX(10px);
+  transition: all 0.3s ease;
+}
+
+.property-card:hover .property-card-quick-actions {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.prop-mini-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: none;
+  background: var(--surface-container-highest);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  transition: all 0.2s ease;
+}
+
+.prop-mini-btn:hover {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.prop-mini-btn.danger:hover {
+  background: var(--error);
+  color: white;
+}
+
+.property-card-body {
+  padding: 2.25rem;
+  flex: 1;
+}
+
+.property-name-modern {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+.property-address-modern {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  color: var(--on-surface-variant);
+  margin-bottom: 2rem;
+  font-weight: 500;
+}
+
+.property-card-stats-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.stat-pill {
+  flex: 1;
+  background: var(--surface-container-highest);
+  padding: 1rem 1.25rem;
+  border-radius: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.stat-pill-label {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 800;
+  opacity: 0.4;
+}
+
+.stat-pill-value {
+  font-weight: 800;
+  font-size: 1.125rem;
+  color: var(--primary);
+  font-family: var(--font-display);
+}
+
+.property-card-footer {
+  padding: 1.5rem 2.25rem;
+  background: rgba(var(--surface-container-highest-rgb), 0.05);
+}
+
+.view-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-display);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: var(--secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.view-link .material-symbols-outlined {
+  font-size: 1.125rem;
+  transition: transform 0.3s ease;
+}
+
+.property-card:hover .view-link .material-symbols-outlined {
+  transform: translateX(6px);
+  color: var(--primary);
+}
+
+@media (max-width: 768px) {
+  .property-card-visual {
+    display: none;
+  }
+  .property-card {
+    border-radius: 1.5rem;
+  }
+  .property-card-body {
+    position: relative;
+    padding: 1.25rem;
+  }
+  .property-card-quick-actions-mobile {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.25rem;
+  }
+  .property-name-modern {
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
+    padding-right: 3rem;
+  }
+  .property-address-modern {
+    font-size: 0.75rem;
+    margin-bottom: 1.25rem;
+    padding-right: 3rem;
+  }
+  .property-card-stats-row {
+    gap: 0.75rem;
+  }
+  .stat-pill {
+    padding: 0.75rem;
+    border-radius: 1rem;
+  }
+  .stat-pill-label {
+    font-size: 0.5rem;
+  }
+  .stat-pill-value {
+    font-size: 0.875rem;
+  }
+  .property-card-footer {
+    padding: 1rem 1.25rem;
+  }
+  .view-link {
+    font-size: 0.65rem;
+  }
+}

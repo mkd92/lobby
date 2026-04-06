@@ -9,18 +9,15 @@ import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoadingScreen } from './layout/LoadingScreen';
-import '../styles/Units.css';
+
 import '../styles/Leases.css';
 
 // ── Types ──────────────────────────────────────────────────────────────
 interface Lease {
   id: string;
-  unit_id: string | null;
   bed_id: string | null;
   tenant_id: string;
   tenant_name: string;
-  unit_number: string | null;
-  property_name: string | null;
   bed_number: string | null;
   room_number: string | null;
   hostel_name: string | null;
@@ -73,7 +70,6 @@ const Leases: React.FC = () => {
         for (const lease of allLeases) {
           if (lease.status === 'Active' && lease.end_date && new Date(lease.end_date) < today) {
             expiredBatch.update(doc(db, 'leases', lease.id), { status: 'Expired' });
-            if (lease.unit_id) expiredBatch.update(doc(db, 'units', lease.unit_id), { status: 'Vacant' });
             if (lease.bed_id)  expiredBatch.update(doc(db, 'beds',  lease.bed_id),  { status: 'Vacant' });
             lease.status = 'Expired';
             hasExpired = true;
@@ -94,7 +90,6 @@ const Leases: React.FC = () => {
       const batch = writeBatch(db);
       batch.delete(doc(db, 'leases', lease.id));
       if (lease.status === 'Active') {
-        if (lease.unit_id) batch.update(doc(db, 'units', lease.unit_id), { status: 'Vacant' });
         if (lease.bed_id)  batch.update(doc(db, 'beds',  lease.bed_id),  { status: 'Vacant' });
       }
       await batch.commit();
@@ -112,7 +107,7 @@ const Leases: React.FC = () => {
         case 'date_asc':  return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
         case 'name_asc':  return a.tenant_name.localeCompare(b.tenant_name);
         case 'name_desc': return b.tenant_name.localeCompare(a.tenant_name);
-        case 'unit_asc':  return (a.unit_number || a.room_number || '').localeCompare(b.unit_number || b.room_number || '');
+        case 'unit_asc':  return (a.room_number || '').localeCompare(b.room_number || '');
         case 'rent_desc': return b.rent_amount - a.rent_amount;
         case 'rent_asc':  return a.rent_amount - b.rent_amount;
         default: return new Date(b.start_date).getTime() - new Date(a.start_date).getTime();
@@ -191,7 +186,7 @@ const Leases: React.FC = () => {
               <option value="date_asc">Oldest First</option>
               <option value="name_asc">Tenant A–Z</option>
               <option value="name_desc">Tenant Z–A</option>
-              <option value="unit_asc">Unit / Room</option>
+              <option value="unit_asc">Room Number</option>
               <option value="rent_desc">Rent High–Low</option>
               <option value="rent_asc">Rent Low–High</option>
             </select>
@@ -223,7 +218,7 @@ const Leases: React.FC = () => {
                 <thead>
                   <tr>
                     <th className="col-tenant">Tenant Entity</th>
-                    <th className="col-asset">Asset Designation</th>
+                    <th className="col-asset">Facility</th>
                     <th>Inventory</th>
                     <th>Financial Value</th>
                     <th>Contractual Period</th>
@@ -233,11 +228,7 @@ const Leases: React.FC = () => {
                 </thead>
                 <tbody>
                   {filtered.map(lease => {
-                    const isHostel  = !!lease.bed_id;
-                    const propName  = isHostel ? lease.hostel_name : lease.property_name;
-                    const unitLabel = isHostel
-                      ? `Room ${lease.room_number} · Bed ${lease.bed_number}`
-                      : `${lease.unit_number}`;
+                    const unitLabel = `Room ${lease.room_number} · Bed ${lease.bed_number}`;
                     return (
                       <tr key={lease.id} onClick={() => navigate(`/leases/${lease.id}`)} style={{ cursor: 'pointer' }}>
                         <td className="col-tenant">
@@ -248,8 +239,8 @@ const Leases: React.FC = () => {
                         </td>
                         <td className="col-asset">
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', overflow: 'hidden' }}>
-                            <div className="badge-modern" style={{ width: 'fit-content', fontSize: '0.55rem', padding: '0.15rem 0.5rem', background: isHostel ? 'rgba(208, 228, 255, 0.1)' : 'rgba(194, 217, 211, 0.1)', color: isHostel ? 'var(--tertiary)' : 'var(--primary)' }}>{isHostel ? 'Shared' : 'Private'}</div>
-                            <span className="text-truncate" style={{ fontSize: '0.875rem', fontWeight: 500 }} title={propName || '—'}>{propName || '—'}</span>
+                            <div className="badge-modern" style={{ width: 'fit-content', fontSize: '0.55rem', padding: '0.15rem 0.5rem', background: 'rgba(208, 228, 255, 0.1)', color: 'var(--tertiary)' }}>Shared</div>
+                            <span className="text-truncate" style={{ fontSize: '0.875rem', fontWeight: 500 }} title={lease.hostel_name || '—'}>{lease.hostel_name || '—'}</span>
                           </div>
                         </td>
                         <td><span style={{ fontWeight: 800, fontSize: '0.875rem', color: 'var(--primary)', fontFamily: 'var(--font-display)' }}>{unitLabel}</span></td>
@@ -286,11 +277,11 @@ const Leases: React.FC = () => {
                   <div className="flex justify-between items-start mb-6">
                     <div className="flex gap-4 items-center" style={{ overflow: 'hidden', flex: 1 }}>
                       <div style={{ width: '44px', height: '44px', borderRadius: '14px', background: 'var(--primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <span className="material-symbols-outlined" style={{ color: 'var(--on-primary)', fontSize: '1.5rem' }}>{lease.bed_id ? 'hotel' : 'domain'}</span>
+                        <span className="material-symbols-outlined" style={{ color: 'var(--on-primary)', fontSize: '1.5rem' }}>hotel</span>
                       </div>
                       <div style={{ overflow: 'hidden' }}>
                         <h3 className="lease-tenant-name" title={lease.tenant_name}>{lease.tenant_name}</h3>
-                        <div className="text-truncate" style={{ fontSize: '0.8125rem', opacity: 0.6, fontWeight: 700, color: 'var(--primary)' }} title={lease.unit_number || `Bed ${lease.bed_number}`}>{lease.unit_number || `Bed ${lease.bed_number}`}</div>
+                        <div className="text-truncate" style={{ fontSize: '0.8125rem', opacity: 0.6, fontWeight: 700, color: 'var(--primary)' }} title={`Bed ${lease.bed_number}`}>Bed {lease.bed_number}</div>
                       </div>
                     </div>
                     <span className={`badge-modern ${lease.status === 'Active' ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.55rem', flexShrink: 0, marginLeft: '1rem' }}>{lease.status}</span>

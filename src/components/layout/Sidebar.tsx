@@ -57,16 +57,6 @@ export const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boole
 
         {!isCollapsed && <div className="nav-section-label" style={{ marginTop: '2rem', opacity: 0.3 }}>Portfolio Assets</div>}
         <Link
-          to="/properties"
-          className={`nav-item ${location.pathname.startsWith('/properties') ? 'active' : ''}`}
-          title="Properties"
-          onMouseEnter={() => prefetch('properties')}
-          style={{ padding: '1rem 1.25rem', borderRadius: '1.25rem' }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>domain</span>
-          {!isCollapsed && <span style={{ fontWeight: 700 }}>Real Estate Assets</span>}
-        </Link>
-        <Link
           to="/hostels"
           className={`nav-item ${location.pathname.startsWith('/hostels') ? 'active' : ''}`}
           title="Hostels"

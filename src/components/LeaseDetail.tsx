@@ -10,12 +10,9 @@ import '../styles/Leases.css';
 
 interface Lease {
   id: string;
-  unit_id: string | null;
   bed_id: string | null;
   tenant_id: string;
   tenant_name: string;
-  unit_number: string | null;
-  property_name: string | null;
   bed_number: string | null;
   room_number: string | null;
   hostel_name: string | null;
@@ -103,9 +100,7 @@ const LeaseDetail: React.FC = () => {
   if (isLoading) return <LoadingScreen message="Accessing Legal Documents" />;
   if (!lease) return null;
 
-  const isHostel = !!lease.bed_id;
-  const propName = isHostel ? lease.hostel_name : lease.property_name;
-  const unitLabel = isHostel ? `Room ${lease.room_number} · Bed ${lease.bed_number}` : `Unit ${lease.unit_number}`;
+  const unitLabel = `Room ${lease.room_number} · Bed ${lease.bed_number}`;
 
   return (
     <div className="view-container page-fade-in">
@@ -128,7 +123,7 @@ const LeaseDetail: React.FC = () => {
         </div>
         <div className="flex gap-3">
           <span className="badge-modern bg-primary/10 text-primary border border-white/5 px-4 py-2 rounded-xl text-xs font-bold">
-            {isHostel ? 'SHARED FACILITY' : 'PRIVATE ASSET'}
+            SHARED FACILITY
           </span>
           <span className={`badge-modern border border-white/5 px-4 py-2 rounded-xl text-xs font-bold ${lease.status === 'Active' ? 'bg-primary-container/20 text-primary-container' : 'bg-secondary-container/20 text-secondary'}`}>
             {lease.status.toUpperCase()}
@@ -141,7 +136,7 @@ const LeaseDetail: React.FC = () => {
         <div className="lg:col-span-4 flex flex-col gap-8">
           <div className="glass-panel p-10 rounded-[40px] relative overflow-hidden">
             <div className="absolute top-0 right-0 p-8 opacity-5">
-              <span className="material-symbols-outlined text-[120px]">{isHostel ? 'hotel' : 'domain'}</span>
+              <span className="material-symbols-outlined text-[120px]">hotel</span>
             </div>
             
             <h3 className="view-eyebrow text-[0.625rem] opacity-40 mb-8">Asset Profile</h3>
@@ -152,7 +147,7 @@ const LeaseDetail: React.FC = () => {
               </div>
               <div>
                 <label className="text-[0.6rem] uppercase tracking-[0.2em] font-black text-secondary/40 block mb-2">Portfolio Asset</label>
-                <div className="text-white/80 font-medium text-lg">{propName}</div>
+                <div className="text-white/80 font-medium text-lg">{lease.hostel_name}</div>
               </div>
               <div>
                 <label className="text-[0.6rem] uppercase tracking-[0.2em] font-black text-secondary/40 block mb-2">Inventory Identification</label>

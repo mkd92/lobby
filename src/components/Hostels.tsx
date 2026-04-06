@@ -7,7 +7,9 @@ import { useOwner } from '../context/OwnerContext';
 import { useQuery } from '@tanstack/react-query';
 import { LoadingScreen } from './layout/LoadingScreen';
 import { useDialog } from '../hooks/useDialog';
-import '../styles/Properties.css';
+import '../styles/Hostels.css';
+import '../styles/Leases.css';
+
 
 interface HostelData {
   id: string;
@@ -172,6 +174,13 @@ const Hostels: React.FC = () => {
               </div>
 
               <div className="property-card-body">
+                {!isStaff && (
+                  <div className="property-card-quick-actions-mobile mobile-only" onClick={e => e.stopPropagation()}>
+                    <button className="prop-mini-btn danger" onClick={e => handleDelete(e, hostel)} title="Terminate Registration">
+                      <span className="material-symbols-outlined">delete</span>
+                    </button>
+                  </div>
+                )}
                 <h3 className="property-name-modern">{hostel.name}</h3>
                 <div className="property-address-modern">
                   <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', opacity: 0.5 }}>location_on</span>

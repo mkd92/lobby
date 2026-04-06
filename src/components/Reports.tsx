@@ -7,170 +7,57 @@ import { useQuery } from '@tanstack/react-query';
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
-interface Property { id: string; name: string; }
 interface Hostel   { id: string; name: string; }
-interface Unit     { id: string; property_id: string; unit_number: string; status: string; type?: string; base_rent?: number; }
 interface Room     { id: string; hostel_id: string; room_number: string; }
 interface Bed      { id: string; hostel_id: string; room_id: string; bed_number: string; status: string; price?: number; }
 interface Lease    {
   id: string;
   tenant_name: string;
-  property_name?: string;
   hostel_name?: string;
-  unit_number?: string;
-  bed_number?: string;
   room_number?: string;
+  bed_number?: string;
   rent_amount: number;
-  end_date?: string;
+  start_date: string;
+  end_date: string | null;
+  status: string;
 }
-interface Payment  {
+interface Payment {
   id: string;
   tenant_name: string;
-  property_name?: string | null;
-  hostel_name?: string | null;
-  unit_number?: string | null;
-  room_number?: string | null;
-  bed_number?: string | null;
+  hostel_name?: string;
+  room_number?: string;
+  bed_number?: string;
+  month_for: string;
+  status: string;
   rent_amount: number;
   amount: number;
-  month_for: string;
-  status: 'Pending' | 'Partial';
 }
-
-const SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
-
-// ── PDF builder ───────────────────────────────────────────────────────────────
 
 interface ReportHTMLParams {
   generatedDate: string;
   scopeNames: string;
   sym: string;
   expiryDays: number;
-  vacantUnitsCount: number;
   vacantBedsCount: number;
   expiringLeasesCount: number;
   outstandingCount: number;
-  unitRows: string;
   bedRows: string;
   leaseRows: string;
   paymentRows: string;
 }
 
-function buildReportHTML(p: ReportHTMLParams): string {
-  const noData = `<tr><td colspan="99" style="text-align:center;color:#999;padding:1.5rem 0;font-style:italic;font-size:0.8rem">No records found</td></tr>`;
-  return `<!DOCTYPE html><html><head><title>Portfolio Report — ${p.generatedDate}</title>
-<meta charset="utf-8">
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;padding:2.5rem;color:#111;background:#fff;font-size:14px;line-height:1.5}
-  h1{font-size:1.75rem;font-weight:900;letter-spacing:-0.03em;margin-bottom:0.25rem}
-  h2{font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;color:#555;margin:2rem 0 0.625rem;padding-bottom:0.4rem;border-bottom:1.5px solid #111}
-  .meta{font-size:0.75rem;color:#888;margin-bottom:0.15rem}
-  .scope{font-size:0.75rem;color:#666;font-style:italic;margin-bottom:0.1rem}
-  .divider{border:none;border-top:2.5px solid #111;margin:1.25rem 0 1rem}
-  .summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0.875rem;margin:1rem 0 1.5rem}
-  .summary-card{background:#f5f5f5;border-radius:0.625rem;padding:1rem 1.25rem;text-align:center}
-  .summary-label{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.12em;color:#888;font-weight:700;margin-bottom:0.25rem}
-  .summary-value{font-size:2rem;font-weight:900;color:#111;line-height:1}
-  table{width:100%;border-collapse:collapse;margin-top:0.25rem;font-size:0.8125rem}
-  th{text-align:left;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.1em;color:#666;font-weight:700;padding:0.5rem 0.5rem 0.5rem;border-bottom:1px solid #ddd}
-  td{padding:0.55rem 0.5rem;border-bottom:1px solid #f0f0f0;vertical-align:middle}
-  tr:last-child td{border-bottom:none}
-  .footer{margin-top:2.5rem;padding-top:1rem;border-top:1px solid #e5e5e5;text-align:center;font-size:0.65rem;color:#bbb;letter-spacing:0.05em}
-  @media print{
-    body{padding:1.5rem}
-    h2{break-before:avoid}
-    table{break-inside:auto}
-    tr{break-inside:avoid;page-break-inside:avoid}
-  }
-</style>
-</head><body>
-<div style="display:flex;justify-content:space-between;align-items:flex-start">
-  <div>
-    <h1>PORTFOLIO REPORT</h1>
-    <div class="meta">Generated on ${p.generatedDate}</div>
-    <div class="scope">Scope: ${p.scopeNames}</div>
-    <div class="scope">Lease expiry window: Next ${p.expiryDays} days</div>
-  </div>
-</div>
-<hr class="divider">
-<div class="summary-grid">
-  <div class="summary-card">
-    <div class="summary-label">Vacant Units</div>
-    <div class="summary-value">${p.vacantUnitsCount}</div>
-  </div>
-  <div class="summary-card">
-    <div class="summary-label">Vacant Beds</div>
-    <div class="summary-value">${p.vacantBedsCount}</div>
-  </div>
-  <div class="summary-card">
-    <div class="summary-label">Expiring Leases</div>
-    <div class="summary-value">${p.expiringLeasesCount}</div>
-  </div>
-  <div class="summary-card" style="background:#fff3f3">
-    <div class="summary-label" style="color:#b91c1c">Outstanding</div>
-    <div class="summary-value" style="color:#b91c1c">${p.outstandingCount}</div>
-  </div>
-</div>
+const SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
 
-<h2>Vacant Units (${p.vacantUnitsCount})</h2>
-<table>
-  <thead><tr>
-    <th>Property</th><th>Unit</th><th>Type</th>
-    <th style="text-align:right">Monthly Rent</th>
-  </tr></thead>
-  <tbody>${p.unitRows || noData}</tbody>
-</table>
-
-<h2>Vacant Beds (${p.vacantBedsCount})</h2>
-<table>
-  <thead><tr>
-    <th>Hostel</th><th>Room</th><th>Vacant Beds</th>
-    <th style="text-align:center">Count</th>
-  </tr></thead>
-  <tbody>${p.bedRows || noData}</tbody>
-</table>
-
-<h2>Expiring Leases — Next ${p.expiryDays} Days (${p.expiringLeasesCount})</h2>
-<table>
-  <thead><tr>
-    <th>Tenant</th><th>Property / Hostel</th><th>Unit / Bed</th>
-    <th style="text-align:right">Rent</th>
-    <th style="text-align:center">Expires</th>
-    <th style="text-align:center">Days Left</th>
-  </tr></thead>
-  <tbody>${p.leaseRows || noData}</tbody>
-</table>
-
-<h2>Outstanding Payments — Pending &amp; Partial (${p.outstandingCount})</h2>
-<table>
-  <thead><tr>
-    <th>Tenant</th><th>Property / Hostel</th><th>Unit / Bed</th>
-    <th>Period</th>
-    <th style="text-align:center">Status</th>
-    <th style="text-align:right">Rent Due</th>
-    <th style="text-align:right">Paid</th>
-    <th style="text-align:right">Balance</th>
-  </tr></thead>
-  <tbody>${p.paymentRows || noData}</tbody>
-</table>
-
-<div class="footer">Generated by Lobby &nbsp;·&nbsp; ${p.generatedDate}</div>
-</body></html>`;
-}
-
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Component ─────────────────────────────────────────────────────────────
 
 const Reports: React.FC = () => {
   const navigate = useNavigate();
   const { ownerId } = useOwner();
 
-  const [selectedPropIds,   setSelectedPropIds]   = useState<Set<string>>(new Set());
   const [selectedHostelIds, setSelectedHostelIds] = useState<Set<string>>(new Set());
   const [expiryDays,        setExpiryDays]        = useState<30 | 60 | 90>(30);
   const [generating,        setGenerating]        = useState(false);
 
-  const propInitialized   = useRef(false);
   const hostelInitialized = useRef(false);
 
   // ── Queries ──────────────────────────────────────────────────────────────
@@ -182,29 +69,11 @@ const Reports: React.FC = () => {
   });
   const sym = SYMBOLS[ownerProfile?.currency] || '₹';
 
-  const { data: properties = [] } = useQuery({
-    queryKey: ['properties', ownerId],
-    queryFn: async () => {
-      const snap = await getDocs(query(collection(db, 'properties'), where('owner_id', '==', ownerId)));
-      return snap.docs.map(d => ({ id: d.id, ...d.data() })) as Property[];
-    },
-    enabled: !!ownerId,
-  });
-
   const { data: hostels = [] } = useQuery({
     queryKey: ['hostels', ownerId],
     queryFn: async () => {
       const snap = await getDocs(query(collection(db, 'hostels'), where('owner_id', '==', ownerId)));
       return snap.docs.map(d => ({ id: d.id, ...d.data() })) as Hostel[];
-    },
-    enabled: !!ownerId,
-  });
-
-  const { data: units = [] } = useQuery({
-    queryKey: ['units', ownerId],
-    queryFn: async () => {
-      const snap = await getDocs(query(collection(db, 'units'), where('owner_id', '==', ownerId)));
-      return snap.docs.map(d => ({ id: d.id, ...d.data() })) as Unit[];
     },
     enabled: !!ownerId,
   });
@@ -259,13 +128,6 @@ const Reports: React.FC = () => {
   // ── Initialize selections once data loads ────────────────────────────────
 
   useEffect(() => {
-    if (properties.length > 0 && !propInitialized.current) {
-      propInitialized.current = true;
-      setSelectedPropIds(new Set(properties.map(p => p.id)));
-    }
-  }, [properties]);
-
-  useEffect(() => {
     if (hostels.length > 0 && !hostelInitialized.current) {
       hostelInitialized.current = true;
       setSelectedHostelIds(new Set(hostels.map(h => h.id)));
@@ -274,19 +136,9 @@ const Reports: React.FC = () => {
 
   // ── Derived data ─────────────────────────────────────────────────────────
 
-  const selectedPropertyNames = useMemo(
-    () => new Set(properties.filter(p => selectedPropIds.has(p.id)).map(p => p.name)),
-    [properties, selectedPropIds],
-  );
-
   const selectedHostelNames = useMemo(
     () => new Set(hostels.filter(h => selectedHostelIds.has(h.id)).map(h => h.name)),
     [hostels, selectedHostelIds],
-  );
-
-  const vacantUnits = useMemo(
-    () => units.filter(u => u.status === 'Vacant' && selectedPropIds.has(u.property_id)),
-    [units, selectedPropIds],
   );
 
   const vacantBeds = useMemo(
@@ -295,7 +147,6 @@ const Reports: React.FC = () => {
   );
 
   const roomMap     = useMemo(() => new Map(rooms.map(r => [r.id, r])),         [rooms]);
-  const propertyMap = useMemo(() => new Map(properties.map(p => [p.id, p])),    [properties]);
   const hostelMap   = useMemo(() => new Map(hostels.map(h => [h.id, h])),       [hostels]);
 
   const expiringLeases = useMemo(() => {
@@ -305,29 +156,21 @@ const Reports: React.FC = () => {
       if (!l.end_date) return false;
       const end = new Date(l.end_date + 'T00:00:00');
       if (end < today || end > cutoff) return false;
-      if (l.property_name) return selectedPropertyNames.has(l.property_name);
       if (l.hostel_name)   return selectedHostelNames.has(l.hostel_name);
       return false;
     });
-  }, [activeLeases, expiryDays, selectedPropertyNames, selectedHostelNames]);
+  }, [activeLeases, expiryDays, selectedHostelNames]);
 
-  // Outstanding payments are already owner-scoped — show all of them regardless
-  // of the property/hostel selection (name-string matching is fragile and drops
-  // payments whose stored name doesn't exactly match the collection name field).
   const filteredOutstanding = outstandingPayments;
 
   // ── Handlers ─────────────────────────────────────────────────────────────
-
-  const toggleProp = (id: string) => setSelectedPropIds(prev => {
-    const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
-  });
 
   const toggleHostel = (id: string) => setSelectedHostelIds(prev => {
     const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
   });
 
-  const selectAll   = () => { setSelectedPropIds(new Set(properties.map(p => p.id))); setSelectedHostelIds(new Set(hostels.map(h => h.id))); };
-  const deselectAll = () => { setSelectedPropIds(new Set()); setSelectedHostelIds(new Set()); };
+  const selectAll   = () => { setSelectedHostelIds(new Set(hostels.map(h => h.id))); };
+  const deselectAll = () => { setSelectedHostelIds(new Set()); };
 
   const generatePDF = async () => {
     setGenerating(true);
@@ -347,19 +190,8 @@ const Reports: React.FC = () => {
     const todayMs = new Date(); todayMs.setHours(0, 0, 0, 0);
 
     const scopeNames = [
-      ...properties.filter(p => selectedPropIds.has(p.id)).map(p => p.name),
       ...hostels.filter(h => selectedHostelIds.has(h.id)).map(h => h.name),
     ].join(', ') || 'None';
-
-    const unitRows = vacantUnits.map(u => {
-      const propName = propertyMap.get(u.property_id)?.name || '—';
-      return `<tr>
-        <td>${propName}</td>
-        <td style="font-weight:700">${u.unit_number}</td>
-        <td>${u.type || '—'}</td>
-        <td style="text-align:right;font-weight:700">${u.base_rent ? sym + u.base_rent.toLocaleString() : '—'}</td>
-      </tr>`;
-    }).join('');
 
     // Group vacant beds by room so each row = one room with its vacant bed list
     const bedsByRoom = new Map<string, { hostelName: string; roomNumber: string; beds: Bed[] }>();
@@ -386,8 +218,8 @@ const Reports: React.FC = () => {
       const endDate  = l.end_date ? new Date(l.end_date + 'T00:00:00') : null;
       const daysLeft = endDate ? Math.ceil((endDate.getTime() - todayMs.getTime()) / 86400000) : null;
       const urgency  = daysLeft === null ? '#888' : daysLeft <= 7 ? '#dc2626' : daysLeft <= 30 ? '#d97706' : '#16a34a';
-      const location = l.property_name || l.hostel_name || '—';
-      const unit     = l.bed_number ? `Room ${l.room_number} · Bed ${l.bed_number}` : l.unit_number ? `Unit ${l.unit_number}` : '—';
+      const location = l.hostel_name || '—';
+      const unit     = l.bed_number ? `Room ${l.room_number} · Bed ${l.bed_number}` : '—';
       return `<tr>
         <td style="font-weight:700">${l.tenant_name}</td>
         <td>${location}</td>
@@ -399,10 +231,8 @@ const Reports: React.FC = () => {
     }).join('');
 
     const paymentRows = filteredOutstanding.map(p => {
-      const location = p.property_name || p.hostel_name || '—';
-      const unit     = p.bed_number
-        ? `Room ${p.room_number} · Bed ${p.bed_number}`
-        : p.unit_number ? `Unit ${p.unit_number}` : '—';
+      const location = p.hostel_name || '—';
+      const unit     = p.bed_number ? `Room ${p.room_number} · Bed ${p.bed_number}` : '—';
       const balance  = p.rent_amount - p.amount;
       const isPending = p.status === 'Pending';
       const statusColor = isPending ? '#b45309' : '#d97706';
@@ -421,11 +251,10 @@ const Reports: React.FC = () => {
 
     w.document.write(buildReportHTML({
       generatedDate, scopeNames, sym, expiryDays,
-      vacantUnitsCount: vacantUnits.length,
       vacantBedsCount: vacantBeds.length,
       expiringLeasesCount: expiringLeases.length,
       outstandingCount: filteredOutstanding.length,
-      unitRows, bedRows, leaseRows, paymentRows,
+      bedRows, leaseRows, paymentRows,
     }));
     w.document.close();
     w.focus();
@@ -434,7 +263,7 @@ const Reports: React.FC = () => {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const noneSelected = selectedPropIds.size === 0 && selectedHostelIds.size === 0;
+  const noneSelected = selectedHostelIds.size === 0;
 
   const checkboxPillStyle = (selected: boolean): React.CSSProperties => ({
     display: 'flex',
@@ -462,8 +291,8 @@ const Reports: React.FC = () => {
             <span className="material-symbols-outlined" style={{ fontSize: '1rem', marginRight: '0.5rem' }}>arrow_back</span>
             Back
           </div>
-          <h1 className="view-title">Portfolio Report</h1>
-          <p className="text-on-surface-variant mt-2">Vacant stock and upcoming lease expirations.</p>
+          <h1 className="view-title">Facility Report</h1>
+          <p className="text-on-surface-variant mt-2">Vacant bed stock and upcoming lease expirations.</p>
         </div>
       </header>
 
@@ -498,33 +327,11 @@ const Reports: React.FC = () => {
           </div>
         </div>
 
-        {/* Properties */}
-        {properties.length > 0 && (
-          <div style={{ marginBottom: '2rem' }}>
-            <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 800, opacity: 0.4, marginBottom: '0.875rem' }}>
-              Properties
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-              {properties.map(p => (
-                <label key={p.id} style={checkboxPillStyle(selectedPropIds.has(p.id))}>
-                  <input
-                    type="checkbox"
-                    checked={selectedPropIds.has(p.id)}
-                    onChange={() => toggleProp(p.id)}
-                    style={{ accentColor: 'var(--primary)', width: '14px', height: '14px', flexShrink: 0 }}
-                  />
-                  {p.name}
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Hostels */}
         {hostels.length > 0 && (
           <div style={{ marginBottom: '2rem' }}>
             <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 800, opacity: 0.4, marginBottom: '0.875rem' }}>
-              Hostels
+              Facilities
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
               {hostels.map(h => (
@@ -563,7 +370,6 @@ const Reports: React.FC = () => {
       {/* Summary Metrics */}
       <div className="properties-metrics-bar" style={{ marginBottom: '2.5rem' }}>
         {[
-          { label: 'Vacant Units',              value: vacantUnits.length,          accent: false },
           { label: 'Vacant Beds',               value: vacantBeds.length,           accent: false },
           { label: `Expiring (${expiryDays}d)`, value: expiringLeases.length,       accent: false },
           { label: 'Outstanding',               value: filteredOutstanding.length,  accent: true  },
@@ -591,5 +397,95 @@ const Reports: React.FC = () => {
     </div>
   );
 };
+
+function buildReportHTML(p: ReportHTMLParams): string {
+  const noData = `<tr><td colspan="99" style="text-align:center;color:#999;padding:1.5rem 0;font-style:italic;font-size:0.8rem">No records found</td></tr>`;
+  return `<!DOCTYPE html><html><head><title>Facility Report — ${p.generatedDate}</title>
+<meta charset="utf-8">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;padding:2.5rem;color:#111;background:#fff;font-size:14px;line-height:1.5}
+  h1{font-size:1.75rem;font-weight:900;letter-spacing:-0.03em;margin-bottom:0.25rem}
+  h2{font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;color:#555;margin:2rem 0 0.625rem;padding-bottom:0.4rem;border-bottom:1.5px solid #111}
+  .meta{font-size:0.75rem;color:#888;margin-bottom:0.15rem}
+  .scope{font-size:0.75rem;color:#666;font-style:italic;margin-bottom:0.1rem}
+  .divider{border:none;border-top:2.5px solid #111;margin:1.25rem 0 1rem}
+  .summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.875rem;margin:1rem 0 1.5rem}
+  .summary-card{background:#f5f5f5;border-radius:0.625rem;padding:1rem 1.25rem;text-align:center}
+  .summary-label{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.12em;color:#888;font-weight:700;margin-bottom:0.25rem}
+  .summary-value{font-size:2rem;font-weight:900;color:#111;line-height:1}
+  table{width:100%;border-collapse:collapse;margin-top:0.25rem;font-size:0.8125rem}
+  th{text-align:left;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.1em;color:#666;font-weight:700;padding:0.5rem 0.5rem 0.5rem;border-bottom:1px solid #ddd}
+  td{padding:0.55rem 0.5rem;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  .footer{margin-top:2rem;padding-top:1rem;border-top:1px solid #e5e5e5;text-align:center;font-size:0.65rem;color:#bbb;letter-spacing:0.05em}
+  @media print{
+    body{padding:1.5rem}
+    h2{break-before:avoid}
+    table{break-inside:auto}
+    tr{break-inside:avoid;page-break-inside:avoid}
+  }
+</style>
+</head><body>
+<div style="display:flex;justify-content:space-between;align-items:flex-start">
+  <div>
+    <h1>FACILITY REPORT</h1>
+    <div class="meta">Generated on ${p.generatedDate}</div>
+    <div class="scope">Scope: ${p.scopeNames}</div>
+    <div class="scope">Lease expiry window: Next ${p.expiryDays} days</div>
+  </div>
+</div>
+<hr class="divider">
+<div class="summary-grid">
+  <div class="summary-card">
+    <div class="summary-label">Vacant Beds</div>
+    <div class="summary-value">${p.vacantBedsCount}</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-label">Expiring Leases</div>
+    <div class="summary-value">${p.expiringLeasesCount}</div>
+  </div>
+  <div class="summary-card" style="background:#fff3f3">
+    <div class="summary-label" style="color:#b91c1c">Outstanding</div>
+    <div class="summary-value" style="color:#b91c1c">${p.outstandingCount}</div>
+  </div>
+</div>
+
+<h2>Vacant Beds (${p.vacantBedsCount})</h2>
+<table>
+  <thead><tr>
+    <th>Hostel</th><th>Room</th><th>Vacant Beds</th>
+    <th style="text-align:center">Count</th>
+  </tr></thead>
+  <tbody>${p.bedRows || noData}</tbody>
+</table>
+
+<h2>Expiring Leases — Next ${p.expiryDays} Days (${p.expiringLeasesCount})</h2>
+<table>
+  <thead><tr>
+    <th>Tenant</th><th>Hostel</th><th>Room / Bed</th>
+    <th style="text-align:right">Rent</th>
+    <th style="text-align:center">Expires</th>
+    <th style="text-align:center">Days Left</th>
+  </tr></thead>
+  <tbody>${p.leaseRows || noData}</tbody>
+</table>
+
+<h2>Outstanding Payments — Pending &amp; Partial (${p.outstandingCount})</h2>
+<table>
+  <thead><tr>
+    <th>Tenant</th><th>Hostel</th><th>Room / Bed</th>
+    <th>Period</th>
+    <th style="text-align:center">Status</th>
+    <th style="text-align:right">Rent Due</th>
+    <th style="text-align:right">Paid</th>
+    <th style="text-align:right">Balance</th>
+  </tr></thead>
+  <tbody>${p.paymentRows || noData}</tbody>
+</table>
+
+<div class="footer">Generated by Lobby &nbsp;·&nbsp; ${p.generatedDate}</div>
+</body></html>`;
+}
 
 export default Reports;

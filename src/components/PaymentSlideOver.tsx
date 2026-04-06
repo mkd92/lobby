@@ -115,11 +115,8 @@ const PaymentSlideOver: React.FC<Props> = ({ id, currencySymbol, onClose, onUpda
 
   const printReceipt = () => {
     if (!payment) return;
-    const isHostel = !!payment.bed_number;
-    const propName = payment.property_name || payment.hostel_name || '';
-    const unitLabel = isHostel
-      ? `Room ${payment.room_number} · Bed ${payment.bed_number}`
-      : `Unit ${payment.unit_number}`;
+    const propName = payment.hostel_name || '';
+    const unitLabel = `Room ${payment.room_number} · Bed ${payment.bed_number}`;
     const paidColor = payment.status === 'Paid' ? '#16a34a' : payment.status === 'Partial' ? '#d97706' : '#b45309';
     const paidBg   = payment.status === 'Paid' ? '#dcfce7' : payment.status === 'Partial' ? '#fef3c7' : '#fef9c3';
     const txRows = transactions.map(tx =>
@@ -132,7 +129,7 @@ const PaymentSlideOver: React.FC<Props> = ({ id, currencySymbol, onClose, onUpda
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Inter',sans-serif;padding:2.5rem;color:#111;background:#fff;font-size:14px}
-  h1{font-size:1.5rem;font-weight:900;letter-spacing:-0.02em}
+  <h1>{font-size:1.5rem;font-weight:900;letter-spacing:-0.02em}
   .sub{font-size:0.7rem;color:#999;margin-top:0.2rem}
   .divider{border:none;border-top:2px solid #111;margin:1.25rem 0}
   .thin{border:none;border-top:1px solid #eee;margin:1rem 0}
@@ -155,7 +152,7 @@ const PaymentSlideOver: React.FC<Props> = ({ id, currencySymbol, onClose, onUpda
 <hr class="divider">
 <div class="row"><div><div class="lbl">Tenant</div><div class="val">${payment.tenant_name}</div></div></div>
 <div class="row">
-  <div><div class="lbl">Property</div><div class="val">${propName}</div></div>
+  <div><div class="lbl">Facility</div><div class="val">${propName}</div></div>
   <div style="text-align:right"><div class="lbl">Unit</div><div class="val">${unitLabel}</div></div>
 </div>
 <div class="row">
@@ -250,9 +247,9 @@ ${txRows ? `<hr class="thin"><div class="lbl" style="margin-bottom:0.75rem">Paym
             <div style={{ background: 'var(--surface-container-low)', borderRadius: '1.5rem', padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontSize: '0.75rem', opacity: 0.5, fontWeight: 600 }}>{payment.property_name || payment.hostel_name}</div>
+                  <div style={{ fontSize: '0.75rem', opacity: 0.5, fontWeight: 600 }}>{payment.hostel_name}</div>
                   <div style={{ fontSize: '0.8125rem', fontWeight: 700, marginTop: '0.15rem' }}>
-                    {payment.bed_number ? `Room ${payment.room_number} · Bed ${payment.bed_number}` : `Unit ${payment.unit_number}`}
+                    Room {payment.room_number} · Bed {payment.bed_number}
                   </div>
                 </div>
                 <span className={`badge-modern ${payment.status === 'Paid' ? 'badge-success' : payment.status === 'Partial' ? 'badge-partial' : 'badge-warning'}`}>

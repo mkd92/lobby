@@ -20,18 +20,6 @@ interface Payment {
   status: 'Paid' | 'Partial' | 'Pending';
 }
 
-interface Unit {
-  id: string;
-  unit_number: string;
-  property_id: string;
-  status: string;
-}
-
-interface Property {
-  id: string;
-  name: string;
-}
-
 interface Bed {
   id: string;
   bed_number: string;
@@ -69,24 +57,6 @@ const StaffDashboard: React.FC = () => {
     },
   });
 
-  const { data: units = [], isLoading: unitsLoading } = useQuery({
-    queryKey: ['staff-units', ownerId],
-    enabled: !!ownerId,
-    queryFn: async () => {
-      const snap = await getDocs(query(collection(db, 'units'), where('owner_id', '==', ownerId)));
-      return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Unit);
-    },
-  });
-
-  const { data: properties = [] } = useQuery({
-    queryKey: ['staff-properties', ownerId],
-    enabled: !!ownerId,
-    queryFn: async () => {
-      const snap = await getDocs(query(collection(db, 'properties'), where('owner_id', '==', ownerId)));
-      return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Property);
-    },
-  });
-
   const { data: beds = [], isLoading: bedsLoading } = useQuery({
     queryKey: ['staff-beds', ownerId],
     enabled: !!ownerId,
@@ -114,15 +84,13 @@ const StaffDashboard: React.FC = () => {
     },
   });
 
-  const isLoading = paymentsLoading || unitsLoading || bedsLoading;
+  const isLoading = paymentsLoading || bedsLoading;
   if (isLoading) return <LoadingScreen message="Loading workspace" />;
 
   // Derived data
   const pendingPayments = payments.filter(p => p.status === 'Pending' || p.status === 'Partial');
-  const vacantUnits     = units.filter(u => u.status === 'Vacant');
   const vacantBeds      = beds.filter(b => b.status === 'Vacant');
 
-  const propertyMap = new Map(properties.map(p => [p.id, p.name]));
   const roomMap     = new Map(rooms.map(r => [r.id, r]));
   const hostelMap   = new Map(hostels.map(h => [h.id, h.name]));
 
@@ -192,8 +160,8 @@ const StaffDashboard: React.FC = () => {
             display: 'flex', alignItems: 'center', gap: '0.375rem',
             fontSize: '0.72rem', fontWeight: 700, opacity: 0.4,
           }}>
-            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>door_front</span>
-            <span>{vacantUnits.length + vacantBeds.length} vacant</span>
+            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>hotel</span>
+            <span>{vacantBeds.length} vacant beds</span>
           </div>
         </div>
       </div>
@@ -264,11 +232,9 @@ const StaffDashboard: React.FC = () => {
                       {p.tenant_name}
                     </div>
                     <div style={{ fontSize: '0.7rem', opacity: 0.45, fontWeight: 500, marginTop: '0.15rem' }}>
-                      {p.unit_number
-                        ? `Unit ${p.unit_number}${p.property_name ? ` · ${p.property_name}` : ''}`
-                        : p.bed_number
-                          ? `Bed ${p.bed_number}${p.room_number ? ` · Room ${p.room_number}` : ''}${p.hostel_name ? ` · ${p.hostel_name}` : ''}`
-                          : '—'
+                      {p.bed_number
+                        ? `Bed ${p.bed_number}${p.room_number ? ` · Room ${p.room_number}` : ''}${p.hostel_name ? ` · ${p.hostel_name}` : ''}`
+                        : '—'
                       }
                       {' · '}{p.month_for}
                     </div>
@@ -285,81 +251,6 @@ const StaffDashboard: React.FC = () => {
                   }}>
                     {p.status}
                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Vacant Units ── */}
-      <div className="modern-card" style={{ padding: '2rem 2.5rem', marginBottom: '1.25rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-          <span style={sectionLabel as React.CSSProperties}>
-            Vacant Units
-            {vacantUnits.length > 0 && (
-              <span style={{
-                marginLeft: '0.625rem',
-                background: 'rgba(34,197,94,0.1)',
-                color: '#22c55e',
-                padding: '0.15rem 0.5rem',
-                borderRadius: '999px',
-                fontSize: '0.6rem',
-                fontWeight: 900,
-                letterSpacing: '0.08em',
-              }}>
-                {vacantUnits.length}
-              </span>
-            )}
-          </span>
-          {vacantUnits.length > 0 && (
-            <Link
-              to="/properties"
-              style={{
-                fontSize: '0.72rem', fontWeight: 700, color: 'var(--primary)',
-                textDecoration: 'none', opacity: 0.7,
-                display: 'flex', alignItems: 'center', gap: '0.25rem',
-              }}
-            >
-              View properties
-              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>arrow_forward</span>
-            </Link>
-          )}
-        </div>
-
-        {vacantUnits.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2.5rem 0', opacity: 0.2 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: '2.25rem', display: 'block', marginBottom: '0.625rem' }}>apartment</span>
-            <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>No vacant units</p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {vacantUnits.map(u => (
-              <div key={u.id} style={{
-                display: 'flex', alignItems: 'center', gap: '0.875rem',
-                padding: '0.875rem 1.125rem', borderRadius: '0.875rem',
-                background: 'var(--surface-container-high)',
-              }}>
-                <div style={{
-                  width: '34px', height: '34px', borderRadius: '0.625rem', flexShrink: 0,
-                  background: 'rgba(34,197,94,0.08)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: '#22c55e' }}>door_front</span>
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.875rem' }}>Unit {u.unit_number}</div>
-                  <div style={{ fontSize: '0.7rem', opacity: 0.45, fontWeight: 500, marginTop: '0.1rem' }}>
-                    {propertyMap.get(u.property_id) ?? '—'}
-                  </div>
-                </div>
-                <div style={{ marginLeft: 'auto' }}>
-                  <span style={{
-                    fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase',
-                    color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '0.2rem 0.5rem', borderRadius: '999px',
-                  }}>
-                    Vacant
-                  </span>
                 </div>
               </div>
             ))}

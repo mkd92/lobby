@@ -13,8 +13,6 @@ interface Payment {
   lease_id: string;
   owner_id: string;
   tenant_name: string;
-  unit_number: string | null;
-  property_name: string | null;
   bed_number: string | null;
   room_number: string | null;
   hostel_name: string | null;
@@ -99,9 +97,7 @@ const PaymentDetail: React.FC = () => {
   if (isLoading) return <LoadingScreen message="Accessing Transaction Vault" />;
   if (!payment) return null;
 
-  const isHostel = !!payment.bed_number;
-  const propName = payment.property_name || payment.hostel_name;
-  const unitLabel = isHostel ? `Room ${payment.room_number} · Bed ${payment.bed_number}` : `Unit ${payment.unit_number}`;
+  const unitLabel = `Room ${payment.room_number} · Bed ${payment.bed_number}`;
 
   return (
     <div className="view-container page-fade-in mesh-gradient-bg">
@@ -142,7 +138,7 @@ const PaymentDetail: React.FC = () => {
               </div>
               <div>
                 <label className="text-[0.6rem] uppercase tracking-[0.2em] font-black text-secondary/40 block mb-2">Portfolio Inventory</label>
-                <div className="text-white/80 font-medium text-lg">{propName} — {unitLabel}</div>
+                <div className="text-white/80 font-medium text-lg">{payment.hostel_name} — {unitLabel}</div>
               </div>
             </div>
           </div>

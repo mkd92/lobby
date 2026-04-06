@@ -6,7 +6,7 @@ import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoadingScreen } from './layout/LoadingScreen';
-import '../styles/Properties.css';
+
 import '../styles/Leases.css';
 
 interface Customer {

@@ -18,9 +18,7 @@ import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import { LoadingScreen } from './layout/LoadingScreen';
 import { useEscapeKey } from '../hooks/useEscapeKey';
-import '../styles/Units.css';
 import '../styles/HostelDetail.css';
-import '../styles/Properties.css';
 import '../styles/Leases.css';
 
 interface Bed {

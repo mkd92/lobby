@@ -8,10 +8,6 @@ import './App.css';
 // Lazy load components with explicit export for prefetching
 const Lobby = lazy(() => import('./components/Lobby'));
 const Auth = lazy(() => import('./components/Auth'));
-const Properties = lazy(() => import('./components/Properties'));
-const AddProperty = lazy(() => import('./components/AddProperty'));
-const PropertyDetail = lazy(() => import('./components/PropertyDetail'));
-const UnitDetail = lazy(() => import('./components/UnitDetail'));
 const Payments = lazy(() => import('./components/Payments'));
 const PaymentDetail = lazy(() => import('./components/PaymentDetail'));
 const Settings = lazy(() => import('./components/Settings'));
@@ -31,10 +27,6 @@ const Team    = lazy(() => import('./components/Team'));
 // Prefetch Map
 export const prefetchMap = {
   lobby: () => import('./components/Lobby'),
-  properties: () => import('./components/Properties'),
-  addProperty: () => import('./components/AddProperty'),
-  propertyDetail: () => import('./components/PropertyDetail'),
-  unitDetail: () => import('./components/UnitDetail'),
   payments: () => import('./components/Payments'),
   paymentDetail: () => import('./components/PaymentDetail'),
   settings: () => import('./components/Settings'),
@@ -77,10 +69,6 @@ function App() {
           <div className="page-fade-in">
             <Routes>
               <Route path="/" element={<Lobby />} />
-              <Route path="/properties" element={<Properties />} />
-              <Route path="/properties/new" element={<AddProperty />} />
-              <Route path="/properties/:id" element={<PropertyDetail />} />
-              <Route path="/units/:id" element={<UnitDetail />} />
               <Route path="/customers" element={<Customers />} />
               <Route path="/customers/new" element={<AddCustomer />} />
               <Route path="/customers/:id" element={<CustomerDetail />} />

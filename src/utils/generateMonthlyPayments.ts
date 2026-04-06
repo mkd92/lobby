@@ -31,7 +31,7 @@ export async function previewMonthlyPayments(ownerId: string): Promise<GenerateP
       where('month_for', '==', currentMonth)
     ));
     if (existingSnap.empty) {
-      const unit = lease.unit_number || (lease.bed_number ? `Bed ${lease.bed_number}` : '—');
+      const unit = lease.bed_number ? `Bed ${lease.bed_number}` : '—';
       toCreate.push({ tenant_name: lease.tenant_name || 'Unknown', unit, rent_amount: lease.rent_amount || 0 });
     } else {
       existing++;
@@ -76,13 +76,11 @@ export async function generateMonthlyPayments(ownerId: string): Promise<void> {
         owner_id:       ownerId,
         lease_id:       leaseDoc.id,
         tenant_name:    lease.tenant_name || '',
-        unit_number:    lease.unit_number || null,
-        property_name:  lease.property_name || null,
         bed_number:     lease.bed_number || null,
         room_number:    lease.room_number || null,
         hostel_name:    lease.hostel_name || null,
         rent_amount:    lease.rent_amount,
-        amount:         lease.rent_amount,
+        amount:         0,
         payment_date:   today.toISOString().split('T')[0],
         month_for:      currentMonth,
         payment_method: null,

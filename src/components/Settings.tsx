@@ -8,7 +8,7 @@ import { auth, db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
 import { useTheme } from '../context/ThemeContext';
 import { LoadingScreen } from './layout/LoadingScreen';
-import '../styles/Properties.css';
+
 import '../styles/Settings.css';
 import '../styles/Leases.css';
 

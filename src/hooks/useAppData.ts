@@ -1,5 +1,4 @@
 import { useDashboard } from './useDashboard';
-import { useProperties } from './useProperties';
 
 /**
  * useAppData - Centralized Hook Architecture (MOMA Pattern)
@@ -15,44 +14,21 @@ export const useAppData = () => {
     refetch: refetchDashboard 
   } = useDashboard();
   
-  const { 
-    properties, 
-    isLoading: isPropertiesLoading, 
-    saveProperty, 
-    removeProperty,
-    checkOccupiedUnits
-  } = useProperties();
-
   // 2. Derive Intelligence
   const stats = dashboardData?.stats;
   const revenueChart = dashboardData?.revenueChart;
   
-  // Example derived KPI: Properties with High Vacancy (mock logic based on available data)
-  const totalAssets = properties.length;
-
   // 3. Centralized State & Mutations Facade
-  const isLoading = isDashboardLoading || isPropertiesLoading;
+  const isLoading = isDashboardLoading;
 
   const refreshAll = () => {
     refetchDashboard();
-    // other invalidations can be triggered here
   };
 
   return {
     // Derived KPIs
     stats,
     revenueChart,
-    totalAssets,
-    
-    // Core Entities
-    properties,
-    
-    // Standard Mutation Callbacks
-    mutations: {
-      saveProperty,
-      removeProperty,
-      checkOccupiedUnits,
-    },
     
     // Meta state
     isLoading,
