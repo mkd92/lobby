@@ -24,18 +24,14 @@ const Lobby: React.FC = () => {
     overdueAmount: "0",
     leaseExpirations: "0",
     annualRevenue: "0",
-    totalUnits: 0,
-    vacantUnits: 0,
     totalBeds: 0,
     vacantBeds: 0,
   };
   const revenueChart = data?.revenueChart ?? [];
 
   const occupancyRate =
-    stats.totalUnits > 0
-      ? Math.round(
-          ((stats.totalUnits - stats.vacantUnits) / stats.totalUnits) * 1000,
-        ) / 10
+    stats.totalBeds > 0
+      ? Math.round(((stats.totalBeds - stats.vacantBeds) / stats.totalBeds) * 1000) / 10
       : 0;
 
   return (
@@ -51,7 +47,7 @@ const Lobby: React.FC = () => {
         {!isStaff && (
           <div className="flex gap-4">
             <Link
-              to="/properties/new"
+              to="/hostels/new"
               className="primary-button"
               style={{ textDecoration: "none" }}
             >
@@ -61,7 +57,7 @@ const Lobby: React.FC = () => {
               >
                 add
               </span>
-              New Property
+              New Hostel
             </Link>
           </div>
         )}
@@ -115,24 +111,29 @@ const Lobby: React.FC = () => {
           </div>
         </div>
 
-        {/* Active Assets */}
+        {/* Bed Inventory */}
         <div className="glass-panel p-10 rounded-[32px] relative overflow-hidden group transition-all hover:scale-[1.02]">
           <div className="flex justify-between items-start mb-8">
             <span className="material-symbols-outlined text-primary p-4 bg-primary/10 rounded-2xl">
-              apartment
+              hotel
             </span>
           </div>
           <h3 className="text-on-surface-variant text-sm font-bold uppercase tracking-widest mb-2">
-            Inventory Assets
+            Bed Inventory
           </h3>
           <div className="flex items-baseline gap-2">
             <span className="text-primary font-display font-extrabold text-5xl">
-              {stats.totalUnits}
+              {stats.totalBeds}
             </span>
             <span className="text-on-surface-variant font-display font-bold text-xl ml-2">
-              Units
+              Beds
             </span>
           </div>
+          {stats.vacantBeds > 0 && (
+            <p className="text-on-surface-variant text-xs font-bold opacity-40 mt-2">
+              {stats.vacantBeds} vacant
+            </p>
+          )}
         </div>
       </div>
 
