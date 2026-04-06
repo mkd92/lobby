@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useOwner } from './context/OwnerContext';
 import Layout from './components/Layout';
 import { LoadingScreen } from './components/layout/LoadingScreen';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import './App.css';
 
 // Lazy load components with explicit export for prefetching
@@ -65,6 +66,7 @@ function App() {
   return (
     <div className="App">
       <Layout>
+        <ErrorBoundary>
         <Suspense fallback={<LoadingScreen />}>
           <div className="page-fade-in">
             <Routes>
@@ -88,6 +90,7 @@ function App() {
             </Routes>
           </div>
         </Suspense>
+        </ErrorBoundary>
       </Layout>
     </div>
   );

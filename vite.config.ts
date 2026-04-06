@@ -13,8 +13,12 @@ export default defineConfig({
     tailwindcss(),
     react(),
     VitePWA({
-      registerType: 'prompt',
-      injectRegister: 'script',
+      registerType: 'autoUpdate',
+      injectRegister: 'auto',
+      workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+      },
       includeAssets: ['favicon.svg', 'icon.svg'],
       manifest: {
         name: 'Kinetic Architect - Lobby',
