@@ -53,7 +53,9 @@ const monthsOverdue = (monthFor: string) => {
 const isOverdue = (p: Payment) => p.status !== 'Paid' && isPastMonth(p.month_for);
 
 const Payments: React.FC = () => {
-  const { ownerId, isStaff } = useOwner();
+  const { ownerId, userRole } = useOwner();
+  const canCreate = userRole !== 'viewer';
+  const isOwner = userRole === 'owner';
   const queryClient = useQueryClient();
   const { showAlert, showConfirm, DialogMount } = useDialog();
 
@@ -422,7 +424,7 @@ const Payments: React.FC = () => {
         <p className="view-eyebrow">Financial Ledger</p>
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
           <h1 className="view-title" style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', margin: 0 }}>Revenue & Receipts</h1>
-          {!isStaff && (
+          {canCreate && (
             <button onClick={handleSync} className="primary-button" disabled={saving}>
               <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle', fontSize: '1.25rem' }}>autorenew</span>
               {saving ? 'Processing...' : 'Generate Cycle'}
@@ -602,7 +604,7 @@ const Payments: React.FC = () => {
                             Amount Paid {sortIcon('amount')}
                           </th>
                           <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
-                          {!isStaff && <th></th>}
+                          {canCreate && <th></th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -639,7 +641,7 @@ const Payments: React.FC = () => {
                               <td style={{ textAlign: 'center' }}>
                                 <span className={`badge-modern ${p.status === 'Paid' ? 'badge-success' : p.status === 'Partial' ? 'badge-partial' : 'badge-warning'}`}>{p.status}</span>
                               </td>
-                              {!isStaff && (
+                              {canCreate && (
                                 <td>
                                   <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
                                     {(p.status === 'Pending' || p.status === 'Partial') && (
@@ -647,9 +649,11 @@ const Payments: React.FC = () => {
                                         <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>payments</span>
                                       </button>
                                     )}
-                                    <button className="btn-icon danger" onClick={e => handleDelete(e, p.id)} style={{ color: 'var(--error)' }}>
-                                      <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span>
-                                    </button>
+                                    {isOwner && (
+                                      <button className="btn-icon danger" onClick={e => handleDelete(e, p.id)} style={{ color: 'var(--error)' }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span>
+                                      </button>
+                                    )}
                                   </div>
                                 </td>
                               )}
@@ -671,7 +675,7 @@ const Payments: React.FC = () => {
               <table className="modern-table">
                 <thead>
                   <tr>
-                    {!isStaff && <th style={{ width: '2.5rem' }}></th>}
+                    {isOwner && <th style={{ width: '2.5rem' }}></th>}
                     <th>Payee Entity</th>
                     <th>Asset Inventory</th>
                     <th>Service Period</th>
@@ -694,7 +698,7 @@ const Payments: React.FC = () => {
                         style={{ cursor: 'pointer', ...(overdue ? { borderLeft: '3px solid var(--error)' } : {}), ...(kbSelectedId === p.id ? { outline: '2px solid var(--primary)', outlineOffset: '-2px' } : {}) }}
                         className={overdue ? 'row-overdue' : ''}
                       >
-                        {!isStaff && (
+                        {isOwner && (
                           <td onClick={e => toggleSelect(e, p.id)} style={{ width: '2.5rem', padding: '0 0.75rem' }}>
                             <div style={{
                               width: '1.125rem', height: '1.125rem', borderRadius: '0.375rem', border: `2px solid ${isChecked ? 'var(--primary)' : 'var(--outline-variant)'}`,
@@ -740,12 +744,12 @@ const Payments: React.FC = () => {
                         </td>
                         <td style={{ textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-                            {!isStaff && (p.status === 'Pending' || p.status === 'Partial') && (
+                            {canCreate && (p.status === 'Pending' || p.status === 'Partial') && (
                               <button className="btn-icon" onClick={(e) => { e.stopPropagation(); openReceiveModal(p); }} title="Receive Payment" style={{ color: 'var(--primary)' }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>payments</span>
                               </button>
                             )}
-                            {!isStaff && (
+                            {isOwner && (
                               <button className="btn-icon danger" onClick={(e) => handleDelete(e, p.id)} title="Delete Record" style={{ color: 'var(--error)' }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span>
                               </button>
@@ -775,12 +779,12 @@ const Payments: React.FC = () => {
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        {!isStaff && (p.status === 'Pending' || p.status === 'Partial') && (
+                        {canCreate && (p.status === 'Pending' || p.status === 'Partial') && (
                           <button className="btn-icon" onClick={(e) => { e.stopPropagation(); openReceiveModal(p); }} style={{ padding: '0.4rem', color: 'var(--primary)' }} title="Receive Payment">
                             <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>payments</span>
                           </button>
                         )}
-                        {!isStaff && (
+                        {isOwner && (
                           <button className="btn-icon danger" onClick={(e) => handleDelete(e, p.id)} style={{ padding: '0.4rem', color: 'var(--error)' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span>
                           </button>

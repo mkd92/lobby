@@ -9,19 +9,20 @@ export interface Account {
   id: string;
   name: string;
   isOwn: boolean;
+  role: 'owner' | 'manager' | 'viewer';
 }
 
 interface OwnerContextType {
   user: User | null;
   ownerId: string | null;
-  isStaff: boolean;
+  userRole: 'owner' | 'manager' | 'viewer';
   ownerLoading: boolean;
   availableAccounts: Account[];
   switchAccount: (id: string) => void;
 }
 
 const OwnerContext = createContext<OwnerContextType>({
-  user: null, ownerId: null, isStaff: false, ownerLoading: true,
+  user: null, ownerId: null, userRole: 'viewer', ownerLoading: true,
   availableAccounts: [], switchAccount: () => {},
 });
 
@@ -30,7 +31,7 @@ const STORAGE_KEY = 'selectedOwnerId';
 export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [ownerId, setOwnerId] = useState<string | null>(null);
-  const [isStaff, setIsStaff] = useState(false);
+  const [userRole, setUserRole] = useState<'owner' | 'manager' | 'viewer'>('viewer');
   const [ownerLoading, setOwnerLoading] = useState(true);
   const [availableAccounts, setAvailableAccounts] = useState<Account[]>([]);
 
@@ -46,7 +47,7 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     if (!user) {
       setOwnerId(null);
-      setIsStaff(false);
+      setUserRole('viewer');
       setOwnerLoading(false);
       setAvailableAccounts([]);
       return;
@@ -77,10 +78,15 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
           // Build accounts list: own account first, then active staff accounts
           const accounts: Account[] = [
-            { id: user.uid, name: ownName, isOwn: true },
+            { id: user.uid, name: ownName, isOwn: true, role: 'owner' },
             ...activeStaffDocs.map(d => {
               const data = d.data();
-              return { id: data.owner_id as string, name: data.owner_name || 'Unknown', isOwn: false };
+              return { 
+                id: data.owner_id as string, 
+                name: data.owner_name || 'Unknown', 
+                isOwn: false,
+                role: (data.role as 'manager' | 'viewer') || 'viewer'
+              };
             }),
           ];
           setAvailableAccounts(accounts);
@@ -105,12 +111,12 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const active = accounts.find(a => a.id === (validSaved || user.uid)) || accounts[0];
 
           setOwnerId(active.id);
-          setIsStaff(!active.isOwn);
+          setUserRole(active.role);
           void generateMonthlyPayments(active.id);
         } catch (error) {
           console.error('OwnerContext error:', error);
           setOwnerId(user.uid);
-          setIsStaff(false);
+          setUserRole('owner');
         } finally {
           setOwnerLoading(false);
         }
@@ -118,7 +124,7 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       (error) => {
         console.error('OwnerContext snapshot error:', error);
         setOwnerId(user.uid);
-        setIsStaff(false);
+        setUserRole('owner');
         setOwnerLoading(false);
       }
     );
@@ -131,12 +137,12 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!account) return;
     localStorage.setItem(STORAGE_KEY, id);
     setOwnerId(id);
-    setIsStaff(!account.isOwn);
+    setUserRole(account.role);
     void generateMonthlyPayments(id);
   };
 
   return (
-    <OwnerContext.Provider value={{ user: user ?? null, ownerId, isStaff, ownerLoading, availableAccounts, switchAccount }}>
+    <OwnerContext.Provider value={{ user: user ?? null, ownerId, userRole, ownerLoading, availableAccounts, switchAccount }}>
       {children}
     </OwnerContext.Provider>
   );

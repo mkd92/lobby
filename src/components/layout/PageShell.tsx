@@ -15,7 +15,8 @@ import '../../styles/Lobby.css';
 export const PageShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const { isStaff } = useOwner();
+  const { userRole } = useOwner();
+  const isStaff = userRole !== 'owner';
   const navigate = useNavigate();
   const { paletteOpen, closePalette } = useCommandPalette();
 

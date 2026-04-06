@@ -8,7 +8,8 @@ import StaffDashboard from "./StaffDashboard";
 import "../styles/Lobby.css";
 
 const Lobby: React.FC = () => {
-  const { isStaff } = useOwner();
+  const { userRole } = useOwner();
+  const isStaff = userRole !== 'owner';
   const { data, isLoading } = useDashboard();
 
   // Staff get a focused operational view instead of the owner analytics dashboard

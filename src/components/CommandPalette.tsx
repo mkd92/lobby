@@ -22,7 +22,9 @@ interface PaletteItem {
 const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
   const navigate     = useNavigate();
   const queryClient  = useQueryClient();
-  const { ownerId, isStaff } = useOwner();
+  const { ownerId, userRole } = useOwner();
+  const isStaff = userRole !== 'owner';
+  const canCreate = userRole !== 'viewer';
 
   const [query,       setQuery]       = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
@@ -59,7 +61,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
       { id: 'go-hostels',   label: 'Go to Hostels',   icon: 'apartment',   action: () => go('/hostels') },
       { id: 'go-payments',  label: 'Go to Payments',   icon: 'payments',    action: () => go('/payments') },
       { id: 'go-team',      label: 'Go to Team',        icon: 'groups',      action: () => go('/team') },
-      ...(!isStaff ? [
+      ...(canCreate ? [
         { id: 'go-customers', label: 'Go to Customers', icon: 'person',      action: () => go('/customers') },
         { id: 'go-leases',    label: 'Go to Leases',    icon: 'description', action: () => go('/leases') },
         { id: 'new-customer', label: 'New Customer',    icon: 'person_add',  action: () => go('/customers/new') },

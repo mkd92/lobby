@@ -26,7 +26,8 @@ const currencies = [
 
 const Settings: React.FC = () => {
   const navigate = useNavigate();
-  const { ownerId, isStaff } = useOwner();
+  const { ownerId, userRole } = useOwner();
+  const isStaff = userRole !== 'owner';
   const { theme, setTheme } = useTheme();
   const queryClient = useQueryClient();
   const [profile, setProfile] = useState({ name: '', email: '', phone: '', currency: 'USD' });

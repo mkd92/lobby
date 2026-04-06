@@ -30,7 +30,8 @@ interface Lease {
 const LeaseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { ownerId, isStaff } = useOwner();
+  const { ownerId, userRole } = useOwner();
+  const isOwner = userRole === 'owner';
   const queryClient = useQueryClient();
   const { showAlert, DialogMount } = useDialog();
 
@@ -78,7 +79,7 @@ const LeaseDetail: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isStaff) return;
+    if (!isOwner) return;
     setSaving(true);
     try {
       await updateDoc(doc(db, 'leases', id!), {
@@ -187,7 +188,7 @@ const LeaseDetail: React.FC = () => {
           <div className="glass-panel p-10 md:p-16 rounded-[48px]">
             <div className="flex justify-between items-center mb-12">
               <h2 className="text-white font-display font-bold text-3xl tracking-tight">Legal Provisions</h2>
-              {!isStaff && (
+              {isOwner && (
                 <div className="flex items-center gap-2 text-primary-container/60 text-xs font-bold uppercase tracking-widest">
                   <span className="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
                   Ready for Sync
@@ -206,7 +207,7 @@ const LeaseDetail: React.FC = () => {
                     onChange={e => setForm({...form, rent_amount: e.target.value})} 
                     className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-display font-bold text-xl"
                     required 
-                    disabled={isStaff} 
+                    disabled={!isOwner} 
                   />
                 </div>
                 <div className="form-group-modern">
@@ -217,7 +218,7 @@ const LeaseDetail: React.FC = () => {
                     value={form.security_deposit} 
                     onChange={e => setForm({...form, security_deposit: e.target.value})} 
                     className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-display font-bold text-xl"
-                    disabled={isStaff} 
+                    disabled={!isOwner} 
                   />
                 </div>
                 <div className="form-group-modern">
@@ -228,7 +229,7 @@ const LeaseDetail: React.FC = () => {
                     onChange={e => setForm({...form, start_date: e.target.value})} 
                     className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-medium text-white"
                     required 
-                    disabled={isStaff} 
+                    disabled={!isOwner} 
                   />
                 </div>
                 <div className="form-group-modern">
@@ -238,7 +239,7 @@ const LeaseDetail: React.FC = () => {
                     value={form.end_date} 
                     onChange={e => setForm({...form, end_date: e.target.value})} 
                     className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-medium text-white"
-                    disabled={isStaff} 
+                    disabled={!isOwner} 
                   />
                 </div>
               </div>
@@ -252,7 +253,7 @@ const LeaseDetail: React.FC = () => {
                       type="button"
                       onClick={() => setForm({...form, status: s})}
                       className={`flex-1 py-4 px-6 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all duration-300 ${form.status === s ? 'bg-white text-on-primary shadow-lg scale-[1.02]' : 'bg-surface-container-low text-secondary/40 hover:text-white hover:bg-white/5'}`}
-                      disabled={isStaff}
+                      disabled={!isOwner}
                     >
                       {s}
                     </button>
@@ -267,11 +268,11 @@ const LeaseDetail: React.FC = () => {
                   onChange={e => setForm({...form, notes: e.target.value})}
                   className="auth-input w-full min-h-[160px] bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-3xl p-6 font-medium text-white leading-relaxed resize-none"
                   placeholder="Record additional contractual provisions, negotiation history, or risk assessment..."
-                  disabled={isStaff}
+                  disabled={!isOwner}
                 />
               </div>
 
-              {!isStaff && (
+              {isOwner && (
                 <footer className="flex flex-wrap justify-center sm:justify-end items-center gap-4 sm:gap-8 mt-6 pt-10 border-t border-white/5">
                   <button type="button" className="text-secondary/40 font-bold uppercase tracking-widest text-xs hover:text-white transition-colors" onClick={() => navigate('/leases')}>
                     Discard Changes

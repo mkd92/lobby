@@ -10,7 +10,9 @@ import '../styles/Properties.css';
 const Properties: React.FC = () => {
   const navigate = useNavigate();
   const { showAlert, showConfirm, DialogMount } = useDialog();
-  const { isStaff } = useOwner();
+  const { userRole } = useOwner();
+  const canCreate = userRole !== 'viewer';
+  const isOwner = userRole === 'owner';
   const { properties, isLoading, mutations } = useAppData();
   const { removeProperty, checkOccupiedUnits } = mutations;
 
@@ -59,7 +61,7 @@ const Properties: React.FC = () => {
         <p className="view-eyebrow">Portfolio Assets</p>
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
           <h1 className="view-title" style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', margin: 0 }}>Property Management</h1>
-          {!isStaff && (
+          {canCreate && (
             <button onClick={() => navigate('/properties/new')} className="primary-button">
               <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle', fontSize: '1.25rem' }}>add</span>
               Register Asset
@@ -110,7 +112,7 @@ const Properties: React.FC = () => {
           </div>
           <h2 className="mb-4">Empty Portfolio</h2>
           <p className="text-on-surface-variant mb-10 max-w-md mx-auto">Register your first property asset to begin tracking units, occupancy, and financial yields.</p>
-          {!isStaff && (
+          {canCreate && (
             <button onClick={() => navigate('/properties/new')} className="primary-button">Initialize Portfolio</button>
           )}
         </div>
@@ -136,7 +138,7 @@ const Properties: React.FC = () => {
                      property.type === 'Industrial' ? 'factory' : 'apartment'}
                   </span>
                 </div>
-                {!isStaff && (
+                {isOwner && (
                   <div className="property-card-quick-actions" onClick={e => e.stopPropagation()}>
                     <button className="prop-mini-btn danger" onClick={e => handleDelete(e, property)} title="Terminate Asset">
                       <span className="material-symbols-outlined">delete</span>

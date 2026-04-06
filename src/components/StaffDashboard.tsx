@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useQuery } from '@tanstack/react-query';
 import { db } from '../firebaseClient';
@@ -45,8 +45,10 @@ const sectionLabel: React.CSSProperties = {
 const QUERY_OPTS = { staleTime: 0, refetchInterval: 60_000 };
 
 const StaffDashboard: React.FC = () => {
-  const { ownerId, availableAccounts } = useOwner();
+  const navigate = useNavigate();
+  const { ownerId, userRole, availableAccounts } = useOwner();
   const ownerName = availableAccounts.find(a => a.id === ownerId)?.name ?? 'Owner';
+  const isManager = userRole === 'manager';
 
   const { data: payments = [], isLoading: paymentsLoading } = useQuery({
     queryKey: ['staff-payments', ownerId],
@@ -149,7 +151,7 @@ const StaffDashboard: React.FC = () => {
               Viewing <span style={{ color: '#f59e0b' }}>{ownerName}</span>
             </div>
             <div style={{ fontSize: '0.7rem', opacity: 0.4, fontWeight: 500 }}>
-              Read-only · Operational Snapshot
+              {isManager ? 'Manager · Can Create Records' : 'Read-only · Operational Snapshot'}
             </div>
           </div>
         </div>
@@ -187,6 +189,27 @@ const StaffDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Manager quick-create actions */}
+      {isManager && (
+        <div style={{
+          display: 'flex', gap: '0.625rem', flexWrap: 'wrap',
+          marginBottom: '1.5rem',
+        }}>
+          <button onClick={() => navigate('/customers/new')} className="primary-button" style={{ fontSize: '0.8rem', padding: '0.625rem 1.125rem' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle', marginRight: '0.375rem' }}>person_add</span>
+            New Customer
+          </button>
+          <button onClick={() => navigate('/leases/new')} className="primary-button" style={{ fontSize: '0.8rem', padding: '0.625rem 1.125rem' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle', marginRight: '0.375rem' }}>description</span>
+            New Lease
+          </button>
+          <button onClick={() => navigate('/payments')} className="primary-button" style={{ fontSize: '0.8rem', padding: '0.625rem 1.125rem' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle', marginRight: '0.375rem' }}>payments</span>
+            Record Payment
+          </button>
+        </div>
+      )}
 
       {/* Two-column grid */}
       <div className="staff-dashboard-grid">

@@ -25,7 +25,8 @@ interface Room {
 const RoomDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { ownerId, isStaff } = useOwner();
+  const { ownerId, userRole } = useOwner();
+  const isStaff = userRole !== 'owner';
   const queryClient = useQueryClient();
   const { showAlert, showConfirm, DialogMount } = useDialog();
 
