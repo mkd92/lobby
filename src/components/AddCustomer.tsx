@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
+import '../styles/Properties.css';
 
 const AddCustomer: React.FC = () => {
   const navigate = useNavigate();
@@ -37,7 +38,7 @@ const AddCustomer: React.FC = () => {
   };
 
   return (
-    <div className="view-container" style={{ maxWidth: '800px', margin: '0 auto' }}>
+    <div className="view-container page-fade-in" style={{ maxWidth: '800px', margin: '0 auto' }}>
       <header className="view-header">
         <div>
           <div className="view-eyebrow" style={{ cursor: 'pointer' }} onClick={() => navigate(-1)}>
@@ -81,7 +82,7 @@ const AddCustomer: React.FC = () => {
           </div>
 
           <footer className="modal-footer-modern" style={{ padding: '2rem 0 0', marginTop: '1rem' }}>
-            <button type="button" className="btn-secondary" onClick={() => navigate(-1)}>Discard</button>
+            <button type="button" className="modal-discard-btn" onClick={() => navigate(-1)}>Discard</button>
             <button type="submit" className="primary-button flex-1" disabled={loading}>{loading ? 'Establishing...' : 'Confirm Registration'}</button>
           </footer>
         </form>

@@ -118,7 +118,7 @@ const AddProperty: React.FC = () => {
           </div>
 
           <footer className="modal-footer-modern" style={{ padding: '2rem 0 0', marginTop: '1rem' }}>
-            <button type="button" className="btn-secondary" onClick={() => navigate(-1)}>Discard</button>
+            <button type="button" className="modal-discard-btn" onClick={() => navigate(-1)}>Discard</button>
             <button type="submit" className="primary-button flex-1" disabled={loading}>{loading ? 'Onboarding...' : 'Confirm Registration'}</button>
           </footer>
         </form>

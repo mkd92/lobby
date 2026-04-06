@@ -8,6 +8,7 @@ import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import '../styles/Properties.css';
 import '../styles/Leases.css';
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -226,57 +227,29 @@ const AddLease: React.FC = () => {
     }
   };
 
-  // ── Helpers ──────────────────────────────────────────────────────────
-  const labelCls: React.CSSProperties = {
-    fontSize: '0.6875rem', fontWeight: 800, textTransform: 'uppercase',
-    letterSpacing: '0.12em', color: 'var(--on-surface-variant)',
-    marginBottom: '0.625rem', display: 'block', opacity: 0.6,
-  };
-
-  const inputCls: React.CSSProperties = {
-    background: 'var(--surface-container-high)',
-    border: '1px solid rgba(255,255,255,0.06)',
-    padding: '0.875rem 1.125rem',
-    borderRadius: '0.875rem',
-    fontFamily: 'var(--font-main)',
-    fontSize: '0.9375rem',
-    color: 'var(--on-surface)',
-    width: '100%',
-    outline: 'none',
-    transition: 'background 0.2s',
-  };
-
-  const selectCls: React.CSSProperties = {
-    ...inputCls,
-    cursor: 'pointer',
-    appearance: 'none',
-    WebkitAppearance: 'none',
-    paddingRight: '2.75rem',
-  };
-
-  // Wraps a <select> with a styled container + Material chevron icon
+  // Wraps a <select> with a Material chevron icon
   const SelectWrap: React.FC<{ children: React.ReactNode; disabled?: boolean }> = ({ children, disabled }) => (
     <div style={{ position: 'relative', opacity: disabled ? 0.45 : 1 }}>
       {children}
       <span
         className="material-symbols-outlined"
         style={{
-          position: 'absolute', right: '0.875rem', top: '50%',
+          position: 'absolute', right: '1.125rem', top: '50%',
           transform: 'translateY(-50%)', pointerEvents: 'none',
           fontSize: '1.25rem', color: 'var(--on-surface-variant)', opacity: 0.55,
         }}
       >
-        expand_more
+        keyboard_arrow_down
       </span>
     </div>
   );
 
   const sectionDivider = (label: string) => (
     <div style={{
-      fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase',
-      letterSpacing: '0.16em', color: 'var(--on-surface-variant)', opacity: 0.35,
-      paddingBottom: '0.875rem', borderBottom: '1px solid rgba(255,255,255,0.05)',
-      marginBottom: '1.25rem',
+      fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase',
+      letterSpacing: '0.16em', color: 'var(--on-surface-variant)', opacity: 0.5,
+      paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)',
+      marginBottom: '1.5rem', marginTop: '1rem',
     }}>
       {label}
     </div>
@@ -284,32 +257,25 @@ const AddLease: React.FC = () => {
 
   // ── Render ───────────────────────────────────────────────────────────
   return (
-    <div className="view-container page-fade-in">
+    <div className="view-container page-fade-in" style={{ maxWidth: '800px', margin: '0 auto' }}>
       {DialogMount}
 
-      {/* Page Header */}
       <header className="view-header">
         <div>
-          <div
-            onClick={() => navigate('/leases')}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginBottom: '1rem', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.08em' }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>arrow_back</span>
-            Lease Portfolio
+          <div className="view-eyebrow" style={{ cursor: 'pointer' }} onClick={() => navigate(-1)}>
+            <span className="material-symbols-outlined" style={{ fontSize: '1rem', marginRight: '0.5rem' }}>arrow_back</span>
+            Back
           </div>
           <h1 className="view-title">New Agreement</h1>
-          <p style={{ color: 'var(--on-surface-variant)', opacity: 0.6, marginTop: '0.5rem', fontWeight: 500 }}>
-            Set up a new lease — tenant, unit, financials and dates.
-          </p>
+          <p className="text-on-surface-variant mt-2">Set up a new lease — tenant, unit, financials and dates.</p>
         </div>
       </header>
 
-      {/* Card */}
-      <div className="modern-card" style={{ padding: '2.5rem' }}>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '2.25rem' }}>
+      <div className="modern-card" style={{ padding: '3rem' }}>
+        <form onSubmit={handleSubmit} className="modal-form-modern" style={{ padding: 0 }}>
 
           {/* ── Lease Type ── */}
-          <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(255,255,255,0.04)', padding: '0.375rem', borderRadius: '1rem', width: 'fit-content' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--surface-container-highest)', padding: '0.375rem', borderRadius: '1rem', width: 'fit-content', marginBottom: '1rem' }}>
             {(['property', 'hostel'] as LeaseType[]).map(t => (
               <button
                 key={t}
@@ -322,8 +288,8 @@ const AddLease: React.FC = () => {
                   fontWeight: 800,
                   fontSize: '0.8125rem',
                   cursor: 'pointer',
-                  background: leaseType === t ? 'var(--surface-container-highest)' : 'transparent',
-                  color: leaseType === t ? 'var(--on-surface)' : 'var(--on-surface-variant)',
+                  background: leaseType === t ? 'var(--primary)' : 'transparent',
+                  color: leaseType === t ? 'var(--on-primary)' : 'var(--on-surface-variant)',
                   transition: 'all 0.2s ease',
                 }}
               >
@@ -335,43 +301,45 @@ const AddLease: React.FC = () => {
           {/* ── Tenant ── */}
           <div>
             {sectionDivider('Tenant')}
-            <label style={labelCls}>Select Tenant *</label>
-            <SelectWrap>
-              <select
-                required
-                value={form.tenant_id}
-                onChange={e => set('tenant_id', e.target.value)}
-                style={selectCls}
-              >
-                <option value="">— choose tenant —</option>
-                {tenants.map(t => (
-                  <option key={t.id} value={t.id}>{t.full_name}{t.phone ? ` · ${t.phone}` : ''}</option>
-                ))}
-              </select>
-            </SelectWrap>
+            <div className="form-group-modern">
+              <label>Select Tenant *</label>
+              <SelectWrap>
+                <select
+                  required
+                  value={form.tenant_id}
+                  onChange={e => set('tenant_id', e.target.value)}
+                  style={{ appearance: 'none', WebkitAppearance: 'none', paddingRight: '2.75rem' }}
+                >
+                  <option value="">— choose tenant —</option>
+                  {tenants.map(t => (
+                    <option key={t.id} value={t.id}>{t.full_name}{t.phone ? ` · ${t.phone}` : ''}</option>
+                  ))}
+                </select>
+              </SelectWrap>
+            </div>
           </div>
 
           {/* ── Asset ── */}
           {leaseType === 'property' ? (
             <div>
               {sectionDivider('Property & Unit')}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-                <div>
-                  <label style={labelCls}>Property *</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                <div className="form-group-modern">
+                  <label>Property *</label>
                   <SelectWrap>
                     <select
                       required
                       value={propertyId}
                       onChange={e => { setPropertyId(e.target.value); set('unit_id', ''); set('rent_amount', ''); }}
-                      style={selectCls}
+                      style={{ appearance: 'none', WebkitAppearance: 'none', paddingRight: '2.75rem' }}
                     >
                       <option value="">— choose property —</option>
                       {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                   </SelectWrap>
                 </div>
-                <div>
-                  <label style={labelCls}>Vacant Unit *</label>
+                <div className="form-group-modern">
+                  <label>Vacant Unit *</label>
                   <SelectWrap disabled={!propertyId}>
                     <select
                       required
@@ -382,7 +350,7 @@ const AddLease: React.FC = () => {
                         set('unit_id', e.target.value);
                         if (u?.base_rent) set('rent_amount', String(u.base_rent));
                       }}
-                      style={selectCls}
+                      style={{ appearance: 'none', WebkitAppearance: 'none', paddingRight: '2.75rem' }}
                     >
                       <option value="">{propertyId ? '— choose unit —' : 'Select property first'}</option>
                       {units.map(u => (
@@ -398,38 +366,38 @@ const AddLease: React.FC = () => {
           ) : (
             <div>
               {sectionDivider('Hostel · Room · Bed')}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem' }}>
-                <div>
-                  <label style={labelCls}>Hostel *</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
+                <div className="form-group-modern">
+                  <label>Hostel *</label>
                   <SelectWrap>
                     <select
                       required
                       value={form.unit_id}
                       onChange={e => { set('unit_id', e.target.value); set('bed_id', ''); set('rent_amount', ''); setRoomId(''); }}
-                      style={selectCls}
+                      style={{ appearance: 'none', WebkitAppearance: 'none', paddingRight: '2.75rem' }}
                     >
                       <option value="">— choose hostel —</option>
                       {hostels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
                     </select>
                   </SelectWrap>
                 </div>
-                <div>
-                  <label style={labelCls}>Room (vacant beds only) *</label>
+                <div className="form-group-modern">
+                  <label>Room (vacant beds) *</label>
                   <SelectWrap disabled={!form.unit_id}>
                     <select
                       required
                       value={roomId}
                       disabled={!form.unit_id}
                       onChange={e => { setRoomId(e.target.value); set('bed_id', ''); }}
-                      style={selectCls}
+                      style={{ appearance: 'none', WebkitAppearance: 'none', paddingRight: '2.75rem' }}
                     >
                       <option value="">{form.unit_id ? '— choose room —' : 'Select hostel first'}</option>
                       {rooms.map(r => <option key={r.id} value={r.id}>Room {r.room_number}</option>)}
                     </select>
                   </SelectWrap>
                 </div>
-                <div>
-                  <label style={labelCls}>Vacant Bed *</label>
+                <div className="form-group-modern">
+                  <label>Vacant Bed *</label>
                   <SelectWrap disabled={!roomId}>
                     <select
                       required
@@ -440,7 +408,7 @@ const AddLease: React.FC = () => {
                         set('bed_id', e.target.value);
                         if (b?.price) set('rent_amount', String(b.price));
                       }}
-                      style={selectCls}
+                      style={{ appearance: 'none', WebkitAppearance: 'none', paddingRight: '2.75rem' }}
                     >
                       <option value="">{roomId ? '— choose bed —' : 'Select room first'}</option>
                       {beds.map(b => (
@@ -458,41 +426,38 @@ const AddLease: React.FC = () => {
           {/* ── Financials ── */}
           <div>
             {sectionDivider('Financial Terms')}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem' }}>
-              <div>
-                <label style={labelCls}>Monthly Rent ({sym}) *</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
+              <div className="form-group-modern">
+                <label>Monthly Rent ({sym}) *</label>
                 <input
                   type="number" step="0.01" min="0" placeholder="0.00" required
                   value={form.rent_amount}
                   onChange={e => set('rent_amount', e.target.value)}
-                  style={inputCls}
                 />
               </div>
-              <div>
-                <label style={labelCls}>First Month ({sym})</label>
+              <div className="form-group-modern">
+                <label>First Month ({sym})</label>
                 <input
                   type="number" step="0.01" min="0" placeholder="same as monthly"
                   value={form.first_month_rent}
                   onChange={e => set('first_month_rent', e.target.value)}
-                  style={inputCls}
                 />
               </div>
-              <div>
-                <label style={labelCls}>Security Deposit ({sym})</label>
+              <div className="form-group-modern">
+                <label>Security Deposit ({sym})</label>
                 <input
                   type="number" step="0.01" min="0" placeholder="0.00"
                   value={form.security_deposit}
                   onChange={e => set('security_deposit', e.target.value)}
-                  style={inputCls}
                 />
               </div>
             </div>
 
             {/* Live move-in total hint */}
             {form.rent_amount && (
-              <div style={{ marginTop: '0.875rem', padding: '0.75rem 1rem', background: 'rgba(var(--primary-rgb, 100,180,120), 0.08)', borderRadius: '0.75rem', fontSize: '0.8125rem', color: 'var(--on-surface-variant)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: 'var(--primary)' }}>payments</span>
-                Move-in amount pending: <strong style={{ color: 'var(--on-surface)', marginLeft: '0.25rem' }}>
+              <div style={{ marginTop: '1.25rem', padding: '1rem', background: 'rgba(var(--primary-rgb, 100,180,120), 0.08)', borderRadius: '0.875rem', fontSize: '0.8125rem', color: 'var(--on-surface-variant)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem', color: 'var(--primary)' }}>payments</span>
+                Move-in amount pending: <strong style={{ color: 'var(--on-surface)', marginLeft: '0.25rem', fontSize: '0.9375rem' }}>
                   {sym}{(
                     (form.first_month_rent ? parseFloat(form.first_month_rent) : parseFloat(form.rent_amount)) +
                     (form.security_deposit  ? parseFloat(form.security_deposit) : 0)
@@ -505,23 +470,21 @@ const AddLease: React.FC = () => {
           {/* ── Dates ── */}
           <div>
             {sectionDivider('Contract Duration')}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-              <div>
-                <label style={labelCls}>Start Date *</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+              <div className="form-group-modern">
+                <label>Start Date *</label>
                 <input
                   type="date" required
                   value={form.start_date}
                   onChange={e => set('start_date', e.target.value)}
-                  style={inputCls}
                 />
               </div>
-              <div>
-                <label style={labelCls}>End Date <span style={{ opacity: 0.45, textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>(leave blank for rolling)</span></label>
+              <div className="form-group-modern">
+                <label>End Date <span style={{ opacity: 0.45, textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>(leave blank for rolling)</span></label>
                 <input
                   type="date"
                   value={form.end_date}
                   onChange={e => set('end_date', e.target.value)}
-                  style={inputCls}
                 />
               </div>
             </div>
@@ -530,34 +493,23 @@ const AddLease: React.FC = () => {
           {/* ── Notes ── */}
           <div>
             {sectionDivider('Notes')}
-            <label style={labelCls}>Special Terms <span style={{ opacity: 0.45, textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>(optional)</span></label>
-            <textarea
-              placeholder="Any special conditions, clauses, or remarks..."
-              rows={3}
-              value={form.notes}
-              onChange={e => set('notes', e.target.value)}
-              style={{ ...inputCls, resize: 'vertical', lineHeight: 1.6 }}
-            />
+            <div className="form-group-modern">
+              <label>Special Terms <span style={{ opacity: 0.45, textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>(optional)</span></label>
+              <textarea
+                placeholder="Any special conditions, clauses, or remarks..."
+                rows={3}
+                value={form.notes}
+                onChange={e => set('notes', e.target.value)}
+                style={{ resize: 'vertical', lineHeight: 1.6 }}
+              />
+            </div>
           </div>
 
           {/* ── Footer ── */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            <button
-              type="button"
-              onClick={() => navigate('/leases')}
-              style={{ background: 'transparent', border: 'none', color: 'var(--on-surface-variant)', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', padding: '0.75rem 1.25rem', borderRadius: '0.75rem' }}
-            >
-              Discard
-            </button>
-            <button
-              type="submit"
-              className="primary-button"
-              disabled={saving}
-              style={{ minWidth: '180px' }}
-            >
-              {saving ? 'Creating...' : 'Create Lease'}
-            </button>
-          </div>
+          <footer className="modal-footer-modern" style={{ padding: '2rem 0 0', marginTop: '1rem' }}>
+            <button type="button" className="modal-discard-btn" onClick={() => navigate(-1)}>Discard</button>
+            <button type="submit" className="primary-button flex-1" disabled={saving}>{saving ? 'Creating...' : 'Confirm Agreement'}</button>
+          </footer>
 
         </form>
       </div>
