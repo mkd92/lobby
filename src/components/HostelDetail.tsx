@@ -10,7 +10,6 @@ import {
   where,
   serverTimestamp,
   writeBatch,
-  updateDoc,
 } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { db } from '../firebaseClient';
@@ -131,12 +130,29 @@ const HostelDetail: React.FC = () => {
     if (!isOwner) return;
     setSavingHostel(true);
     try {
-      await updateDoc(doc(db, 'hostels', id!), {
+      const batch = writeBatch(db);
+
+      // Update the hostel document itself
+      batch.update(doc(db, 'hostels', id!), {
         ...hostelForm,
         updated_at: serverTimestamp(),
       });
+
+      // Cascade the new name to all leases and payments that reference this hostel
+      if (hostelForm.name) {
+        const [leaseSnap, paymentSnap] = await Promise.all([
+          getDocs(query(collection(db, 'leases'), where('hostel_id', '==', id))),
+          getDocs(query(collection(db, 'payments'), where('hostel_id', '==', id))),
+        ]);
+        leaseSnap.docs.forEach(d => batch.update(d.ref, { hostel_name: hostelForm.name }));
+        paymentSnap.docs.forEach(d => batch.update(d.ref, { hostel_name: hostelForm.name }));
+      }
+
+      await batch.commit();
       queryClient.invalidateQueries({ queryKey: ['hostel', id, ownerId] });
       queryClient.invalidateQueries({ queryKey: ['hostels', ownerId] });
+      queryClient.invalidateQueries({ queryKey: ['leases', ownerId] });
+      queryClient.invalidateQueries({ queryKey: ['payments', ownerId] });
       showAlert('Facility profile synchronized successfully.');
     } catch (err) {
       showAlert((err as Error).message);
