@@ -5,6 +5,7 @@ import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useListKeyNav } from '../hooks/useListKeyNav';
 import { LoadingScreen } from './layout/LoadingScreen';
 import '../styles/Properties.css';
 import '../styles/Leases.css';
@@ -37,12 +38,17 @@ const Customers: React.FC = () => {
 
   const filteredCustomers = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    return customers.filter(c => 
-      c.full_name.toLowerCase().includes(q) || 
-      (c.email && c.email.toLowerCase().includes(q)) || 
+    return customers.filter(c =>
+      c.full_name.toLowerCase().includes(q) ||
+      (c.email && c.email.toLowerCase().includes(q)) ||
       (c.phone && c.phone.includes(q))
     );
   }, [customers, searchQuery]);
+
+  const { selectedId: kbSelectedId } = useListKeyNav(
+    filteredCustomers,
+    (c) => navigate(`/customers/${c.id}`),
+  );
 
   const handleDelete = async (e: React.MouseEvent, customer: Customer) => {
     e.stopPropagation();
@@ -164,7 +170,7 @@ const Customers: React.FC = () => {
               </thead>
               <tbody>
                 {filteredCustomers.map(customer => (
-                  <tr key={customer.id} onClick={() => navigate(`/customers/${customer.id}`)} style={{ cursor: 'pointer' }}>
+                  <tr key={customer.id} onClick={() => navigate(`/customers/${customer.id}`)} style={{ cursor: 'pointer', outline: kbSelectedId === customer.id ? '2px solid var(--primary)' : undefined, outlineOffset: '-2px' }}>
                     <td>
                       <div className="flex items-center gap-4">
                         <div style={{ width: '36px', height: '36px', borderRadius: '12px', background: 'var(--primary-container)', color: 'var(--on-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.875rem' }}>

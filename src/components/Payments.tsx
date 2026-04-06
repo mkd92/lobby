@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   collection, query, where, getDocs, doc, getDoc, deleteDoc,
   updateDoc, addDoc, serverTimestamp,
@@ -7,6 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
+import { useListKeyNav } from '../hooks/useListKeyNav';
 import { generateMonthlyPayments, previewMonthlyPayments } from '../utils/generateMonthlyPayments';
 import { LoadingScreen } from './layout/LoadingScreen';
 import PaymentSlideOver from './PaymentSlideOver';
@@ -55,7 +57,8 @@ const Payments: React.FC = () => {
   const queryClient = useQueryClient();
   const { showAlert, showConfirm, DialogMount } = useDialog();
 
-  const [filter, setFilter]           = useState<FilterTab>('All');
+  const [searchParams] = useSearchParams();
+  const [filter, setFilter]           = useState<FilterTab>((searchParams.get('status') as FilterTab | null) ?? 'All');
   const [search, setSearch]           = useState('');
   const [sort, setSort]               = useState<SortOption>('date_desc');
   const [saving, setSaving]           = useState(false);
@@ -111,6 +114,12 @@ const Payments: React.FC = () => {
       }
     });
   }, [payments, filter, search, sort]);
+
+  const { selectedId: kbSelectedId } = useListKeyNav(
+    filtered,
+    (p) => setSelectedId(p.id),
+    !receiveModal.open && !selectedId,
+  );
 
   // ── Metrics ────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -682,7 +691,7 @@ const Payments: React.FC = () => {
                       <tr
                         key={p.id}
                         onClick={() => setSelectedId(p.id)}
-                        style={{ cursor: 'pointer', ...(overdue ? { borderLeft: '3px solid var(--error)' } : {}) }}
+                        style={{ cursor: 'pointer', ...(overdue ? { borderLeft: '3px solid var(--error)' } : {}), ...(kbSelectedId === p.id ? { outline: '2px solid var(--primary)', outlineOffset: '-2px' } : {}) }}
                         className={overdue ? 'row-overdue' : ''}
                       >
                         {!isStaff && (
