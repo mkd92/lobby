@@ -30,7 +30,8 @@ interface Lease {
 const CustomerDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { ownerId, isStaff } = useOwner();
+  const { ownerId, userRole } = useOwner();
+  const isOwner = userRole === 'owner';
   const queryClient = useQueryClient();
   const { showAlert, DialogMount } = useDialog();
 
@@ -77,7 +78,7 @@ const CustomerDetail: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isStaff) return;
+    if (!isOwner) return;
     setSaving(true);
     try {
       await updateDoc(doc(db, 'tenants', id!), {
@@ -193,7 +194,7 @@ const CustomerDetail: React.FC = () => {
           <div className="glass-panel p-10 md:p-16 rounded-[48px]">
             <div className="flex justify-between items-center mb-12">
               <h2 className="text-white font-display font-bold text-3xl tracking-tight">Modify Parameters</h2>
-              {!isStaff && (
+              {isOwner && (
                 <div className="flex items-center gap-2 text-primary-container/60 text-xs font-bold uppercase tracking-widest">
                   <span className="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
                   Ready for Sync
@@ -210,7 +211,7 @@ const CustomerDetail: React.FC = () => {
                   onChange={e => setForm({...form, full_name: e.target.value})} 
                   className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-display font-bold text-xl"
                   required 
-                  disabled={isStaff} 
+                  disabled={!isOwner} 
                 />
               </div>
 
@@ -223,7 +224,7 @@ const CustomerDetail: React.FC = () => {
                     onChange={e => setForm({...form, email: e.target.value})} 
                     className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-medium text-white"
                     placeholder="email@legal.com"
-                    disabled={isStaff} 
+                    disabled={!isOwner} 
                   />
                 </div>
                 <div className="form-group-modern">
@@ -234,7 +235,7 @@ const CustomerDetail: React.FC = () => {
                     onChange={e => setForm({...form, phone: e.target.value})} 
                     className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-medium text-white"
                     placeholder="+1 (000) 000-0000"
-                    disabled={isStaff} 
+                    disabled={!isOwner} 
                   />
                 </div>
               </div>
@@ -249,7 +250,7 @@ const CustomerDetail: React.FC = () => {
                     className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-medium text-white"
                     placeholder="XXXX XXXX XXXX"
                     maxLength={14}
-                    disabled={isStaff}
+                    disabled={!isOwner}
                   />
                 </div>
                 <div className="form-group-modern">
@@ -267,12 +268,12 @@ const CustomerDetail: React.FC = () => {
                     onChange={e => setForm({...form, aadhar_drive_link: e.target.value})}
                     className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-medium text-white"
                     placeholder="https://drive.google.com/..."
-                    disabled={isStaff}
+                    disabled={!isOwner}
                   />
                 </div>
               </div>
 
-              {!isStaff && (
+              {isOwner && (
                 <footer className="flex flex-wrap justify-center sm:justify-end items-center gap-4 sm:gap-8 mt-6 pt-10 border-t border-white/5">
                   <button type="button" className="text-secondary/40 font-bold uppercase tracking-widest text-xs hover:text-white transition-colors" onClick={() => navigate('/customers')}>
                     Discard Changes

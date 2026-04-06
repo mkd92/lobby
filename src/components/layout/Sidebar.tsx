@@ -55,7 +55,7 @@ export const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boole
           {!isCollapsed && <span style={{ fontWeight: 700 }}>Executive Overview</span>}
         </Link>
 
-        {!isCollapsed && <div className="nav-section-label" style={{ marginTop: '2rem', opacity: 0.3 }}>Portfolio Assets</div>}
+        {!isCollapsed && <div className="nav-section-label" style={{ marginTop: '2rem', opacity: 0.3 }}>Facilities</div>}
         <Link
           to="/hostels"
           className={`nav-item ${location.pathname.startsWith('/hostels') ? 'active' : ''}`}

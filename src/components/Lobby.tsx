@@ -8,7 +8,8 @@ import StaffDashboard from "./StaffDashboard";
 import "../styles/Lobby.css";
 
 const Lobby: React.FC = () => {
-  const { isStaff } = useOwner();
+  const { userRole } = useOwner();
+  const isStaff = userRole !== 'owner';
   const { data, isLoading } = useDashboard();
 
   // Staff get a focused operational view instead of the owner analytics dashboard
@@ -31,9 +32,7 @@ const Lobby: React.FC = () => {
 
   const occupancyRate =
     stats.totalBeds > 0
-      ? Math.round(
-          ((stats.totalBeds - stats.vacantBeds) / stats.totalBeds) * 1000,
-        ) / 10
+      ? Math.round(((stats.totalBeds - stats.vacantBeds) / stats.totalBeds) * 1000) / 10
       : 0;
 
   return (
@@ -71,14 +70,14 @@ const Lobby: React.FC = () => {
         <div className="glass-panel p-10 rounded-[32px] relative overflow-hidden group transition-all hover:scale-[1.02]">
           <div className="flex justify-between items-start mb-8">
             <span className="material-symbols-outlined text-primary-container p-4 bg-primary-container/10 rounded-2xl">
-              hotel
+              door_front
             </span>
             <span className="badge-modern bg-primary-container/20 text-primary-container font-bold">
-              Target 95%
+              +2.4%
             </span>
           </div>
           <h3 className="text-on-surface-variant text-sm font-bold uppercase tracking-widest mb-2">
-            Bed Occupancy
+            Portfolio Occupancy
           </h3>
           <div className="flex items-baseline gap-2">
             <span className="text-primary font-display font-extrabold text-5xl">
@@ -97,7 +96,7 @@ const Lobby: React.FC = () => {
               contract
             </span>
             <span className="badge-modern bg-secondary/20 text-secondary font-bold">
-              Yield
+              Target
             </span>
           </div>
           <h3 className="text-on-surface-variant text-sm font-bold uppercase tracking-widest mb-2">
@@ -113,15 +112,15 @@ const Lobby: React.FC = () => {
           </div>
         </div>
 
-        {/* Active Assets */}
+        {/* Bed Inventory */}
         <div className="glass-panel p-10 rounded-[32px] relative overflow-hidden group transition-all hover:scale-[1.02]">
           <div className="flex justify-between items-start mb-8">
             <span className="material-symbols-outlined text-primary p-4 bg-primary/10 rounded-2xl">
-              apartment
+              hotel
             </span>
           </div>
           <h3 className="text-on-surface-variant text-sm font-bold uppercase tracking-widest mb-2">
-            Active Inventory
+            Bed Inventory
           </h3>
           <div className="flex items-baseline gap-2">
             <span className="text-primary font-display font-extrabold text-5xl">
@@ -131,6 +130,11 @@ const Lobby: React.FC = () => {
               Beds
             </span>
           </div>
+          {stats.vacantBeds > 0 && (
+            <p className="text-on-surface-variant text-xs font-bold opacity-40 mt-2">
+              {stats.vacantBeds} vacant
+            </p>
+          )}
         </div>
       </div>
 

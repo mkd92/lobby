@@ -5,6 +5,7 @@ import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useListKeyNav } from '../hooks/useListKeyNav';
 import { LoadingScreen } from './layout/LoadingScreen';
 
 import '../styles/Leases.css';
@@ -20,7 +21,9 @@ interface Customer {
 const Customers: React.FC = () => {
   const navigate = useNavigate();
   const { showAlert, showConfirm, DialogMount } = useDialog();
-  const { ownerId, isStaff } = useOwner();
+  const { ownerId, userRole } = useOwner();
+  const isOwner = userRole === 'owner';
+  const canCreate = userRole === 'owner' || userRole === 'manager';
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -37,12 +40,17 @@ const Customers: React.FC = () => {
 
   const filteredCustomers = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    return customers.filter(c => 
-      c.full_name.toLowerCase().includes(q) || 
-      (c.email && c.email.toLowerCase().includes(q)) || 
+    return customers.filter(c =>
+      c.full_name.toLowerCase().includes(q) ||
+      (c.email && c.email.toLowerCase().includes(q)) ||
       (c.phone && c.phone.includes(q))
     );
   }, [customers, searchQuery]);
+
+  const { selectedId: kbSelectedId } = useListKeyNav(
+    filteredCustomers,
+    (c) => navigate(`/customers/${c.id}`),
+  );
 
   const handleDelete = async (e: React.MouseEvent, customer: Customer) => {
     e.stopPropagation();
@@ -83,7 +91,7 @@ const Customers: React.FC = () => {
             <p className="view-eyebrow">Relationship Base</p>
             <h1 className="view-title" style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', margin: 0 }}>Stakeholder Registry</h1>
           </div>
-          {!isStaff && (
+          {canCreate && (
             <button onClick={() => navigate('/customers/new')} className="primary-button">
               <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle', fontSize: '1.25rem' }}>person_add</span>
               Onboard Entity
@@ -134,7 +142,7 @@ const Customers: React.FC = () => {
           </div>
           <h2 className="mb-4">Empty Registry</h2>
           <p className="text-on-surface-variant mb-10 max-w-md mx-auto">Initialize your relationship management base by onboarding your first legal entity or tenant.</p>
-          {!isStaff && (
+          {canCreate && (
             <button onClick={() => navigate('/customers/new')} className="primary-button">Start Onboarding</button>
           )}
         </div>
@@ -164,7 +172,7 @@ const Customers: React.FC = () => {
               </thead>
               <tbody>
                 {filteredCustomers.map(customer => (
-                  <tr key={customer.id} onClick={() => navigate(`/customers/${customer.id}`)} style={{ cursor: 'pointer' }}>
+                  <tr key={customer.id} onClick={() => navigate(`/customers/${customer.id}`)} style={{ cursor: 'pointer', outline: kbSelectedId === customer.id ? '2px solid var(--primary)' : undefined, outlineOffset: '-2px' }}>
                     <td>
                       <div className="flex items-center gap-4">
                         <div style={{ width: '36px', height: '36px', borderRadius: '12px', background: 'var(--primary-container)', color: 'var(--on-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.875rem' }}>
@@ -178,7 +186,7 @@ const Customers: React.FC = () => {
                     <td style={{ fontSize: '0.8125rem', color: 'var(--on-surface-variant)', fontWeight: 500 }}>{fmtDate(customer.created_at)}</td>
                     <td><span className="badge-modern badge-success" style={{ fontSize: '0.55rem' }}>Verified</span></td>
                     <td>
-                      {!isStaff && (
+                      {isOwner && (
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                           <button className="btn-icon danger" style={{ color: 'var(--error)' }} onClick={(e) => handleDelete(e, customer)}>
                             <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span>
@@ -206,7 +214,7 @@ const Customers: React.FC = () => {
                       <span className="badge-modern badge-success" style={{ fontSize: '0.5rem', padding: '0.1rem 0.4rem', marginTop: '0.25rem' }}>Registered Entity</span>
                     </div>
                   </div>
-                  {!isStaff && (
+                  {isOwner && (
                     <div className="flex gap-2">
                       <button className="btn-icon danger" style={{ color: 'var(--error)' }} onClick={(e) => handleDelete(e, customer)}><span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>delete</span></button>
                     </div>

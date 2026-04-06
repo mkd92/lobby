@@ -27,7 +27,8 @@ interface Payment {
 const PaymentDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { ownerId, isStaff } = useOwner();
+  const { ownerId, userRole } = useOwner();
+  const isOwner = userRole === 'owner';
   const queryClient = useQueryClient();
   const { showAlert, DialogMount } = useDialog();
 
@@ -73,7 +74,7 @@ const PaymentDetail: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isStaff) return;
+    if (!isOwner) return;
     setSaving(true);
     try {
       if (form.payment_date && !payment?.payment_date) localStorage.setItem('lastPaymentDate', form.payment_date);
@@ -178,11 +179,11 @@ const PaymentDetail: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                 <div className="form-group-modern">
                   <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Settlement Value ({currencySymbol})</label>
-                  <input type="number" step="0.01" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high border-none rounded-2xl p-5 font-display font-bold text-xl" required disabled={isStaff} />
+                  <input type="number" step="0.01" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high border-none rounded-2xl p-5 font-display font-bold text-xl" required disabled={!isOwner} />
                 </div>
                 <div className="form-group-modern">
                   <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Settlement Date</label>
-                  <input type="date" value={form.payment_date} onChange={e => setForm({...form, payment_date: e.target.value})} className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high border-none rounded-2xl p-5 font-medium text-white" required disabled={isStaff} />
+                  <input type="date" value={form.payment_date} onChange={e => setForm({...form, payment_date: e.target.value})} className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high border-none rounded-2xl p-5 font-medium text-white" required disabled={!isOwner} />
                 </div>
               </div>
 
@@ -190,7 +191,7 @@ const PaymentDetail: React.FC = () => {
                 <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-4">Payment Channel</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {['Cash', 'Bank Transfer', 'Online', 'Check'].map(m => (
-                    <button key={m} type="button" onClick={() => setForm({...form, payment_method: m})} className={`py-4 rounded-2xl font-bold text-[0.7rem] uppercase tracking-widest transition-all ${form.payment_method === m ? 'bg-white text-on-primary scale-[1.02]' : 'bg-surface-container-low text-secondary/40'}`} disabled={isStaff}>{m}</button>
+                    <button key={m} type="button" onClick={() => setForm({...form, payment_method: m})} className={`py-4 rounded-2xl font-bold text-[0.7rem] uppercase tracking-widest transition-all ${form.payment_method === m ? 'bg-white text-on-primary scale-[1.02]' : 'bg-surface-container-low text-secondary/40'}`} disabled={!isOwner}>{m}</button>
                   ))}
                 </div>
               </div>
@@ -199,12 +200,12 @@ const PaymentDetail: React.FC = () => {
                 <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-4">Accounting Status</label>
                 <div className="flex gap-4">
                   {['Paid', 'Partial', 'Pending'].map(s => (
-                    <button key={s} type="button" onClick={() => setForm({...form, status: s as any})} className={`flex-1 py-4 rounded-2xl font-bold text-[0.7rem] uppercase tracking-widest transition-all ${form.status === s ? 'bg-white text-on-primary scale-[1.02]' : 'bg-surface-container-low text-secondary/40'}`} disabled={isStaff}>{s}</button>
+                    <button key={s} type="button" onClick={() => setForm({...form, status: s as any})} className={`flex-1 py-4 rounded-2xl font-bold text-[0.7rem] uppercase tracking-widest transition-all ${form.status === s ? 'bg-white text-on-primary scale-[1.02]' : 'bg-surface-container-low text-secondary/40'}`} disabled={!isOwner}>{s}</button>
                   ))}
                 </div>
               </div>
 
-              {!isStaff && (
+              {isOwner && (
                 <footer className="flex flex-wrap justify-center sm:justify-end items-center gap-4 sm:gap-8 mt-6 pt-10 border-t border-white/5">
                   <button type="button" className="text-secondary/40 font-bold uppercase tracking-widest text-xs hover:text-white transition-colors" onClick={() => navigate('/payments')}>Discard Changes</button>
                   <button type="submit" className="primary-button w-full sm:w-auto sm:min-w-[220px]" disabled={saving}>{saving ? 'Synchronizing...' : 'Update Record'}</button>

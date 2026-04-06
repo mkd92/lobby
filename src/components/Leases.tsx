@@ -34,7 +34,9 @@ type SortOption = 'date_desc' | 'date_asc' | 'name_asc' | 'name_desc' | 'unit_as
 
 // ── Main Component ─────────────────────────────────────────────────────
 const Leases: React.FC = () => {
-  const { ownerId, isStaff } = useOwner();
+  const { ownerId, userRole } = useOwner();
+  const canCreate = userRole !== 'viewer';
+  const isOwner = userRole === 'owner';
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { showAlert, showConfirm, DialogMount } = useDialog();
@@ -133,7 +135,7 @@ const Leases: React.FC = () => {
             <p className="view-eyebrow">Lease Portfolio</p>
             <h1 className="view-title" style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', margin: 0 }}>Contractual Yield</h1>
           </div>
-          {!isStaff && (
+          {canCreate && (
             <button onClick={() => navigate('/leases/new')} className="primary-button">
               <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle', fontSize: '1.25rem' }}>description</span>
               Generate Agreement
@@ -209,7 +211,7 @@ const Leases: React.FC = () => {
             </div>
             <h2>Clean Slate</h2>
             <p className="text-on-surface-variant mb-10 max-w-md mx-auto">Your document vault is clear for this selection. Adjust your parameters or initialize a new agreement.</p>
-            {filter === 'All' && !isStaff && <button className="primary-button glass-panel mt-4" onClick={() => navigate('/leases/new')} style={{ background: 'rgba(255,255,255,0.05)' }}>Initialize First Agreement</button>}
+            {filter === 'All' && canCreate && <button className="primary-button glass-panel mt-4" onClick={() => navigate('/leases/new')} style={{ background: 'rgba(255,255,255,0.05)' }}>Initialize First Agreement</button>}
           </div>
         ) : (
           <>
@@ -258,7 +260,7 @@ const Leases: React.FC = () => {
                           <span className={`badge-modern ${lease.status === 'Active' ? 'badge-success' : lease.status === 'Expired' ? 'badge-warning' : 'badge-error'}`} style={{ fontSize: '0.55rem' }}>{lease.status}</span>
                         </td>
                         <td>
-                          {!isStaff && (
+                          {isOwner && (
                             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                               <button className="btn-icon danger" style={{ color: 'var(--error)' }} onClick={(e) => { e.stopPropagation(); handleDelete(lease); }}><span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span></button>
                             </div>
@@ -298,7 +300,7 @@ const Leases: React.FC = () => {
                   </div>
                   <div className="pt-4 border-t border-white/5 flex justify-between items-center">
                     <span className="view-link" style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--secondary)' }}>Manage Contract <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>arrow_forward_ios</span></span>
-                    {!isStaff && (
+                    {isOwner && (
                       <button className="btn-icon danger" style={{ color: 'var(--error)' }} onClick={(e) => { e.stopPropagation(); handleDelete(lease); }}><span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span></button>
                     )}
                   </div>

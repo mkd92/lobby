@@ -45,7 +45,9 @@ const HostelDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { showAlert, DialogMount } = useDialog();
-  const { ownerId, isStaff } = useOwner();
+  const { ownerId, userRole } = useOwner();
+  const canCreate = userRole !== 'viewer';
+  const isOwner = userRole === 'owner';
   const queryClient = useQueryClient();
 
   const [hostelForm, setHostelForm] = useState({ name: '', address: '' });
@@ -126,7 +128,7 @@ const HostelDetail: React.FC = () => {
 
   const handleHostelSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isStaff) return;
+    if (!isOwner) return;
     setSavingHostel(true);
     try {
       await updateDoc(doc(db, 'hostels', id!), {
@@ -145,7 +147,7 @@ const HostelDetail: React.FC = () => {
 
   const handleAddRoom = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isStaff) return;
+    if (!canCreate) return;
     try {
       await addDoc(collection(db, 'rooms'), {
         ...newRoom,
@@ -163,7 +165,7 @@ const HostelDetail: React.FC = () => {
 
   const handleAddBeds = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRoomId || isStaff) return;
+    if (!selectedRoomId || !canCreate) return;
     try {
       const batch = writeBatch(db);
       for (let i = 0; i < newBed.count; i++) {
@@ -209,7 +211,7 @@ const HostelDetail: React.FC = () => {
             {data.hostel.address}
           </p>
         </div>
-        {!isStaff && (
+        {canCreate && (
           <button className="primary-button min-w-[200px]" onClick={() => setIsAddRoomModalOpen(true)}>
             <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle', fontSize: '1.25rem' }}>add_circle</span>
             Add Room
@@ -257,7 +259,7 @@ const HostelDetail: React.FC = () => {
                   onChange={e => setHostelForm({...hostelForm, name: e.target.value})}
                   className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-xl p-3 font-display font-bold text-lg text-white"
                   required
-                  disabled={isStaff}
+                  disabled={!isOwner}
                 />
               </div>
               <div className="form-group-modern">
@@ -268,10 +270,10 @@ const HostelDetail: React.FC = () => {
                   onChange={e => setHostelForm({...hostelForm, address: e.target.value})}
                   className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-xl p-3 font-medium text-white/80"
                   required
-                  disabled={isStaff}
+                  disabled={!isOwner}
                 />
               </div>
-              {!isStaff && (
+              {isOwner && (
                 <button type="submit" className="primary-button text-[0.7rem] py-3" disabled={savingHostel}>
                   {savingHostel ? 'Syncing...' : 'Update Facility'}
                 </button>
@@ -337,7 +339,7 @@ const HostelDetail: React.FC = () => {
                   )}
                   <div className="pt-4 border-t border-white/5 mt-2 flex justify-between items-center">
                     <span className="text-[0.6rem] font-bold text-secondary/60 uppercase tracking-widest">{room.beds.length} Total Inventory</span>
-                    {!isStaff && (
+                    {canCreate && (
                       <button className="btn-icon" onClick={(e) => { e.stopPropagation(); setSelectedRoomId(room.id); setIsAddBedModalOpen(true); }} title="Allocate Beds">
                         <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>add_circle</span>
                       </button>

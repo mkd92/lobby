@@ -12,6 +12,7 @@ interface StaffMember {
   staff_email: string;
   staff_uid?: string;
   status: 'active' | 'pending';
+  role?: 'manager' | 'viewer';
 }
 
 interface PendingInvite {
@@ -20,14 +21,17 @@ interface PendingInvite {
   owner_name: string;
   staff_email: string;
   status: string;
+  role?: 'manager' | 'viewer';
 }
 
 const Team: React.FC = () => {
   const navigate = useNavigate();
-  const { ownerId, isStaff, user, switchAccount } = useOwner();
+  const { ownerId, userRole, user, switchAccount } = useOwner();
+  const isStaff = userRole !== 'owner';
   const queryClient = useQueryClient();
 
   const [staffEmail,  setStaffEmail]  = useState('');
+  const [inviteRole,  setInviteRole]  = useState<'viewer' | 'manager'>('viewer');
   const [addingStaff, setAddingStaff] = useState(false);
   const [message,     setMessage]     = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -82,7 +86,7 @@ const Team: React.FC = () => {
       // Path: /staff_lookup/{staffUid}/owners/{ownerUid}
       await setDoc(
         doc(db, 'staff_lookup', user.uid, 'owners', invite.owner_id),
-        { accepted_at: serverTimestamp() },
+        { accepted_at: serverTimestamp(), role: invite.role ?? 'viewer' },
       );
       refetchInvites();
       queryClient.invalidateQueries({ queryKey: ['pending-invites'] });
@@ -121,9 +125,11 @@ const Team: React.FC = () => {
         owner_id: ownerId,
         owner_name: ownerProfile?.name || '',
         status: 'pending',
+        role: inviteRole,
         created_at: serverTimestamp(),
       });
       setStaffEmail('');
+      setInviteRole('viewer');
       refetchStaff();
       queryClient.invalidateQueries({ queryKey: ['staff-list', ownerId] });
       flash("Invite sent. They'll see it on their Team page.", 'success');
@@ -222,7 +228,7 @@ const Team: React.FC = () => {
                       {invite.owner_name || 'A workspace owner'}
                     </div>
                     <div style={{ fontSize: '0.75rem', opacity: 0.45, fontWeight: 500, marginTop: '0.2rem' }}>
-                      Invited you as a read-only viewer
+                      Invited you as a {invite.role === 'manager' ? 'manager (can create)' : 'read-only viewer'}
                     </div>
                   </div>
                 </div>
@@ -275,7 +281,7 @@ const Team: React.FC = () => {
           {/* Invite card */}
           <div className="modern-card" style={{ padding: '2rem 2.5rem', marginBottom: '1.25rem' }}>
             <span style={sectionLabel}>Invite Stakeholder</span>
-            <form onSubmit={handleAddStaff} style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <form onSubmit={handleAddStaff} style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
               <input
                 type="email"
                 value={staffEmail}
@@ -290,6 +296,20 @@ const Team: React.FC = () => {
                   color: 'var(--on-surface)', fontSize: '0.9375rem', fontWeight: 500, outline: 'none',
                 }}
               />
+              <select
+                value={inviteRole}
+                onChange={e => setInviteRole(e.target.value as 'viewer' | 'manager')}
+                style={{
+                  padding: '0.875rem 1.25rem', borderRadius: '1rem',
+                  background: 'var(--surface-container-high)',
+                  border: '1.5px solid var(--outline-variant)',
+                  color: 'var(--on-surface)', fontSize: '0.9375rem', fontWeight: 500, outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="viewer">Viewer (Read-Only)</option>
+                <option value="manager">Manager (Can Create)</option>
+              </select>
               <button type="submit" className="primary-button" disabled={addingStaff} style={{ whiteSpace: 'nowrap' }}>
                 {addingStaff ? 'Sending...' : 'Send Invite'}
               </button>
@@ -343,7 +363,7 @@ const Team: React.FC = () => {
                             fontSize: '0.6rem', textTransform: 'uppercase',
                             letterSpacing: '0.1em', fontWeight: 700, opacity: 0.45,
                           }}>
-                            {s.status === 'active' ? 'Active · Read-Only' : 'Invite Pending'}
+                            {s.status === 'active' ? `Active · ${s.role === 'manager' ? 'Manager' : 'Read-Only'}` : 'Invite Pending'}
                           </span>
                         </div>
                       </div>
@@ -372,7 +392,7 @@ const Team: React.FC = () => {
             }}>
               <span className="material-symbols-outlined" style={{ fontSize: '1rem', flexShrink: 0, marginTop: '0.05rem' }}>shield</span>
               <p style={{ fontSize: '0.75rem', fontWeight: 500, lineHeight: 1.5 }}>
-                Staff can view all properties, leases, payments, and customers — but cannot create, edit, or delete any records.
+                <strong>Viewers</strong> can see all data but cannot make changes. <strong>Managers</strong> can additionally create new records (like leases or properties) but cannot edit or delete existing ones.
               </p>
             </div>
           </div>

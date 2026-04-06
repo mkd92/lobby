@@ -41,8 +41,7 @@ export const useDashboard = () => {
       const currency = ownerData?.currency || 'USD';
 
       const beds = bedsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as { id: string; status: string }[];
-
-      const totalBeds = beds.length;
+      const totalBeds  = beds.length;
       const vacantBeds = beds.filter(b => b.status === 'Vacant').length;
 
       const allLeases = leasesSnap.docs.map(d => ({ id: d.id, ...d.data() })) as {
@@ -85,11 +84,11 @@ export const useDashboard = () => {
 
       const revenueChart = last6.map(m => ({ month: m.short, revenue: revenueByMonth[m.label] || 0 }));
       const stats = {
-        monthlyRevenue: formatCompactCurrency(monthlyRevenue, currency),
-        activeLeaseRent: formatCompactCurrency(activeLeaseRent, currency),
-        overdueAmount: formatCompactCurrency(overdueAmount, currency),
+        monthlyRevenue:   formatCompactCurrency(monthlyRevenue, currency),
+        activeLeaseRent:  formatCompactCurrency(activeLeaseRent, currency),
+        overdueAmount:    formatCompactCurrency(overdueAmount, currency),
         leaseExpirations: String(expiringCount),
-        annualRevenue: formatCompactCurrency(annualRevenue, currency),
+        annualRevenue:    formatCompactCurrency(annualRevenue, currency),
         totalBeds,
         vacantBeds,
         currency,
@@ -98,4 +97,4 @@ export const useDashboard = () => {
       return { stats, revenueChart };
     },
   });
-};;
+};

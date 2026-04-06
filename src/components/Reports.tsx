@@ -14,24 +14,26 @@ interface Lease    {
   id: string;
   tenant_name: string;
   hostel_name?: string;
-  room_number?: string;
   bed_number?: string;
+  room_number?: string;
   rent_amount: number;
-  start_date: string;
-  end_date: string | null;
-  status: string;
+  end_date?: string;
 }
-interface Payment {
+interface Payment  {
   id: string;
   tenant_name: string;
-  hostel_name?: string;
-  room_number?: string;
-  bed_number?: string;
-  month_for: string;
-  status: string;
+  hostel_name?: string | null;
+  room_number?: string | null;
+  bed_number?: string | null;
   rent_amount: number;
   amount: number;
+  month_for: string;
+  status: 'Pending' | 'Partial';
 }
+
+const SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
+
+// ── PDF builder ───────────────────────────────────────────────────────────────
 
 interface ReportHTMLParams {
   generatedDate: string;
@@ -46,9 +48,97 @@ interface ReportHTMLParams {
   paymentRows: string;
 }
 
-const SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
+function buildReportHTML(p: ReportHTMLParams): string {
+  const noData = `<tr><td colspan="99" style="text-align:center;color:#999;padding:1.5rem 0;font-style:italic;font-size:0.8rem">No records found</td></tr>`;
+  return `<!DOCTYPE html><html><head><title>Portfolio Report — ${p.generatedDate}</title>
+<meta charset="utf-8">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;padding:2.5rem;color:#111;background:#fff;font-size:14px;line-height:1.5}
+  h1{font-size:1.75rem;font-weight:900;letter-spacing:-0.03em;margin-bottom:0.25rem}
+  h2{font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;color:#555;margin:2rem 0 0.625rem;padding-bottom:0.4rem;border-bottom:1.5px solid #111}
+  .meta{font-size:0.75rem;color:#888;margin-bottom:0.15rem}
+  .scope{font-size:0.75rem;color:#666;font-style:italic;margin-bottom:0.1rem}
+  .divider{border:none;border-top:2.5px solid #111;margin:1.25rem 0 1rem}
+  .summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.875rem;margin:1rem 0 1.5rem}
+  .summary-card{background:#f5f5f5;border-radius:0.625rem;padding:1rem 1.25rem;text-align:center}
+  .summary-label{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.12em;color:#888;font-weight:700;margin-bottom:0.25rem}
+  .summary-value{font-size:2rem;font-weight:900;color:#111;line-height:1}
+  table{width:100%;border-collapse:collapse;margin-top:0.25rem;font-size:0.8125rem}
+  th{text-align:left;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.1em;color:#666;font-weight:700;padding:0.5rem 0.5rem 0.5rem;border-bottom:1px solid #ddd}
+  td{padding:0.55rem 0.5rem;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  .footer{margin-top:2.5rem;padding-top:1rem;border-top:1px solid #e5e5e5;text-align:center;font-size:0.65rem;color:#bbb;letter-spacing:0.05em}
+  @media print{
+    body{padding:1.5rem}
+    h2{break-before:avoid}
+    table{break-inside:auto}
+    tr{break-inside:avoid;page-break-inside:avoid}
+  }
+</style>
+</head><body>
+<div style="display:flex;justify-content:space-between;align-items:flex-start">
+  <div>
+    <h1>PORTFOLIO REPORT</h1>
+    <div class="meta">Generated on ${p.generatedDate}</div>
+    <div class="scope">Scope: ${p.scopeNames}</div>
+    <div class="scope">Lease expiry window: Next ${p.expiryDays} days</div>
+  </div>
+</div>
+<hr class="divider">
+<div class="summary-grid">
+  <div class="summary-card">
+    <div class="summary-label">Vacant Beds</div>
+    <div class="summary-value">${p.vacantBedsCount}</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-label">Expiring Leases</div>
+    <div class="summary-value">${p.expiringLeasesCount}</div>
+  </div>
+  <div class="summary-card" style="background:#fff3f3">
+    <div class="summary-label" style="color:#b91c1c">Outstanding</div>
+    <div class="summary-value" style="color:#b91c1c">${p.outstandingCount}</div>
+  </div>
+</div>
 
-// ── Component ─────────────────────────────────────────────────────────────
+<h2>Vacant Beds (${p.vacantBedsCount})</h2>
+<table>
+  <thead><tr>
+    <th>Hostel</th><th>Room</th><th>Vacant Beds</th>
+    <th style="text-align:center">Count</th>
+  </tr></thead>
+  <tbody>${p.bedRows || noData}</tbody>
+</table>
+
+<h2>Expiring Leases — Next ${p.expiryDays} Days (${p.expiringLeasesCount})</h2>
+<table>
+  <thead><tr>
+    <th>Tenant</th><th>Hostel</th><th>Room / Bed</th>
+    <th style="text-align:right">Rent</th>
+    <th style="text-align:center">Expires</th>
+    <th style="text-align:center">Days Left</th>
+  </tr></thead>
+  <tbody>${p.leaseRows || noData}</tbody>
+</table>
+
+<h2>Outstanding Payments — Pending &amp; Partial (${p.outstandingCount})</h2>
+<table>
+  <thead><tr>
+    <th>Tenant</th><th>Hostel</th><th>Room / Bed</th>
+    <th>Period</th>
+    <th style="text-align:center">Status</th>
+    <th style="text-align:right">Rent Due</th>
+    <th style="text-align:right">Paid</th>
+    <th style="text-align:right">Balance</th>
+  </tr></thead>
+  <tbody>${p.paymentRows || noData}</tbody>
+</table>
+
+<div class="footer">Generated by Lobby &nbsp;·&nbsp; ${p.generatedDate}</div>
+</body></html>`;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 const Reports: React.FC = () => {
   const navigate = useNavigate();
@@ -146,8 +236,8 @@ const Reports: React.FC = () => {
     [beds, selectedHostelIds],
   );
 
-  const roomMap     = useMemo(() => new Map(rooms.map(r => [r.id, r])),         [rooms]);
-  const hostelMap   = useMemo(() => new Map(hostels.map(h => [h.id, h])),       [hostels]);
+  const roomMap   = useMemo(() => new Map(rooms.map(r => [r.id, r])),   [rooms]);
+  const hostelMap = useMemo(() => new Map(hostels.map(h => [h.id, h])), [hostels]);
 
   const expiringLeases = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -156,7 +246,7 @@ const Reports: React.FC = () => {
       if (!l.end_date) return false;
       const end = new Date(l.end_date + 'T00:00:00');
       if (end < today || end > cutoff) return false;
-      if (l.hostel_name)   return selectedHostelNames.has(l.hostel_name);
+      if (l.hostel_name) return selectedHostelNames.has(l.hostel_name);
       return false;
     });
   }, [activeLeases, expiryDays, selectedHostelNames]);
@@ -169,8 +259,8 @@ const Reports: React.FC = () => {
     const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
   });
 
-  const selectAll   = () => { setSelectedHostelIds(new Set(hostels.map(h => h.id))); };
-  const deselectAll = () => { setSelectedHostelIds(new Set()); };
+  const selectAll   = () => setSelectedHostelIds(new Set(hostels.map(h => h.id)));
+  const deselectAll = () => setSelectedHostelIds(new Set());
 
   const generatePDF = async () => {
     setGenerating(true);
@@ -189,9 +279,7 @@ const Reports: React.FC = () => {
     const generatedDate = new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
     const todayMs = new Date(); todayMs.setHours(0, 0, 0, 0);
 
-    const scopeNames = [
-      ...hostels.filter(h => selectedHostelIds.has(h.id)).map(h => h.name),
-    ].join(', ') || 'None';
+    const scopeNames = hostels.filter(h => selectedHostelIds.has(h.id)).map(h => h.name).join(', ') || 'None';
 
     // Group vacant beds by room so each row = one room with its vacant bed list
     const bedsByRoom = new Map<string, { hostelName: string; roomNumber: string; beds: Bed[] }>();
@@ -218,11 +306,10 @@ const Reports: React.FC = () => {
       const endDate  = l.end_date ? new Date(l.end_date + 'T00:00:00') : null;
       const daysLeft = endDate ? Math.ceil((endDate.getTime() - todayMs.getTime()) / 86400000) : null;
       const urgency  = daysLeft === null ? '#888' : daysLeft <= 7 ? '#dc2626' : daysLeft <= 30 ? '#d97706' : '#16a34a';
-      const location = l.hostel_name || '—';
       const unit     = l.bed_number ? `Room ${l.room_number} · Bed ${l.bed_number}` : '—';
       return `<tr>
         <td style="font-weight:700">${l.tenant_name}</td>
-        <td>${location}</td>
+        <td>${l.hostel_name || '—'}</td>
         <td>${unit}</td>
         <td style="text-align:right">${sym}${Number(l.rent_amount).toLocaleString()}</td>
         <td style="text-align:center">${endDate ? endDate.toLocaleDateString() : '—'}</td>
@@ -231,7 +318,6 @@ const Reports: React.FC = () => {
     }).join('');
 
     const paymentRows = filteredOutstanding.map(p => {
-      const location = p.hostel_name || '—';
       const unit     = p.bed_number ? `Room ${p.room_number} · Bed ${p.bed_number}` : '—';
       const balance  = p.rent_amount - p.amount;
       const isPending = p.status === 'Pending';
@@ -239,7 +325,7 @@ const Reports: React.FC = () => {
       const statusBg    = isPending ? '#fef3c7' : '#fff3e0';
       return `<tr>
         <td style="font-weight:700">${p.tenant_name}</td>
-        <td>${location}</td>
+        <td>${p.hostel_name || '—'}</td>
         <td>${unit}</td>
         <td style="color:#555">${p.month_for}</td>
         <td style="text-align:center"><span style="display:inline-block;padding:0.15rem 0.6rem;border-radius:99px;font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;background:${statusBg};color:${statusColor}">${p.status}</span></td>
@@ -291,8 +377,8 @@ const Reports: React.FC = () => {
             <span className="material-symbols-outlined" style={{ fontSize: '1rem', marginRight: '0.5rem' }}>arrow_back</span>
             Back
           </div>
-          <h1 className="view-title">Facility Report</h1>
-          <p className="text-on-surface-variant mt-2">Vacant bed stock and upcoming lease expirations.</p>
+          <h1 className="view-title">Portfolio Report</h1>
+          <p className="text-on-surface-variant mt-2">Vacant stock and upcoming lease expirations.</p>
         </div>
       </header>
 
@@ -331,7 +417,7 @@ const Reports: React.FC = () => {
         {hostels.length > 0 && (
           <div style={{ marginBottom: '2rem' }}>
             <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 800, opacity: 0.4, marginBottom: '0.875rem' }}>
-              Facilities
+              Hostels
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
               {hostels.map(h => (
@@ -397,95 +483,5 @@ const Reports: React.FC = () => {
     </div>
   );
 };
-
-function buildReportHTML(p: ReportHTMLParams): string {
-  const noData = `<tr><td colspan="99" style="text-align:center;color:#999;padding:1.5rem 0;font-style:italic;font-size:0.8rem">No records found</td></tr>`;
-  return `<!DOCTYPE html><html><head><title>Facility Report — ${p.generatedDate}</title>
-<meta charset="utf-8">
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;padding:2.5rem;color:#111;background:#fff;font-size:14px;line-height:1.5}
-  h1{font-size:1.75rem;font-weight:900;letter-spacing:-0.03em;margin-bottom:0.25rem}
-  h2{font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;color:#555;margin:2rem 0 0.625rem;padding-bottom:0.4rem;border-bottom:1.5px solid #111}
-  .meta{font-size:0.75rem;color:#888;margin-bottom:0.15rem}
-  .scope{font-size:0.75rem;color:#666;font-style:italic;margin-bottom:0.1rem}
-  .divider{border:none;border-top:2.5px solid #111;margin:1.25rem 0 1rem}
-  .summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.875rem;margin:1rem 0 1.5rem}
-  .summary-card{background:#f5f5f5;border-radius:0.625rem;padding:1rem 1.25rem;text-align:center}
-  .summary-label{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.12em;color:#888;font-weight:700;margin-bottom:0.25rem}
-  .summary-value{font-size:2rem;font-weight:900;color:#111;line-height:1}
-  table{width:100%;border-collapse:collapse;margin-top:0.25rem;font-size:0.8125rem}
-  th{text-align:left;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.1em;color:#666;font-weight:700;padding:0.5rem 0.5rem 0.5rem;border-bottom:1px solid #ddd}
-  td{padding:0.55rem 0.5rem;border-bottom:1px solid #f0f0f0;vertical-align:middle}
-  tr:last-child td{border-bottom:none}
-  .footer{margin-top:2rem;padding-top:1rem;border-top:1px solid #e5e5e5;text-align:center;font-size:0.65rem;color:#bbb;letter-spacing:0.05em}
-  @media print{
-    body{padding:1.5rem}
-    h2{break-before:avoid}
-    table{break-inside:auto}
-    tr{break-inside:avoid;page-break-inside:avoid}
-  }
-</style>
-</head><body>
-<div style="display:flex;justify-content:space-between;align-items:flex-start">
-  <div>
-    <h1>FACILITY REPORT</h1>
-    <div class="meta">Generated on ${p.generatedDate}</div>
-    <div class="scope">Scope: ${p.scopeNames}</div>
-    <div class="scope">Lease expiry window: Next ${p.expiryDays} days</div>
-  </div>
-</div>
-<hr class="divider">
-<div class="summary-grid">
-  <div class="summary-card">
-    <div class="summary-label">Vacant Beds</div>
-    <div class="summary-value">${p.vacantBedsCount}</div>
-  </div>
-  <div class="summary-card">
-    <div class="summary-label">Expiring Leases</div>
-    <div class="summary-value">${p.expiringLeasesCount}</div>
-  </div>
-  <div class="summary-card" style="background:#fff3f3">
-    <div class="summary-label" style="color:#b91c1c">Outstanding</div>
-    <div class="summary-value" style="color:#b91c1c">${p.outstandingCount}</div>
-  </div>
-</div>
-
-<h2>Vacant Beds (${p.vacantBedsCount})</h2>
-<table>
-  <thead><tr>
-    <th>Hostel</th><th>Room</th><th>Vacant Beds</th>
-    <th style="text-align:center">Count</th>
-  </tr></thead>
-  <tbody>${p.bedRows || noData}</tbody>
-</table>
-
-<h2>Expiring Leases — Next ${p.expiryDays} Days (${p.expiringLeasesCount})</h2>
-<table>
-  <thead><tr>
-    <th>Tenant</th><th>Hostel</th><th>Room / Bed</th>
-    <th style="text-align:right">Rent</th>
-    <th style="text-align:center">Expires</th>
-    <th style="text-align:center">Days Left</th>
-  </tr></thead>
-  <tbody>${p.leaseRows || noData}</tbody>
-</table>
-
-<h2>Outstanding Payments — Pending &amp; Partial (${p.outstandingCount})</h2>
-<table>
-  <thead><tr>
-    <th>Tenant</th><th>Hostel</th><th>Room / Bed</th>
-    <th>Period</th>
-    <th style="text-align:center">Status</th>
-    <th style="text-align:right">Rent Due</th>
-    <th style="text-align:right">Paid</th>
-    <th style="text-align:right">Balance</th>
-  </tr></thead>
-  <tbody>${p.paymentRows || noData}</tbody>
-</table>
-
-<div class="footer">Generated by Lobby &nbsp;·&nbsp; ${p.generatedDate}</div>
-</body></html>`;
-}
 
 export default Reports;

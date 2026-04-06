@@ -5,7 +5,8 @@ import { useOwner } from '../../context/OwnerContext';
 
 export const BottomNav: React.FC = () => {
   const location = useLocation();
-  const { isStaff } = useOwner();
+  const { userRole } = useOwner();
+  const isStaff = userRole !== 'owner';
   const isActive = (path: string) => location.pathname === path;
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -71,7 +72,6 @@ export const BottomNav: React.FC = () => {
             <span className="material-symbols-outlined" style={{ fontVariationSettings: isActive('/') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>dashboard</span>
           </Link>
 
-
           {/* Hostels — always visible */}
           <Link
             to="/hostels"
@@ -79,6 +79,15 @@ export const BottomNav: React.FC = () => {
             onMouseEnter={() => prefetch('hostels')}
           >
             <span className="material-symbols-outlined" style={{ fontVariationSettings: location.pathname.startsWith('/hostels') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>hotel</span>
+          </Link>
+
+          {/* Payments — always visible */}
+          <Link
+            to="/payments"
+            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${isActive('/payments') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
+            onMouseEnter={() => prefetch('payments')}
+          >
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: isActive('/payments') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>payments</span>
           </Link>
 
           {/* 4th slot: Payments for staff, Leases for owners */}

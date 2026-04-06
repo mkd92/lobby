@@ -6,42 +6,42 @@ import { LoadingScreen } from './components/layout/LoadingScreen';
 import './App.css';
 
 // Lazy load components with explicit export for prefetching
-const Lobby = lazy(() => import('./components/Lobby'));
-const Auth = lazy(() => import('./components/Auth'));
-const Payments = lazy(() => import('./components/Payments'));
+const Lobby       = lazy(() => import('./components/Lobby'));
+const Auth        = lazy(() => import('./components/Auth'));
+const Payments    = lazy(() => import('./components/Payments'));
 const PaymentDetail = lazy(() => import('./components/PaymentDetail'));
-const Settings = lazy(() => import('./components/Settings'));
-const Customers = lazy(() => import('./components/Customers'));
+const Settings    = lazy(() => import('./components/Settings'));
+const Customers   = lazy(() => import('./components/Customers'));
 const AddCustomer = lazy(() => import('./components/AddCustomer'));
 const CustomerDetail = lazy(() => import('./components/CustomerDetail'));
-const Hostels = lazy(() => import('./components/Hostels'));
-const AddHostel = lazy(() => import('./components/AddHostel'));
+const Hostels     = lazy(() => import('./components/Hostels'));
+const AddHostel   = lazy(() => import('./components/AddHostel'));
 const HostelDetail = lazy(() => import('./components/HostelDetail'));
-const RoomDetail = lazy(() => import('./components/RoomDetail'));
-const Leases = lazy(() => import('./components/Leases'));
-const AddLease = lazy(() => import('./components/AddLease'));
+const RoomDetail  = lazy(() => import('./components/RoomDetail'));
+const Leases      = lazy(() => import('./components/Leases'));
+const AddLease    = lazy(() => import('./components/AddLease'));
 const LeaseDetail = lazy(() => import('./components/LeaseDetail'));
-const Reports = lazy(() => import('./components/Reports'));
-const Team    = lazy(() => import('./components/Team'));
+const Reports     = lazy(() => import('./components/Reports'));
+const Team        = lazy(() => import('./components/Team'));
 
 // Prefetch Map
 export const prefetchMap = {
-  lobby: () => import('./components/Lobby'),
-  payments: () => import('./components/Payments'),
+  lobby:       () => import('./components/Lobby'),
+  payments:    () => import('./components/Payments'),
   paymentDetail: () => import('./components/PaymentDetail'),
-  settings: () => import('./components/Settings'),
-  customers: () => import('./components/Customers'),
+  settings:    () => import('./components/Settings'),
+  customers:   () => import('./components/Customers'),
   addCustomer: () => import('./components/AddCustomer'),
   customerDetail: () => import('./components/CustomerDetail'),
-  hostels: () => import('./components/Hostels'),
-  addHostel: () => import('./components/AddHostel'),
+  hostels:     () => import('./components/Hostels'),
+  addHostel:   () => import('./components/AddHostel'),
   hostelDetail: () => import('./components/HostelDetail'),
-  roomDetail: () => import('./components/RoomDetail'),
-  leases: () => import('./components/Leases'),
-  addLease: () => import('./components/AddLease'),
+  roomDetail:  () => import('./components/RoomDetail'),
+  leases:      () => import('./components/Leases'),
+  addLease:    () => import('./components/AddLease'),
   leaseDetail: () => import('./components/LeaseDetail'),
-  reports: () => import('./components/Reports'),
-  team:    () => import('./components/Team'),
+  reports:     () => import('./components/Reports'),
+  team:        () => import('./components/Team'),
 };
 
 function App() {
@@ -80,7 +80,7 @@ function App() {
               <Route path="/leases/new" element={<AddLease />} />
               <Route path="/leases/:id" element={<LeaseDetail />} />
               <Route path="/reports" element={<Reports />} />
-              <Route path="/team"    element={<Team />} />
+              <Route path="/team" element={<Team />} />
               <Route path="/payments" element={<Payments />} />
               <Route path="/payments/:id" element={<PaymentDetail />} />
               <Route path="/settings" element={<Settings />} />

@@ -20,7 +20,9 @@ interface HostelData {
 
 const Hostels: React.FC = () => {
   const navigate = useNavigate();
-  const { ownerId, isStaff } = useOwner();
+  const { ownerId, userRole } = useOwner();
+  const canCreate = userRole !== 'viewer';
+  const isOwner = userRole === 'owner';
   const queryClient = useQueryClient();
   const { showAlert, showConfirm, DialogMount } = useDialog();
 
@@ -91,7 +93,7 @@ const Hostels: React.FC = () => {
         <p className="view-eyebrow">Shared Facilities</p>
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
           <h1 className="view-title" style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', margin: 0 }}>Hostel Facilities</h1>
-          {!isStaff && (
+          {canCreate && (
             <button onClick={() => navigate('/hostels/new')} className="primary-button">
               <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle', fontSize: '1.25rem' }}>add_home</span>
               Add Facility
@@ -142,7 +144,7 @@ const Hostels: React.FC = () => {
           </div>
           <h2 className="mb-4">No Hostels Registered</h2>
           <p className="text-on-surface-variant mb-10 max-w-md mx-auto">Initialize your first shared accommodation facility to begin managing rooms and bed allocations.</p>
-          {!isStaff && (
+          {canCreate && (
             <button onClick={() => navigate('/hostels/new')} className="primary-button">Register First Facility</button>
           )}
         </div>
@@ -164,7 +166,7 @@ const Hostels: React.FC = () => {
                 <div className="property-icon-large">
                   <span className="material-symbols-outlined">hotel</span>
                 </div>
-                {!isStaff && (
+                {isOwner && (
                   <div className="property-card-quick-actions" onClick={e => e.stopPropagation()}>
                     <button className="prop-mini-btn danger" onClick={e => handleDelete(e, hostel)} title="Terminate Registration">
                       <span className="material-symbols-outlined">delete</span>
@@ -174,7 +176,7 @@ const Hostels: React.FC = () => {
               </div>
 
               <div className="property-card-body">
-                {!isStaff && (
+                {isOwner && (
                   <div className="property-card-quick-actions-mobile mobile-only" onClick={e => e.stopPropagation()}>
                     <button className="prop-mini-btn danger" onClick={e => handleDelete(e, hostel)} title="Terminate Registration">
                       <span className="material-symbols-outlined">delete</span>

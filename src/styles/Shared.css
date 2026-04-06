@@ -236,3 +236,17 @@ h1, .view-title {
   z-index: 1;
 }
 
+
+/* ── Staff Dashboard Two-Column Grid ────────────────────────────────────────── */
+.staff-dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .staff-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
