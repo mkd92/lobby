@@ -86,7 +86,7 @@ const Team: React.FC = () => {
       // Path: /staff_lookup/{staffUid}/owners/{ownerUid}
       await setDoc(
         doc(db, 'staff_lookup', user.uid, 'owners', invite.owner_id),
-        { accepted_at: serverTimestamp() },
+        { accepted_at: serverTimestamp(), role: invite.role ?? 'viewer' },
       );
       refetchInvites();
       queryClient.invalidateQueries({ queryKey: ['pending-invites'] });
