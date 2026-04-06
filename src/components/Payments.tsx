@@ -12,7 +12,6 @@ import { useListKeyNav } from '../hooks/useListKeyNav';
 import { generateMonthlyPayments, previewMonthlyPayments } from '../utils/generateMonthlyPayments';
 import { LoadingScreen } from './layout/LoadingScreen';
 import PaymentSlideOver from './PaymentSlideOver';
-import '../styles/Units.css';
 import '../styles/Leases.css';
 import '../styles/Payments.css';
 

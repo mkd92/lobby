@@ -8,7 +8,6 @@ import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import '../styles/Properties.css';
 import '../styles/Leases.css';
 
 // ── Types ──────────────────────────────────────────────────────────────

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
-import '../styles/Properties.css';
 
 const AddCustomer: React.FC = () => {
   const navigate = useNavigate();
