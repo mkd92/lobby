@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
@@ -74,7 +74,7 @@ const PaymentDetail: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canWrite) return;
+    if (!canWrite || !payment) return;
     setSaving(true);
     try {
       if (form.payment_date && !payment?.payment_date) localStorage.setItem('lastPaymentDate', form.payment_date);
