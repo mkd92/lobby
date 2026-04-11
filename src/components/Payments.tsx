@@ -196,9 +196,16 @@ const Payments: React.FC = () => {
         const invoiceRef = doc(db, 'invoices', p.id);
         batch.set(invoiceRef, {
           owner_id: ownerId!,
+          lease_id: p.lease_id || '',
+          tenant_name: p.tenant_name || '',
+          hostel_id: p.hostel_id || null,
+          hostel_name: p.hostel_name || null,
+          month_for: p.month_for || '',
+          amount: p.rent_amount || 0,
+          due_date: p.payment_date || today,
           status: 'Paid',
-          amount: p.rent_amount,
-          updated_at: serverTimestamp()
+          updated_at: serverTimestamp(),
+          legacy_payment_id: p.id,
         }, { merge: true });
 
         if (remainingAmount > 0) {
@@ -296,8 +303,16 @@ const Payments: React.FC = () => {
       const invoiceRef = doc(db, 'invoices', p.id);
       batch.set(invoiceRef, {
         owner_id: ownerId!,
+        lease_id: p.lease_id || '',
+        tenant_name: p.tenant_name || '',
+        hostel_id: p.hostel_id || null,
+        hostel_name: p.hostel_name || null,
+        month_for: p.month_for || '',
+        amount: p.rent_amount || 0,
+        due_date: p.payment_date || receiveForm.payment_date,
         status: newStatus,
         updated_at: serverTimestamp(),
+        legacy_payment_id: p.id,
       }, { merge: true });
 
       const receiptRef = doc(collection(db, 'receipts'));
@@ -342,10 +357,10 @@ const Payments: React.FC = () => {
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(p => 
-        p.tenant_name.toLowerCase().includes(q) || 
+        (p.tenant_name || '').toLowerCase().includes(q) || 
         (p.hostel_name || '').toLowerCase().includes(q) || 
         (p.property_name || '').toLowerCase().includes(q) ||
-        p.month_for.toLowerCase().includes(q)
+        (p.month_for || '').toLowerCase().includes(q)
       );
     }
     return [...list].sort((a, b) => {

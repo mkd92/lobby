@@ -123,8 +123,16 @@ const PaymentSlideOver: React.FC<Props> = ({ id, currencySymbol, onClose, onUpda
       const invoiceRef = doc(db, 'invoices', id);
       batch.set(invoiceRef, {
         owner_id: ownerId!,
+        lease_id: payment.lease_id || '',
+        tenant_name: payment.tenant_name || '',
+        hostel_id: (payment as any).hostel_id || null,
+        hostel_name: payment.hostel_name || null,
+        month_for: payment.month_for || '',
+        amount: payment.rent_amount || 0,
+        due_date: payment.payment_date || form.payment_date,
         status: form.status,
         updated_at: serverTimestamp(),
+        legacy_payment_id: id,
       }, { merge: true });
 
       if (amountDiff > 0) {

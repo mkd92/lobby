@@ -78,7 +78,11 @@ const PaymentDetail: React.FC = () => {
     setSaving(true);
     try {
       if (form.payment_date && !payment?.payment_date) localStorage.setItem('lastPaymentDate', form.payment_date);
-      await updateDoc(doc(db, 'payments', id!), {
+      
+      const batch = writeBatch(db);
+      
+      const paymentRef = doc(db, 'payments', id!);
+      batch.update(paymentRef, {
         owner_id: ownerId!,
         amount: parseFloat(form.amount),
         payment_date: form.payment_date,
@@ -86,6 +90,24 @@ const PaymentDetail: React.FC = () => {
         status: form.status,
         updated_at: serverTimestamp(),
       });
+
+      const invoiceRef = doc(db, 'invoices', id!);
+      batch.set(invoiceRef, {
+        owner_id: ownerId!,
+        lease_id: payment.lease_id || '',
+        tenant_name: payment.tenant_name || '',
+        hostel_id: (payment as any).hostel_id || null,
+        hostel_name: payment.hostel_name || null,
+        month_for: payment.month_for || '',
+        amount: payment.rent_amount || 0,
+        due_date: payment.payment_date || form.payment_date,
+        status: form.status,
+        updated_at: serverTimestamp(),
+        legacy_payment_id: id!,
+      }, { merge: true });
+
+      await batch.commit();
+      
       queryClient.invalidateQueries({ queryKey: ['payment', id] });
       queryClient.invalidateQueries({ queryKey: ['payments', ownerId] });
       showAlert('Financial record synchronized successfully.');
