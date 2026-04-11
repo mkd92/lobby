@@ -264,7 +264,7 @@ const Team: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                    <button onClick={() => handleRevokeStaff(s)} className="btn-icon danger opacity-0 group-hover:opacity-100 transition-opacity" title="Revoke access">
+                    <button onClick={() => handleRevokeStaff(s)} className="prop-mini-btn danger" title="Revoke access" style={{ flexShrink: 0 }}>
                       <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>person_remove</span>
                     </button>
                   </div>
