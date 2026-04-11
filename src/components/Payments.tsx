@@ -14,6 +14,7 @@ import { PageSkeleton } from './layout/PageSkeleton';
 import { useListKeyNav } from '../hooks/useListKeyNav';
 
 import '../styles/Payments.css';
+import '../styles/Leases.css';
 
 // ── Types ──────────────────────────────────────────────────────────────
 interface Payment {
