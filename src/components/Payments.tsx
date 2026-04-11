@@ -114,20 +114,38 @@ const Payments: React.FC = () => {
       };
 
       const receipts = receiptsSnap.docs.map(d => d.data());
+      const legacyMap = new Map(legacySnap.docs.map(d => [d.id, d.data()]));
       
       // Process Invoices
       const invoicePayments = invoicesSnap.docs.map(d => {
         const data = d.data();
+        const legacyData = legacyMap.get(d.id);
+        
         const paidAmount = receipts
           .filter(r => r.invoice_id === d.id)
           .reduce((acc, r) => acc + (Number(r.amount) || 0), 0);
-        const { hId, hName } = resolveHostel(data);
+        
+        // Merge: prefer legacy data for descriptive fields as they are more likely to be populated
+        const merged = {
+          ...data,
+          tenant_name:  legacyData?.tenant_name || data.tenant_name || '',
+          hostel_id:    legacyData?.hostel_id || data.hostel_id || null,
+          hostel_name:  legacyData?.hostel_name || data.hostel_name || null,
+          month_for:    legacyData?.month_for || data.month_for || '',
+          rent_amount:  legacyData?.rent_amount || data.amount || 0,
+          room_number:  legacyData?.room_number || null,
+          bed_number:   legacyData?.bed_number || null,
+          unit_number:  legacyData?.unit_number || null,
+          property_name: legacyData?.property_name || null,
+        };
+
+        const { hId, hName } = resolveHostel(merged);
+
         return {
           id: d.id,
-          ...data,
-          rent_amount: data.amount || 0,
+          ...merged,
           amount: paidAmount,
-          payment_date: data.due_date || '',
+          payment_date: data.due_date || merged.payment_date || '',
           hostel_id: hId || null,
           hostel_name: hName || null,
         } as Payment;
@@ -569,8 +587,12 @@ const Payments: React.FC = () => {
                         </td>
                         <td>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                            <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{p.property_name || p.hostel_name}</span>
-                            <span style={{ fontSize: '0.75rem', opacity: 0.5, fontWeight: 600 }}>{isHostel ? `Rm ${p.room_number} · Bed ${p.bed_number}` : `Unit ${p.unit_number}`}</span>
+                            <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{p.property_name || p.hostel_name || 'Facility'}</span>
+                            <span style={{ fontSize: '0.75rem', opacity: 0.5, fontWeight: 600 }}>
+                              {isHostel 
+                                ? (p.room_number ? `Rm ${p.room_number} · Bed ${p.bed_number || '?'}` : (p.bed_number ? `Bed ${p.bed_number}` : 'No unit assigned'))
+                                : `Unit ${p.unit_number || '—'}`}
+                            </span>
                           </div>
                         </td>
                         <td>
