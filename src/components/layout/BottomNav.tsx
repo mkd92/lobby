@@ -7,6 +7,7 @@ export const BottomNav: React.FC = () => {
   const location = useLocation();
   const { userRole } = useOwner();
   const isStaff = userRole !== 'owner';
+  const isViewer = userRole === 'viewer';
   const isActive = (path: string) => location.pathname === path;
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -63,59 +64,77 @@ export const BottomNav: React.FC = () => {
 
       <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[92%] max-w-lg rounded-[32px] z-50 bg-surface/80 backdrop-blur-[32px] shadow-ambient border border-outline-variant md:hidden">
         <div className="flex justify-around items-center h-20 px-6">
-          {/* Dashboard — always visible */}
-          <Link
-            to="/"
-            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${isActive('/') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
-            onMouseEnter={() => prefetch('lobby')}
-          >
-            <span className="material-symbols-outlined" style={{ fontVariationSettings: isActive('/') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>dashboard</span>
-          </Link>
+          {isViewer ? (
+            // Viewer: Payments + sign-out only
+            <>
+              <Link
+                to="/payments"
+                className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/payments') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
+                onMouseEnter={() => prefetch('payments')}
+              >
+                <span className="material-symbols-outlined" style={{ fontVariationSettings: location.pathname.startsWith('/payments') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>account_balance_wallet</span>
+              </Link>
 
-          {/* Hostels — always visible */}
-          <Link
-            to="/hostels"
-            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/hostels') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
-            onMouseEnter={() => prefetch('hostels')}
-          >
-            <span className="material-symbols-outlined" style={{ fontVariationSettings: location.pathname.startsWith('/hostels') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>hotel</span>
-          </Link>
-
-          {/* Payments — always visible */}
-          <Link
-            to="/payments"
-            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${isActive('/payments') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
-            onMouseEnter={() => prefetch('payments')}
-          >
-            <span className="material-symbols-outlined" style={{ fontVariationSettings: isActive('/payments') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>payments</span>
-          </Link>
-
-          {/* 4th slot: Payments for staff, Leases for owners */}
-          {isStaff ? (
-            <Link
-              to="/payments"
-              className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${isActive('/payments') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
-              onMouseEnter={() => prefetch('payments')}
-            >
-              <span className="material-symbols-outlined" style={{ fontVariationSettings: isActive('/payments') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>payments</span>
-            </Link>
+              <button
+                className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${moreOpen ? 'bg-surface-container-highest text-primary' : 'text-on-surface-variant opacity-50'}`}
+                onClick={() => setMoreOpen(prev => !prev)}
+              >
+                <span className="material-symbols-outlined" style={{ transform: moreOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.3s ease', fontSize: '1.75rem' }}>more_horiz</span>
+              </button>
+            </>
           ) : (
-            <Link
-              to="/leases"
-              className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/leases') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
-              onMouseEnter={() => prefetch('leases')}
-            >
-              <span className="material-symbols-outlined" style={{ fontVariationSettings: location.pathname.startsWith('/leases') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>contract</span>
-            </Link>
-          )}
+            // Owner / Manager: full bottom nav
+            <>
+              <Link
+                to="/"
+                className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${isActive('/') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
+                onMouseEnter={() => prefetch('lobby')}
+              >
+                <span className="material-symbols-outlined" style={{ fontVariationSettings: isActive('/') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>dashboard</span>
+              </Link>
 
-          {/* More sheet */}
-          <button
-            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${moreOpen ? 'bg-surface-container-highest text-primary' : 'text-on-surface-variant opacity-50'}`}
-            onClick={() => setMoreOpen(prev => !prev)}
-          >
-            <span className="material-symbols-outlined" style={{ transform: moreOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.3s ease', fontSize: '1.75rem' }}>more_horiz</span>
-          </button>
+              <Link
+                to="/hostels"
+                className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/hostels') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
+                onMouseEnter={() => prefetch('hostels')}
+              >
+                <span className="material-symbols-outlined" style={{ fontVariationSettings: location.pathname.startsWith('/hostels') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>hotel</span>
+              </Link>
+
+              <Link
+                to="/payments"
+                className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${isActive('/payments') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
+                onMouseEnter={() => prefetch('payments')}
+              >
+                <span className="material-symbols-outlined" style={{ fontVariationSettings: isActive('/payments') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>payments</span>
+              </Link>
+
+              {isStaff ? (
+                <Link
+                  to="/payments"
+                  className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${isActive('/payments') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
+                  onMouseEnter={() => prefetch('payments')}
+                >
+                  <span className="material-symbols-outlined" style={{ fontVariationSettings: isActive('/payments') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>payments</span>
+                </Link>
+              ) : (
+                <Link
+                  to="/leases"
+                  className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/leases') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
+                  onMouseEnter={() => prefetch('leases')}
+                >
+                  <span className="material-symbols-outlined" style={{ fontVariationSettings: location.pathname.startsWith('/leases') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.75rem' }}>contract</span>
+                </Link>
+              )}
+
+              <button
+                className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${moreOpen ? 'bg-surface-container-highest text-primary' : 'text-on-surface-variant opacity-50'}`}
+                onClick={() => setMoreOpen(prev => !prev)}
+              >
+                <span className="material-symbols-outlined" style={{ transform: moreOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.3s ease', fontSize: '1.75rem' }}>more_horiz</span>
+              </button>
+            </>
+          )}
         </div>
       </nav>
     </>

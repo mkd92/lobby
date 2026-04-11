@@ -46,7 +46,7 @@ export const prefetchMap = {
 };
 
 function App() {
-  const { user, ownerLoading } = useOwner();
+  const { user, ownerLoading, userRole } = useOwner();
 
   if (ownerLoading) {
     return <LoadingScreen message="Initializing session" />;
@@ -63,6 +63,8 @@ function App() {
     );
   }
 
+  const isViewer = userRole === 'viewer';
+
   return (
     <div className="App">
       <Layout>
@@ -70,23 +72,37 @@ function App() {
         <Suspense fallback={<LoadingScreen />}>
           <div className="page-fade-in">
             <Routes>
-              <Route path="/" element={<Lobby />} />
-              <Route path="/customers" element={<Customers />} />
-              <Route path="/customers/new" element={<AddCustomer />} />
-              <Route path="/customers/:id" element={<CustomerDetail />} />
-              <Route path="/hostels" element={<Hostels />} />
-              <Route path="/hostels/new" element={<AddHostel />} />
-              <Route path="/hostels/:id" element={<HostelDetail />} />
-              <Route path="/rooms/:id" element={<RoomDetail />} />
-              <Route path="/leases" element={<Leases />} />
-              <Route path="/leases/new" element={<AddLease />} />
-              <Route path="/leases/:id" element={<LeaseDetail />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/team" element={<Team />} />
-              <Route path="/payments" element={<Payments />} />
-              <Route path="/payments/:id" element={<PaymentDetail />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
+              {isViewer ? (
+                // Viewers: payments page only
+                <>
+                  <Route path="/payments" element={<Payments />} />
+                  <Route path="/payments/:id" element={<PaymentDetail />} />
+                  <Route path="/team" element={<Team />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="*" element={<Navigate to="/payments" replace />} />
+                </>
+              ) : (
+                // Owners & managers: full access
+                <>
+                  <Route path="/" element={<Lobby />} />
+                  <Route path="/customers" element={<Customers />} />
+                  <Route path="/customers/new" element={<AddCustomer />} />
+                  <Route path="/customers/:id" element={<CustomerDetail />} />
+                  <Route path="/hostels" element={<Hostels />} />
+                  <Route path="/hostels/new" element={<AddHostel />} />
+                  <Route path="/hostels/:id" element={<HostelDetail />} />
+                  <Route path="/rooms/:id" element={<RoomDetail />} />
+                  <Route path="/leases" element={<Leases />} />
+                  <Route path="/leases/new" element={<AddLease />} />
+                  <Route path="/leases/:id" element={<LeaseDetail />} />
+                  <Route path="/reports" element={<Reports />} />
+                  <Route path="/team" element={<Team />} />
+                  <Route path="/payments" element={<Payments />} />
+                  <Route path="/payments/:id" element={<PaymentDetail />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </>
+              )}
             </Routes>
           </div>
         </Suspense>
