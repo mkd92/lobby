@@ -137,9 +137,9 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [user]);
 
   const switchAccount = (id: string) => {
+    localStorage.setItem(STORAGE_KEY, id); // persist intent before account list is updated
     const account = availableAccounts.find(a => a.id === id);
     if (!account) return;
-    localStorage.setItem(STORAGE_KEY, id);
     setOwnerId(id);
     setUserRole(account.role);
     if (account.role === 'owner' || account.role === 'manager') {

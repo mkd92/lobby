@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   collection, query, where, getDocs, addDoc, serverTimestamp, deleteDoc, doc, getDoc, updateDoc, setDoc,
 } from 'firebase/firestore';
@@ -26,7 +25,6 @@ interface PendingInvite {
 }
 
 const Team: React.FC = () => {
-  const navigate = useNavigate();
   const { ownerId, userRole, user, switchAccount } = useOwner();
   const isStaff = userRole !== 'owner';
   const queryClient = useQueryClient();
@@ -86,11 +84,10 @@ const Team: React.FC = () => {
         doc(db, 'staff_lookup', user.uid, 'owners', invite.owner_id),
         { accepted_at: serverTimestamp(), role: invite.role ?? 'viewer' },
       );
-      refetchInvites();
-      queryClient.invalidateQueries({ queryKey: ['pending-invites'] });
-      queryClient.invalidateQueries({ queryKey: ['staff-list'] });
+      // Persist the account preference before reloading so OwnerContext
+      // picks it up cleanly on init (snapshot may not have fired yet).
       switchAccount(invite.owner_id);
-      navigate('/');
+      window.location.href = '/';
     } catch (err) {
       flash((err as Error).message, 'error');
     }
