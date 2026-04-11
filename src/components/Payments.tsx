@@ -137,6 +137,7 @@ const Payments: React.FC = () => {
           bed_number:   legacyData?.bed_number || null,
           unit_number:  legacyData?.unit_number || null,
           property_name: legacyData?.property_name || null,
+          payment_date: legacyData?.payment_date || null,
         };
 
         const { hId, hName } = resolveHostel(merged);
