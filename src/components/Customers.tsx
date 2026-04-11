@@ -4,7 +4,7 @@ import { collection, query, where, getDocs, doc, deleteDoc } from 'firebase/fire
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
-import { LoadingScreen } from './layout/LoadingScreen';
+import { PageSkeleton } from './layout/PageSkeleton';
 import { useDialog } from '../hooks/useDialog';
 import { useListKeyNav } from '../hooks/useListKeyNav';
 
@@ -61,7 +61,7 @@ const Customers: React.FC = () => {
   const initials = (name: string) => name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
   const fmtDate = (d: any) => d?.toDate ? d.toDate().toLocaleDateString() : '—';
 
-  if (isLoading) return <LoadingScreen message="Accessing Relationship Base" />;
+  if (isLoading) return <div className="view-container"><PageSkeleton cols={[1, 3, 3, 2, 2]} rows={7} /></div>;
 
   return (
     <div className="view-container page-fade-in">

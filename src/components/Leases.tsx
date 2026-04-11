@@ -8,7 +8,7 @@ import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { LoadingScreen } from './layout/LoadingScreen';
+import { PageSkeleton } from './layout/PageSkeleton';
 
 import '../styles/Leases.css';
 
@@ -234,9 +234,7 @@ const Leases: React.FC = () => {
 
       <div className="leases-content-area">
         {isLoading ? (
-          <div style={{ minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <LoadingScreen message="Accessing Agreement Vault" />
-          </div>
+          <PageSkeleton cols={[3, 3, 2, 2, 2]} rows={7} />
         ) : filtered.length === 0 ? (
           <div className="modern-card" style={{ textAlign: 'center', padding: '6rem 2rem' }}>
             <div style={{ opacity: 0.1, marginBottom: '2rem' }}>

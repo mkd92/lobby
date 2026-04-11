@@ -10,7 +10,7 @@ import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import { prefetchMap } from '../App';
 import PaymentSlideOver from './PaymentSlideOver';
-import { LoadingScreen } from './layout/LoadingScreen';
+import { PageSkeleton } from './layout/PageSkeleton';
 import { useListKeyNav } from '../hooks/useListKeyNav';
 
 import '../styles/Payments.css';
@@ -381,7 +381,7 @@ const Payments: React.FC = () => {
     return { totalCollected, settledCount, outstanding, overdue };
   }, [payments, metricPeriod]);
 
-  if (isLoading) return <LoadingScreen message="Accessing Secure Ledger" />;
+  if (isLoading) return <div className="view-container"><PageSkeleton hasMetrics cols={[3, 3, 2, 2, 2]} rows={8} /></div>;
 
   return (
     <div className="view-container page-fade-in">

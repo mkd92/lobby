@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
 import { useQuery } from '@tanstack/react-query';
-import { LoadingScreen } from './layout/LoadingScreen';
+import { PageSkeleton } from './layout/PageSkeleton';
 import { useDialog } from '../hooks/useDialog';
 import '../styles/Hostels.css';
 
@@ -81,7 +81,7 @@ const Hostels: React.FC = () => {
     }
   };
 
-  if (isLoading) return <LoadingScreen message="Accessing Shared Facility Vault" />;
+  if (isLoading) return <div className="view-container"><PageSkeleton variant="cards" rows={6} /></div>;
 
   return (
     <div className="view-container page-fade-in">
