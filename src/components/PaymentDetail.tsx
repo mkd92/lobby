@@ -28,7 +28,6 @@ const PaymentDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { ownerId, userRole } = useOwner();
-  const isOwner = userRole === 'owner';
   const canWrite = userRole === 'owner' || userRole === 'manager';
   const queryClient = useQueryClient();
   const { showAlert, DialogMount } = useDialog();

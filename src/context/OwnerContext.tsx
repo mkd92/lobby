@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, query, where, onSnapshot, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseClient';
 import { generateMonthlyPayments } from '../utils/generateMonthlyPayments';
 

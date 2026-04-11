@@ -42,7 +42,6 @@ interface Props {
 
 const PaymentSlideOver: React.FC<Props> = ({ id, currencySymbol, onClose, onUpdated }) => {
   const { ownerId, userRole } = useOwner();
-  const isOwner = userRole === 'owner';
   const canWrite = userRole === 'owner' || userRole === 'manager';
   const queryClient = useQueryClient();
 
