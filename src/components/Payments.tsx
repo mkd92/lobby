@@ -113,31 +113,15 @@ const Payments: React.FC = () => {
         return { hId, hName: hId ? hostelMap.get(hId) : data.hostel_name };
       };
 
-      const useLegacy = invoicesSnap.empty;
-      
-      if (useLegacy) {
-        return legacySnap.docs.map(d => {
-          const data = d.data();
-          const { hId, hName } = resolveHostel(data);
-          return { 
-            id: d.id, 
-            ...data, 
-            hostel_id: hId || null,
-            hostel_name: hName || null
-          } as Payment;
-        }).sort((a, b) => b.month_for.localeCompare(a.month_for) || b.payment_date.localeCompare(a.payment_date));
-      }
-
       const receipts = receiptsSnap.docs.map(d => d.data());
-
-      return invoicesSnap.docs.map(d => {
+      
+      // Process Invoices
+      const invoicePayments = invoicesSnap.docs.map(d => {
         const data = d.data();
         const paidAmount = receipts
           .filter(r => r.invoice_id === d.id)
           .reduce((acc, r) => acc + (Number(r.amount) || 0), 0);
-
         const { hId, hName } = resolveHostel(data);
-
         return {
           id: d.id,
           ...data,
@@ -147,7 +131,28 @@ const Payments: React.FC = () => {
           hostel_id: hId || null,
           hostel_name: hName || null,
         } as Payment;
-      }).sort((a, b) => b.month_for.localeCompare(a.month_for) || b.payment_date.localeCompare(a.payment_date));
+      });
+
+      const invoiceIds = new Set(invoicePayments.map(p => p.id));
+
+      // Process Legacy Payments (only those not already represented by an invoice)
+      const legacyPayments = legacySnap.docs
+        .filter(d => !invoiceIds.has(d.id))
+        .map(d => {
+          const data = d.data();
+          const { hId, hName } = resolveHostel(data);
+          return { 
+            id: d.id, 
+            ...data, 
+            hostel_id: hId || null,
+            hostel_name: hName || null
+          } as Payment;
+        });
+
+      return [...invoicePayments, ...legacyPayments].sort((a, b) => 
+        (b.month_for || '').localeCompare(a.month_for || '') || 
+        (b.payment_date || '').localeCompare(a.payment_date || '')
+      );
     },
     enabled: !!ownerId,
   });
