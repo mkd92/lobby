@@ -185,24 +185,26 @@ const Payments: React.FC = () => {
         const paymentRef = doc(db, 'payments', p.id);
         const remainingAmount = p.rent_amount - p.amount;
         
-        batch.update(paymentRef, {
+        batch.set(paymentRef, {
+          owner_id: ownerId!,
           status: 'Paid',
           amount: p.rent_amount,
           payment_date: p.payment_date || today,
           updated_at: serverTimestamp(),
-        });
+        }, { merge: true });
 
         const invoiceRef = doc(db, 'invoices', p.id);
-        batch.update(invoiceRef, {
+        batch.set(invoiceRef, {
+          owner_id: ownerId!,
           status: 'Paid',
           amount: p.rent_amount,
           updated_at: serverTimestamp()
-        });
+        }, { merge: true });
 
         if (remainingAmount > 0) {
           const receiptRef = doc(collection(db, 'receipts'));
           batch.set(receiptRef, {
-            owner_id: ownerId,
+            owner_id: ownerId!,
             invoice_id: p.id,
             tenant_name: p.tenant_name,
             amount: remainingAmount,
@@ -214,7 +216,7 @@ const Payments: React.FC = () => {
 
           const jeRef = doc(collection(db, 'journal_entries'));
           batch.set(jeRef, {
-            owner_id: ownerId,
+            owner_id: ownerId!,
             date: p.payment_date || today,
             description: `Payment Received (Bulk) - ${p.tenant_name}`,
             reference_type: 'Receipt',
@@ -272,16 +274,18 @@ const Payments: React.FC = () => {
       const batch = writeBatch(db);
       
       const paymentRef = doc(db, 'payments', p.id);
-      batch.update(paymentRef, {
+      batch.set(paymentRef, {
+        owner_id: ownerId!,
         amount: storedAmount,
         payment_date: receiveForm.payment_date,
         payment_method: receiveForm.payment_method,
         status: newStatus,
         updated_at: serverTimestamp(),
-      });
+      }, { merge: true });
       
       const txRef = doc(collection(db, 'payments', p.id, 'transactions'));
       batch.set(txRef, {
+        owner_id:         ownerId!,
         amount:           newAmount,
         payment_date:     receiveForm.payment_date,
         payment_method:   receiveForm.payment_method,
@@ -290,10 +294,11 @@ const Payments: React.FC = () => {
       });
 
       const invoiceRef = doc(db, 'invoices', p.id);
-      batch.update(invoiceRef, {
+      batch.set(invoiceRef, {
+        owner_id: ownerId!,
         status: newStatus,
         updated_at: serverTimestamp(),
-      });
+      }, { merge: true });
 
       const receiptRef = doc(collection(db, 'receipts'));
       batch.set(receiptRef, {

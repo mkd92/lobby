@@ -111,19 +111,21 @@ const PaymentSlideOver: React.FC<Props> = ({ id, currencySymbol, onClose, onUpda
       const batch = writeBatch(db);
       
       const paymentRef = doc(db, 'payments', id);
-      batch.update(paymentRef, {
+      batch.set(paymentRef, {
+        owner_id: ownerId!,
         amount: newAmount,
         payment_date: form.payment_date,
         payment_method: form.payment_method,
         status: form.status,
         updated_at: serverTimestamp(),
-      });
+      }, { merge: true });
 
       const invoiceRef = doc(db, 'invoices', id);
-      batch.update(invoiceRef, {
+      batch.set(invoiceRef, {
+        owner_id: ownerId!,
         status: form.status,
         updated_at: serverTimestamp(),
-      });
+      }, { merge: true });
 
       if (amountDiff > 0) {
         const receiptRef = doc(collection(db, 'receipts'));

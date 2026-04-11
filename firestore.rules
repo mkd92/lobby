@@ -87,7 +87,8 @@ service cloud.firestore {
       // Subcollections (e.g., transactions)
       match /{allPaths=**} {
         allow read: if canRead(get(/databases/$(database)/documents/payments/$(docId)).data.owner_id);
-        allow write: if canWrite(get(/databases/$(database)/documents/payments/$(docId)).data.owner_id);
+        allow write: if canWrite(get(/databases/$(database)/documents/payments/$(docId)).data.owner_id) || 
+                      canWrite(request.resource.data.owner_id);
       }
     }
 
