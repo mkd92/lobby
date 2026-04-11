@@ -6,6 +6,7 @@ import {
 import { db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { LoadingScreen } from './layout/LoadingScreen';
 
 interface StaffMember {
   id: string;
@@ -39,7 +40,7 @@ const Team: React.FC = () => {
   useEffect(() => () => { if (msgTimer.current) clearTimeout(msgTimer.current); }, []);
 
   // Pending invites sent to the current user
-  const { data: pendingInvites = [], refetch: refetchInvites } = useQuery({
+  const { data: pendingInvites = [], refetch: refetchInvites, isLoading: invitesLoading } = useQuery({
     queryKey: ['pending-invites', user?.email],
     enabled: !!user?.email,
     queryFn: async () => {
@@ -59,7 +60,7 @@ const Team: React.FC = () => {
     enabled: !!ownerId && !isStaff,
   });
 
-  const { data: staffList = [], refetch: refetchStaff } = useQuery({
+  const { data: staffList = [], refetch: refetchStaff, isLoading: staffLoading } = useQuery({
     queryKey: ['staff-list', ownerId],
     queryFn: async () => {
       const snap = await getDocs(query(collection(db, 'staff'), where('owner_id', '==', ownerId)));
@@ -77,13 +78,10 @@ const Team: React.FC = () => {
   const handleAcceptInvite = async (invite: PendingInvite) => {
     if (!user) return;
     try {
-      // Mark invite as active and record the staff user's UID
       await updateDoc(doc(db, 'staff', invite.id), {
         status: 'active',
         staff_uid: user.uid,
       });
-      // Create the security lookup entry so Firestore rules allow access
-      // Path: /staff_lookup/{staffUid}/owners/{ownerUid}
       await setDoc(
         doc(db, 'staff_lookup', user.uid, 'owners', invite.owner_id),
         { accepted_at: serverTimestamp(), role: invite.role ?? 'viewer' },
@@ -91,7 +89,6 @@ const Team: React.FC = () => {
       refetchInvites();
       queryClient.invalidateQueries({ queryKey: ['pending-invites'] });
       queryClient.invalidateQueries({ queryKey: ['staff-list'] });
-      // Auto-switch to the accepted workspace
       switchAccount(invite.owner_id);
       navigate('/');
     } catch (err) {
@@ -142,11 +139,9 @@ const Team: React.FC = () => {
 
   const handleRevokeStaff = async (s: StaffMember) => {
     try {
-      // Remove the Firestore security lookup entry (allows rules-based access)
       if (s.staff_uid && ownerId) {
         await deleteDoc(doc(db, 'staff_lookup', s.staff_uid, 'owners', ownerId));
       }
-      // Remove the staff invite document
       await deleteDoc(doc(db, 'staff', s.id));
       refetchStaff();
       flash('Access revoked.', 'success');
@@ -155,102 +150,53 @@ const Team: React.FC = () => {
     }
   };
 
-  // ── Styles ────────────────────────────────────────────────────────────────
-
-  const sectionLabel: React.CSSProperties = {
-    fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.12em',
-    fontWeight: 800, opacity: 0.4, marginBottom: '1rem', display: 'block',
-  };
-
-  // ── Render ────────────────────────────────────────────────────────────────
+  if (invitesLoading || (ownerId && !isStaff && staffLoading)) return <LoadingScreen message="Accessing Personnel Registry" />;
 
   return (
-    <div className="view-container" style={{ maxWidth: '720px', margin: '0 auto' }}>
+    <div className="view-container page-fade-in" style={{ maxWidth: '800px' }}>
 
       {/* Header */}
       <header className="view-header">
         <p className="view-eyebrow">Access Management</p>
-        <h1 className="view-title">Team & Access</h1>
-        <p style={{ opacity: 0.45, fontSize: '0.9rem', marginTop: '0.5rem', fontWeight: 500 }}>
+        <h1 className="view-title text-4xl md:text-6xl">Team & Access</h1>
+        <p className="text-on-surface-variant mt-4 font-medium max-w-xl">
           {isStaff
-            ? 'Review workspace invitations sent to you.'
-            : 'Invite stakeholders to view your portfolio. They get read-only access to all data.'}
+            ? 'Review workspace invitations sent to you by facility owners.'
+            : 'Invite stakeholders to collaborate. Assign roles to manage inventory or monitor performance.'}
         </p>
       </header>
 
       {/* Flash message */}
       {message && (
-        <div style={{
-          marginBottom: '1.5rem', padding: '1rem 1.25rem', borderRadius: '1.25rem',
-          background: message.type === 'success' ? 'var(--surface-container-high)' : 'rgba(239,68,68,0.08)',
-          border: `1px solid ${message.type === 'success' ? 'var(--outline-variant)' : 'rgba(239,68,68,0.25)'}`,
-          display: 'flex', alignItems: 'center', gap: '0.75rem',
-          color: message.type === 'success' ? 'var(--on-surface)' : '#ef4444',
-          fontWeight: 600, fontSize: '0.875rem',
-        }}>
-          <span className="material-symbols-outlined" style={{ fontSize: '1.125rem', flexShrink: 0 }}>
+        <div className={`modern-card mb-8 py-4 flex items-center gap-4 ${message.type === 'success' ? 'border-success/30 bg-success/5' : 'border-error/30 bg-error/5'}`}>
+          <span className="material-symbols-outlined" style={{ color: message.type === 'success' ? 'var(--color-success)' : 'var(--error)' }}>
             {message.type === 'success' ? 'check_circle' : 'error'}
           </span>
-          {message.text}
+          <span style={{ fontWeight: 600, fontSize: '0.9375rem' }}>{message.text}</span>
         </div>
       )}
 
-      {/* ── Pending invitations for this user ── */}
+      {/* Pending invitations for this user */}
       {pendingInvites.length > 0 && (
-        <div className="modern-card" style={{
-          padding: '2rem 2.5rem', marginBottom: '1.25rem',
-          border: '1px solid rgba(245,158,11,0.25)',
-          background: 'rgba(245,158,11,0.03)',
-        }}>
-          <span style={{ ...sectionLabel, opacity: 1, color: '#f59e0b' }}>
-            Pending Invitations · {pendingInvites.length}
-          </span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div className="modern-card mb-12" style={{ border: '1px solid var(--color-warning)', background: 'rgba(245,158,11,0.02)' }}>
+          <div className="view-eyebrow mb-6" style={{ color: 'var(--color-warning)', opacity: 1 }}>Pending Invitations</div>
+          <div className="flex flex-col gap-4">
             {pendingInvites.map(invite => (
-              <div key={invite.id} style={{
-                padding: '1.25rem', borderRadius: '1rem',
-                background: 'var(--surface-container-high)',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                gap: '1rem', flexWrap: 'wrap',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-                  <div style={{
-                    width: '42px', height: '42px', borderRadius: '0.875rem',
-                    background: 'rgba(245,158,11,0.12)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem', color: '#f59e0b' }}>
-                      mark_email_unread
-                    </span>
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>
-                      {invite.owner_name || 'A workspace owner'}
+              <div key={invite.id} className="modern-card" style={{ padding: '1.25rem', background: 'var(--surface-container-high)' }}>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                  <div className="flex items-center gap-4">
+                    <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'var(--color-warning-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span className="material-symbols-outlined" style={{ color: 'var(--color-warning)', fontSize: '1.25rem' }}>mark_email_unread</span>
                     </div>
-                    <div style={{ fontSize: '0.75rem', opacity: 0.45, fontWeight: 500, marginTop: '0.2rem' }}>
-                      Invited you as a {invite.role === 'manager' ? 'manager (can create)' : 'read-only viewer'}
+                    <div>
+                      <div className="font-bold text-lg">{invite.owner_name || 'Organization Owner'}</div>
+                      <div className="text-on-surface-variant text-sm font-medium">Invited you as {invite.role || 'viewer'}</div>
                     </div>
                   </div>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
-                  <button
-                    onClick={() => handleDeclineInvite(invite.id)}
-                    style={{
-                      padding: '0.5rem 0.875rem', borderRadius: '0.75rem',
-                      border: 'none', background: 'var(--surface-container-highest)',
-                      color: 'var(--on-surface-variant)', fontWeight: 700,
-                      fontSize: '0.8125rem', cursor: 'pointer',
-                    }}
-                  >
-                    Decline
-                  </button>
-                  <button
-                    onClick={() => handleAcceptInvite(invite)}
-                    className="primary-button"
-                    style={{ padding: '0.5rem 1.125rem' }}
-                  >
-                    Accept
-                  </button>
+                  <div className="flex gap-3 w-full sm:w-auto">
+                    <button onClick={() => handleDeclineInvite(invite.id)} className="primary-button" style={{ background: 'var(--surface-container-highest)', color: 'var(--on-surface)', flex: 1 }}>Decline</button>
+                    <button onClick={() => handleAcceptInvite(invite)} className="primary-button" style={{ flex: 1 }}>Accept</button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -258,147 +204,91 @@ const Team: React.FC = () => {
         </div>
       )}
 
-      {/* ── Staff user: no pending invites ── */}
-      {isStaff && pendingInvites.length === 0 && (
-        <div className="modern-card" style={{ padding: '3rem 2.5rem', textAlign: 'center' }}>
-          <span className="material-symbols-outlined" style={{
-            fontSize: '2.5rem', opacity: 0.12, display: 'block', marginBottom: '1rem',
-          }}>
-            mark_email_read
-          </span>
-          <p style={{ fontWeight: 700, fontSize: '0.9375rem', marginBottom: '0.375rem' }}>
-            No pending invitations
-          </p>
-          <p style={{ fontSize: '0.8125rem', opacity: 0.4, fontWeight: 500 }}>
-            When someone invites you to their workspace, it will appear here.
-          </p>
-        </div>
-      )}
-
-      {/* ── Owner management ── */}
+      {/* Owner management */}
       {!isStaff && (
-        <>
-          {/* Invite card */}
-          <div className="modern-card" style={{ padding: '2rem 2.5rem', marginBottom: '1.25rem' }}>
-            <span style={sectionLabel}>Invite Stakeholder</span>
-            <form onSubmit={handleAddStaff} style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <input
-                type="email"
-                value={staffEmail}
-                onChange={e => setStaffEmail(e.target.value)}
-                placeholder="colleague@company.com"
-                required
-                style={{
-                  flex: 1, minWidth: '220px',
-                  padding: '0.875rem 1.25rem', borderRadius: '1rem',
-                  background: 'var(--surface-container-high)',
-                  border: '1.5px solid var(--outline-variant)',
-                  color: 'var(--on-surface)', fontSize: '0.9375rem', fontWeight: 500, outline: 'none',
-                }}
-              />
-              <select
-                value={inviteRole}
-                onChange={e => setInviteRole(e.target.value as 'viewer' | 'manager')}
-                style={{
-                  padding: '0.875rem 1.25rem', borderRadius: '1rem',
-                  background: 'var(--surface-container-high)',
-                  border: '1.5px solid var(--outline-variant)',
-                  color: 'var(--on-surface)', fontSize: '0.9375rem', fontWeight: 500, outline: 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                <option value="viewer">Viewer (Read-Only)</option>
-                <option value="manager">Manager (Can Create)</option>
-              </select>
-              <button type="submit" className="primary-button" disabled={addingStaff} style={{ whiteSpace: 'nowrap' }}>
-                {addingStaff ? 'Sending...' : 'Send Invite'}
+        <div className="grid grid-cols-1 gap-8">
+          {/* Invite form */}
+          <div className="modern-card">
+            <div className="view-eyebrow mb-6">Authorize Colleague</div>
+            <form onSubmit={handleAddStaff} className="flex flex-col sm:flex-row gap-4">
+              <div style={{ flex: 2 }}>
+                <input
+                  type="email"
+                  value={staffEmail}
+                  onChange={e => setStaffEmail(e.target.value)}
+                  placeholder="colleague@company.com"
+                  required
+                  style={{ width: '100%', background: 'var(--surface-container-high)', border: '1px solid var(--outline-variant)', borderRadius: '0.75rem', padding: '0.875rem 1.25rem', color: 'var(--on-surface)', fontWeight: 600 }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <select
+                  value={inviteRole}
+                  onChange={e => setInviteRole(e.target.value as any)}
+                  style={{ width: '100%', background: 'var(--surface-container-high)', border: '1px solid var(--outline-variant)', borderRadius: '0.75rem', padding: '0.875rem 1.25rem', color: 'var(--on-surface)', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  <option value="viewer">Viewer</option>
+                  <option value="manager">Manager</option>
+                </select>
+              </div>
+              <button type="submit" className="primary-button" disabled={addingStaff}>
+                {addingStaff ? 'Sending...' : 'Send Invitation'}
               </button>
             </form>
-            <p style={{ fontSize: '0.75rem', opacity: 0.35, marginTop: '0.875rem', fontWeight: 500 }}>
-              They'll see the invitation on their Team page when they open Lobby.
-            </p>
+            <p className="text-on-surface-variant text-xs mt-4 font-medium opacity-60">Recipient will receive a secure notification within their Team dashboard.</p>
           </div>
 
-          {/* Team members */}
-          <div className="modern-card" style={{ padding: '2rem 2.5rem' }}>
-            <span style={sectionLabel}>
-              Team Members{staffList.length > 0 ? ` · ${staffList.length}` : ''}
-            </span>
-
+          {/* Personnel list */}
+          <div className="modern-card">
+            <div className="view-eyebrow mb-8">Authorized Personnel</div>
             {staffList.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '3rem 0', opacity: 0.25 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.75rem' }}>group</span>
-                <p style={{ fontSize: '0.875rem', fontWeight: 600 }}>No team members yet</p>
-                <p style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>Invite someone above to get started</p>
+              <div className="py-12 text-center opacity-30">
+                <span className="material-symbols-outlined" style={{ fontSize: '3rem' }}>supervisor_account</span>
+                <p className="mt-4 font-bold">No registered personnel</p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+              <div className="flex flex-col gap-3">
                 {staffList.map(s => (
-                  <div key={s.id} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '1rem 1.25rem', borderRadius: '1rem',
-                    background: 'var(--surface-container-high)', gap: '1rem',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', minWidth: 0, flex: 1 }}>
-                      <div style={{
-                        width: '38px', height: '38px', borderRadius: '0.75rem',
-                        background: 'var(--surface-container-highest)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                      }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '1.125rem', opacity: 0.35 }}>person</span>
+                  <div key={s.id} className="flex items-center justify-between p-4 rounded-xl hover:bg-white/5 transition-colors group">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'var(--surface-container-high)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span className="material-symbols-outlined opacity-40">person</span>
                       </div>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{
-                          fontWeight: 700, fontSize: '0.9rem',
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>
-                          {s.staff_email}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.3rem' }}>
-                          <span style={{
-                            width: '6px', height: '6px', borderRadius: '50%', display: 'inline-block', flexShrink: 0,
-                            background: s.status === 'active' ? '#22c55e' : '#f59e0b',
-                          }} />
-                          <span style={{
-                            fontSize: '0.6rem', textTransform: 'uppercase',
-                            letterSpacing: '0.1em', fontWeight: 700, opacity: 0.45,
-                          }}>
-                            {s.status === 'active' ? `Active · ${s.role === 'manager' ? 'Manager' : 'Read-Only'}` : 'Invite Pending'}
+                      <div className="min-w-0">
+                        <div className="font-bold text-on-surface truncate">{s.staff_email}</div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`badge-modern ${s.status === 'active' ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.55rem', padding: '0.1rem 0.4rem' }}>
+                            {s.status}
                           </span>
+                          <span className="view-eyebrow" style={{ fontSize: '0.55rem', margin: 0 }}>{s.role || 'viewer'}</span>
                         </div>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleRevokeStaff(s)}
-                      title="Revoke access"
-                      style={{
-                        padding: '0.5rem 0.625rem', borderRadius: '0.625rem',
-                        border: 'none', background: 'var(--surface-container-highest)',
-                        cursor: 'pointer', color: 'var(--error)',
-                        display: 'flex', alignItems: 'center', flexShrink: 0,
-                      }}
-                    >
-                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>person_remove</span>
+                    <button onClick={() => handleRevokeStaff(s)} className="btn-icon danger opacity-0 group-hover:opacity-100 transition-opacity" title="Revoke access">
+                      <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>person_remove</span>
                     </button>
                   </div>
                 ))}
               </div>
             )}
-
-            <div style={{
-              marginTop: '1.75rem', paddingTop: '1.5rem',
-              borderTop: '1px solid var(--outline-variant)',
-              display: 'flex', alignItems: 'flex-start', gap: '0.75rem', opacity: 0.35,
-            }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '1rem', flexShrink: 0, marginTop: '0.05rem' }}>shield</span>
-              <p style={{ fontSize: '0.75rem', fontWeight: 500, lineHeight: 1.5 }}>
-                <strong>Viewers</strong> can see all data but cannot make changes. <strong>Managers</strong> can additionally create new records (like leases or properties) but cannot edit or delete existing ones.
+            
+            <div className="mt-10 pt-8 border-t border-white/5 flex gap-4">
+              <span className="material-symbols-outlined text-on-surface-variant opacity-40" style={{ fontSize: '1.25rem' }}>shield</span>
+              <p className="text-on-surface-variant text-xs leading-relaxed font-medium">
+                <strong>Access Control:</strong> Viewers maintain read-only privileges across the portfolio. Managers are authorized to initialize new inventory and agreements but cannot modify historical ledger records.
               </p>
             </div>
           </div>
-        </>
+        </div>
       )}
 
+      {isStaff && pendingInvites.length === 0 && (
+        <div className="modern-card py-20 text-center">
+          <span className="material-symbols-outlined opacity-10" style={{ fontSize: '4rem' }}>verified_user</span>
+          <h2 className="text-xl font-bold mt-6">Registry Verified</h2>
+          <p className="text-on-surface-variant mt-2">No pending workspace invitations identified.</p>
+        </div>
+      )}
     </div>
   );
 };

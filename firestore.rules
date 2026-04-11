@@ -9,19 +9,29 @@ service cloud.firestore {
     }
 
     function isOwner(ownerId) {
-      return isSignedIn() && request.auth.uid == ownerId;
+      return isSignedIn() && ownerId != null && request.auth.uid == ownerId;
     }
 
     // Returns true when the requesting user has an accepted staff_lookup entry
     // for the given owner. The entry is written when staff accepts an invite.
     // Path: /staff_lookup/{staffUid}/owners/{ownerUid}
     function isActiveStaff(ownerId) {
-      return isSignedIn() &&
+      return isSignedIn() && ownerId != null &&
         exists(/databases/$(database)/documents/staff_lookup/$(request.auth.uid)/owners/$(ownerId));
+    }
+
+    function isManager(ownerId) {
+      return isSignedIn() && ownerId != null &&
+        exists(/databases/$(database)/documents/staff_lookup/$(request.auth.uid)/owners/$(ownerId)) &&
+        get(/databases/$(database)/documents/staff_lookup/$(request.auth.uid)/owners/$(ownerId)).data.role == 'manager';
     }
 
     function canRead(ownerId) {
       return isOwner(ownerId) || isActiveStaff(ownerId);
+    }
+
+    function canWrite(ownerId) {
+      return isOwner(ownerId) || isManager(ownerId);
     }
 
     // ── Owner profiles ─────────────────────────────────────────────────────
@@ -35,44 +45,80 @@ service cloud.firestore {
 
     match /hostels/{docId} {
       allow read:          if canRead(resource.data.owner_id);
-      allow create:        if isOwner(request.resource.data.owner_id);
-      allow update, delete: if isOwner(resource.data.owner_id);
+      allow create:        if canWrite(request.resource.data.owner_id);
+      allow update, delete: if canWrite(resource.data.owner_id);
     }
 
     match /rooms/{docId} {
       allow read:          if canRead(resource.data.owner_id);
-      allow create:        if isOwner(request.resource.data.owner_id);
-      allow update, delete: if isOwner(resource.data.owner_id);
+      allow create:        if canWrite(request.resource.data.owner_id);
+      allow update, delete: if canWrite(resource.data.owner_id);
     }
 
     match /beds/{docId} {
       allow read:          if canRead(resource.data.owner_id);
-      allow create:        if isOwner(request.resource.data.owner_id);
-      allow update, delete: if isOwner(resource.data.owner_id);
+      allow create:        if canWrite(request.resource.data.owner_id);
+      allow update, delete: if canWrite(resource.data.owner_id);
     }
 
     // ── Tenants / customers ────────────────────────────────────────────────
 
     match /tenants/{docId} {
       allow read:          if canRead(resource.data.owner_id);
-      allow create:        if isOwner(request.resource.data.owner_id);
-      allow update, delete: if isOwner(resource.data.owner_id);
+      allow create:        if canWrite(request.resource.data.owner_id);
+      allow update, delete: if canWrite(resource.data.owner_id);
     }
 
     // ── Leases ─────────────────────────────────────────────────────────────
 
     match /leases/{docId} {
       allow read:          if canRead(resource.data.owner_id);
-      allow create:        if isOwner(request.resource.data.owner_id);
-      allow update, delete: if isOwner(resource.data.owner_id);
+      allow create:        if canWrite(request.resource.data.owner_id);
+      allow update, delete: if canWrite(resource.data.owner_id);
     }
 
     // ── Payments ───────────────────────────────────────────────────────────
 
     match /payments/{docId} {
       allow read:          if canRead(resource.data.owner_id);
-      allow create:        if isOwner(request.resource.data.owner_id);
-      allow update, delete: if isOwner(resource.data.owner_id);
+      allow create:        if canWrite(request.resource.data.owner_id);
+      allow update, delete: if canWrite(resource.data.owner_id);
+
+      // Subcollections (e.g., transactions)
+      match /{allPaths=**} {
+        allow read: if canRead(get(/databases/$(database)/documents/payments/$(docId)).data.owner_id);
+        allow write: if canWrite(get(/databases/$(database)/documents/payments/$(docId)).data.owner_id);
+      }
+    }
+
+    // ── Accounting (Double-Entry) ──────────────────────────────────────────
+
+    match /accounts/{docId} {
+      allow read:   if canRead(resource.data.owner_id);
+      allow create: if canWrite(request.resource.data.owner_id);
+      allow update: if canWrite(resource.data.owner_id);
+      allow delete: if false;
+    }
+
+    match /invoices/{docId} {
+      allow read:   if canRead(resource.data.owner_id);
+      allow create: if canWrite(request.resource.data.owner_id);
+      allow update: if canWrite(resource.data.owner_id);
+      allow delete: if false;
+    }
+
+    match /receipts/{docId} {
+      allow read:   if canRead(resource.data.owner_id);
+      allow create: if canWrite(request.resource.data.owner_id);
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /journal_entries/{docId} {
+      allow read:   if canRead(resource.data.owner_id);
+      allow create: if canWrite(request.resource.data.owner_id);
+      allow update: if false;
+      allow delete: if false;
     }
 
     // ── Staff invites ──────────────────────────────────────────────────────

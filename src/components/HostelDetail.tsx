@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   doc,
   getDoc,
   getDocs,
   addDoc,
+  updateDoc,
   collection,
   query,
   where,
@@ -66,7 +67,7 @@ const HostelDetail: React.FC = () => {
     setIsAddBedModalOpen(false);
   }, isAddRoomModalOpen || isAddBedModalOpen);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, isError } = useQuery({
     queryKey: ['hostel', id, ownerId],
     queryFn: async () => {
       if (!id) throw new Error('No hostel id');
@@ -74,8 +75,8 @@ const HostelDetail: React.FC = () => {
 
       const [hostelSnap, roomsSnap, bedsSnap, ownerSnap] = await Promise.all([
         getDoc(doc(db, 'hostels', id)),
-        getDocs(query(collection(db, 'rooms'), where('hostel_id', '==', id))),
-        getDocs(query(collection(db, 'beds'), where('hostel_id', '==', id))),
+        getDocs(query(collection(db, 'rooms'), where('hostel_id', '==', id), where('owner_id', '==', ownerId))),
+        getDocs(query(collection(db, 'beds'), where('hostel_id', '==', id), where('owner_id', '==', ownerId))),
         ownerId ? getDoc(doc(db, 'owners', ownerId)) : Promise.resolve(null),
       ]);
 
@@ -85,7 +86,6 @@ const HostelDetail: React.FC = () => {
       }
 
       const hostel = { id: hostelSnap.id, ...hostelSnap.data() } as Hostel;
-      setHostelForm({ name: hostel.name, address: hostel.address });
 
       const allBeds = bedsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as (Bed & { room_id: string })[];
       const roomsList = roomsSnap.docs
@@ -108,6 +108,12 @@ const HostelDetail: React.FC = () => {
     enabled: !!id && !!ownerId,
   });
 
+  useEffect(() => {
+    if (data?.hostel) {
+      setHostelForm({ name: data.hostel.name, address: data.hostel.address });
+    }
+  }, [data?.hostel]);
+
   const filteredRooms = useMemo(() => {
     if (!data) return [];
     return data.rooms.filter(room => {
@@ -127,35 +133,69 @@ const HostelDetail: React.FC = () => {
 
   const handleHostelSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isOwner) return;
+    if (!isOwner || !id) return;
     setSavingHostel(true);
     try {
-      const batch = writeBatch(db);
-
-      // Update the hostel document itself
-      batch.update(doc(db, 'hostels', id!), {
+      // 1. Update the hostel document itself first
+      await updateDoc(doc(db, 'hostels', id), {
         ...hostelForm,
         updated_at: serverTimestamp(),
       });
 
-      // Cascade the new name to all leases and payments that reference this hostel
-      if (hostelForm.name) {
-        const [leaseSnap, paymentSnap] = await Promise.all([
+      // 2. Attempt cascading updates in the background or separately
+      // We use simple queries to avoid manual index requirements
+      try {
+        const [leaseSnap, paymentSnap, invoiceSnap] = await Promise.all([
           getDocs(query(collection(db, 'leases'), where('hostel_id', '==', id))),
           getDocs(query(collection(db, 'payments'), where('hostel_id', '==', id))),
+          getDocs(query(collection(db, 'invoices'), where('hostel_id', '==', id))),
         ]);
-        leaseSnap.docs.forEach(d => batch.update(d.ref, { hostel_name: hostelForm.name }));
-        paymentSnap.docs.forEach(d => batch.update(d.ref, { hostel_name: hostelForm.name }));
+
+        if (!leaseSnap.empty || !paymentSnap.empty || !invoiceSnap.empty) {
+          let batch = writeBatch(db);
+          let opCount = 0;
+
+          const addOp = async () => {
+            opCount++;
+            if (opCount >= 450) {
+              await batch.commit();
+              batch = writeBatch(db);
+              opCount = 0;
+            }
+          };
+
+          for (const d of leaseSnap.docs) {
+            batch.update(d.ref, { hostel_name: hostelForm.name });
+            await addOp();
+          }
+          for (const d of paymentSnap.docs) {
+            batch.update(d.ref, { hostel_name: hostelForm.name });
+            await addOp();
+          }
+          for (const d of invoiceSnap.docs) {
+            batch.update(d.ref, { hostel_name: hostelForm.name });
+            await addOp();
+          }
+
+          if (opCount > 0) {
+            await batch.commit();
+          }
+        }
+      } catch (cascadeErr) {
+        console.warn('Cascading name change failed (non-critical):', cascadeErr);
+        // We don't alert here because the primary hostel name was updated successfully
       }
 
-      await batch.commit();
       queryClient.invalidateQueries({ queryKey: ['hostel', id, ownerId] });
       queryClient.invalidateQueries({ queryKey: ['hostels', ownerId] });
       queryClient.invalidateQueries({ queryKey: ['leases', ownerId] });
       queryClient.invalidateQueries({ queryKey: ['payments', ownerId] });
+      queryClient.invalidateQueries({ queryKey: ['invoices', ownerId] });
+      
       showAlert('Facility profile synchronized successfully.');
     } catch (err) {
-      showAlert((err as Error).message);
+      console.error('Hostel update failure:', err);
+      showAlert(`Update failed: ${(err as Error).message}`);
     } finally {
       setSavingHostel(false);
     }
@@ -206,6 +246,20 @@ const HostelDetail: React.FC = () => {
   };
 
   if (isLoading) return <LoadingScreen message="Accessing Facility Vault" />;
+  
+  if (isError) {
+    return (
+      <div className="view-container">
+        <div className="glass-panel p-10 rounded-[40px] text-center">
+          <span className="material-symbols-outlined text-6xl text-error mb-4">error</span>
+          <h2 className="text-2xl font-bold text-white mb-2">Vault Access Failure</h2>
+          <p className="text-secondary/60 mb-8">{error instanceof Error ? error.message : 'An unexpected security or network error occurred.'}</p>
+          <button className="primary-button" onClick={() => navigate('/hostels')}>Return to Registry</button>
+        </div>
+      </div>
+    );
+  }
+
   if (!data) return null;
 
   return (

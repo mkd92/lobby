@@ -8,7 +8,6 @@ import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import '../styles/Leases.css';
 
 // ── Types ──────────────────────────────────────────────────────────────
 interface Tenant { id: string; full_name: string; email: string; phone: string; }
@@ -133,20 +132,18 @@ const AddLease: React.FC = () => {
         notes:            form.notes || null,
         created_at:       serverTimestamp(),
         updated_at:       serverTimestamp(),
-        // Hostel fields
         bed_id:      form.bed_id,
         bed_number:  bed?.bed_number || '',
         room_number: room?.room_number || '',
         hostel_id:   form.unit_id,
         hostel_name: hostels.find(h => h.id === form.unit_id)?.name || '',
-        // Null out property fields
         unit_id: null, unit_number: null, property_name: null,
       };
 
-      batch.set(doc(collection(db, 'leases')), payload);
+      const newLeaseRef = doc(collection(db, 'leases'));
+      batch.set(newLeaseRef, payload);
       batch.update(doc(db, 'beds', form.bed_id), { status: 'Occupied' });
 
-      // Move-in pending payment
       const firstRent  = form.first_month_rent ? parseFloat(form.first_month_rent) : parseFloat(form.rent_amount);
       const depositAmt = form.security_deposit  ? parseFloat(form.security_deposit) : 0;
       const totalDue   = firstRent + depositAmt;
@@ -154,7 +151,8 @@ const AddLease: React.FC = () => {
       const baseLabel  = startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       const monthFor   = depositAmt > 0 ? `${baseLabel} + Deposit` : baseLabel;
 
-      batch.set(doc(collection(db, 'payments')), {
+      const newPaymentRef = doc(collection(db, 'payments'));
+      batch.set(newPaymentRef, {
         owner_id:       ownerId,
         tenant_name:    payload.tenant_name,
         bed_number:     payload.bed_number,
@@ -172,6 +170,34 @@ const AddLease: React.FC = () => {
         created_at:     serverTimestamp(),
       });
 
+      const invoiceRef = doc(db, 'invoices', newPaymentRef.id);
+      batch.set(invoiceRef, {
+        owner_id: ownerId,
+        lease_id: newLeaseRef.id,
+        tenant_name: payload.tenant_name,
+        hostel_id: payload.hostel_id,
+        hostel_name: payload.hostel_name,
+        month_for: monthFor,
+        amount: totalDue,
+        due_date: form.start_date,
+        status: 'Pending',
+        legacy_payment_id: newPaymentRef.id,
+        created_at: serverTimestamp(),
+      });
+
+      const invJeRef = doc(collection(db, 'journal_entries'));
+      batch.set(invJeRef, {
+        owner_id: ownerId,
+        date: form.start_date,
+        description: `Initial Rent Billed - ${payload.tenant_name}`,
+        reference_type: 'Invoice',
+        reference_id: invoiceRef.id,
+        debit_account_code: '1200',
+        credit_account_code: '4000',
+        amount: totalDue,
+        created_at: serverTimestamp(),
+      });
+
       await batch.commit();
       queryClient.invalidateQueries({ queryKey: ['leases', ownerId] });
       navigate('/leases');
@@ -181,219 +207,195 @@ const AddLease: React.FC = () => {
     }
   };
 
-  const SelectWrap: React.FC<{ children: React.ReactNode; disabled?: boolean }> = ({ children, disabled }) => (
-    <div style={{ position: 'relative', opacity: disabled ? 0.45 : 1 }}>
-      {children}
-      <span
-        className="material-symbols-outlined"
-        style={{
-          position: 'absolute', right: '1.125rem', top: '50%',
-          transform: 'translateY(-50%)', pointerEvents: 'none',
-          fontSize: '1.25rem', color: 'var(--on-surface-variant)', opacity: 0.55,
-        }}
-      >
-        keyboard_arrow_down
-      </span>
-    </div>
-  );
-
   const sectionDivider = (label: string) => (
-    <div style={{
-      fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase',
-      letterSpacing: '0.16em', color: 'var(--on-surface-variant)', opacity: 0.5,
-      paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)',
-      marginBottom: '1.5rem', marginTop: '1rem',
-    }}>
+    <div className="view-eyebrow" style={{ paddingBottom: '0.75rem', borderBottom: '1px solid var(--outline-variant)', marginBottom: '2rem', marginTop: '1.5rem', opacity: 0.4 }}>
       {label}
     </div>
   );
 
-  // ── Render ───────────────────────────────────────────────────────────
   return (
-    <div className="view-container page-fade-in" style={{ maxWidth: '800px', margin: '0 auto' }}>
+    <div className="view-container page-fade-in" style={{ maxWidth: '900px' }}>
       {DialogMount}
 
       <header className="view-header">
-        <div>
-          <div className="view-eyebrow" style={{ cursor: 'pointer' }} onClick={() => navigate(-1)}>
-            <span className="material-symbols-outlined" style={{ fontSize: '1rem', marginRight: '0.5rem' }}>arrow_back</span>
-            Back
-          </div>
-          <h1 className="view-title">New Agreement</h1>
-          <p className="text-on-surface-variant mt-2">Set up a new lease — tenant, bed, financials and dates.</p>
-        </div>
+        <button 
+          onClick={() => navigate(-1)} 
+          className="view-eyebrow flex items-center gap-2 hover:text-on-surface transition-colors mb-10"
+          style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>arrow_back</span>
+          Back to Agreement Vault
+        </button>
+        <h1 className="view-title text-4xl md:text-6xl">Establish Agreement</h1>
+        <p className="text-on-surface-variant mt-4 font-medium opacity-70">Initialize a new contractual relationship including unit allocation and financial terms.</p>
       </header>
 
       <div className="modern-card" style={{ padding: '3rem' }}>
-        <form onSubmit={handleSubmit} className="modal-form-modern" style={{ padding: 0 }}>
+        <form onSubmit={handleSubmit}>
 
           {/* ── Tenant ── */}
-          <div>
-            {sectionDivider('Tenant')}
-            <div className="form-group-modern">
-              <label>Select Tenant *</label>
-              <SelectWrap>
-                <select
-                  required
-                  value={form.tenant_id}
-                  onChange={e => set('tenant_id', e.target.value)}
-                  style={{ appearance: 'none', WebkitAppearance: 'none', paddingRight: '2.75rem' }}
-                >
-                  <option value="">— choose tenant —</option>
-                  {tenants.map(t => (
-                    <option key={t.id} value={t.id}>{t.full_name}{t.phone ? ` · ${t.phone}` : ''}</option>
-                  ))}
-                </select>
-              </SelectWrap>
-            </div>
+          {sectionDivider('Legal Entity')}
+          <div className="form-group-modern">
+            <label>Select Stakeholder *</label>
+            <select
+              required
+              value={form.tenant_id}
+              onChange={e => set('tenant_id', e.target.value)}
+              style={{ fontWeight: 600 }}
+            >
+              <option value="">— choose from registry —</option>
+              {tenants.map(t => (
+                <option key={t.id} value={t.id}>{t.full_name}{t.phone ? ` · ${t.phone}` : ''}</option>
+              ))}
+            </select>
           </div>
 
-          {/* ── Hostel · Room · Bed ── */}
-          <div>
-            {sectionDivider('Hostel · Room · Bed')}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
-              <div className="form-group-modern">
-                <label>Hostel *</label>
-                <SelectWrap>
-                  <select
-                    required
-                    value={form.unit_id}
-                    onChange={e => { set('unit_id', e.target.value); set('bed_id', ''); set('rent_amount', ''); setRoomId(''); }}
-                    style={{ appearance: 'none', WebkitAppearance: 'none', paddingRight: '2.75rem' }}
-                  >
-                    <option value="">— choose hostel —</option>
-                    {hostels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-                  </select>
-                </SelectWrap>
-              </div>
-              <div className="form-group-modern">
-                <label>Room (vacant beds) *</label>
-                <SelectWrap disabled={!form.unit_id}>
-                  <select
-                    required
-                    value={roomId}
-                    disabled={!form.unit_id}
-                    onChange={e => { setRoomId(e.target.value); set('bed_id', ''); }}
-                    style={{ appearance: 'none', WebkitAppearance: 'none', paddingRight: '2.75rem' }}
-                  >
-                    <option value="">{form.unit_id ? '— choose room —' : 'Select hostel first'}</option>
-                    {rooms.map(r => <option key={r.id} value={r.id}>Room {r.room_number}</option>)}
-                  </select>
-                </SelectWrap>
-              </div>
-              <div className="form-group-modern">
-                <label>Vacant Bed *</label>
-                <SelectWrap disabled={!roomId}>
-                  <select
-                    required
-                    value={form.bed_id}
-                    disabled={!roomId}
-                    onChange={e => {
-                      const b = beds.find(b => b.id === e.target.value);
-                      set('bed_id', e.target.value);
-                      if (b?.price) set('rent_amount', String(b.price));
-                    }}
-                    style={{ appearance: 'none', WebkitAppearance: 'none', paddingRight: '2.75rem' }}
-                  >
-                    <option value="">{roomId ? '— choose bed —' : 'Select room first'}</option>
-                    {beds.map(b => (
-                      <option key={b.id} value={b.id}>
-                        Bed {b.bed_number}{b.price ? ` — ${sym}${b.price.toLocaleString()}/mo` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </SelectWrap>
-              </div>
+          {/* ── Inventory ── */}
+          {sectionDivider('Asset Allocation')}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="form-group-modern">
+              <label>Hostel Facility *</label>
+              <select
+                required
+                value={form.unit_id}
+                onChange={e => { set('unit_id', e.target.value); set('bed_id', ''); set('rent_amount', ''); setRoomId(''); }}
+              >
+                <option value="">— choose facility —</option>
+                {hostels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+              </select>
+            </div>
+            <div className="form-group-modern">
+              <label>Internal ID (Room) *</label>
+              <select
+                required
+                value={roomId}
+                disabled={!form.unit_id}
+                onChange={e => { setRoomId(e.target.value); set('bed_id', ''); }}
+              >
+                <option value="">{form.unit_id ? '— choose room —' : 'Select facility'}</option>
+                {rooms.map(r => <option key={r.id} value={r.id}>Room {r.room_number}</option>)}
+              </select>
+            </div>
+            <div className="form-group-modern">
+              <label>Inventory Unit (Bed) *</label>
+              <select
+                required
+                value={form.bed_id}
+                disabled={!roomId}
+                onChange={e => {
+                  const b = beds.find(b => b.id === e.target.value);
+                  set('bed_id', e.target.value);
+                  if (b?.price) set('rent_amount', String(b.price));
+                }}
+              >
+                <option value="">{roomId ? '— choose bed —' : 'Select room'}</option>
+                {beds.map(b => (
+                  <option key={b.id} value={b.id}>
+                    Bed {b.bed_number}{b.price ? ` — ${sym}${b.price.toLocaleString()}` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
           {/* ── Financials ── */}
-          <div>
-            {sectionDivider('Financial Terms')}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
-              <div className="form-group-modern">
-                <label>Monthly Rent ({sym}) *</label>
-                <input
-                  type="number" step="0.01" min="0" placeholder="0.00" required
-                  value={form.rent_amount}
-                  onChange={e => set('rent_amount', e.target.value)}
-                />
-              </div>
-              <div className="form-group-modern">
-                <label>First Month ({sym})</label>
-                <input
-                  type="number" step="0.01" min="0" placeholder="same as monthly"
-                  value={form.first_month_rent}
-                  onChange={e => set('first_month_rent', e.target.value)}
-                />
-              </div>
-              <div className="form-group-modern">
-                <label>Security Deposit ({sym})</label>
-                <input
-                  type="number" step="0.01" min="0" placeholder="0.00"
-                  value={form.security_deposit}
-                  onChange={e => set('security_deposit', e.target.value)}
-                />
-              </div>
-            </div>
-
-            {form.rent_amount && (
-              <div style={{ marginTop: '1.25rem', padding: '1rem', background: 'rgba(var(--primary-rgb, 100,180,120), 0.08)', borderRadius: '0.875rem', fontSize: '0.8125rem', color: 'var(--on-surface-variant)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem', color: 'var(--primary)' }}>payments</span>
-                Move-in amount pending: <strong style={{ color: 'var(--on-surface)', marginLeft: '0.25rem', fontSize: '0.9375rem' }}>
-                  {sym}{(
-                    (form.first_month_rent ? parseFloat(form.first_month_rent) : parseFloat(form.rent_amount)) +
-                    (form.security_deposit  ? parseFloat(form.security_deposit) : 0)
-                  ).toLocaleString()}
-                </strong>
-              </div>
-            )}
-          </div>
-
-          {/* ── Dates ── */}
-          <div>
-            {sectionDivider('Contract Duration')}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-              <div className="form-group-modern">
-                <label>Start Date *</label>
-                <input
-                  type="date" required
-                  value={form.start_date}
-                  onChange={e => set('start_date', e.target.value)}
-                />
-              </div>
-              <div className="form-group-modern">
-                <label>End Date <span style={{ opacity: 0.45, textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>(leave blank for rolling)</span></label>
-                <input
-                  type="date"
-                  value={form.end_date}
-                  onChange={e => set('end_date', e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* ── Notes ── */}
-          <div>
-            {sectionDivider('Notes')}
+          {sectionDivider('Contractual Value')}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="form-group-modern">
-              <label>Special Terms <span style={{ opacity: 0.45, textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>(optional)</span></label>
-              <textarea
-                placeholder="Any special conditions, clauses, or remarks..."
-                rows={3}
-                value={form.notes}
-                onChange={e => set('notes', e.target.value)}
-                style={{ resize: 'vertical', lineHeight: 1.6 }}
+              <label>Monthly Yield ({sym}) *</label>
+              <input
+                type="number" step="0.01" min="0" placeholder="0.00" required
+                value={form.rent_amount}
+                onChange={e => set('rent_amount', e.target.value)}
+                style={{ fontWeight: 700 }}
+              />
+            </div>
+            <div className="form-group-modern">
+              <label>Initial Term ({sym})</label>
+              <input
+                type="number" step="0.01" min="0" placeholder="Monthly rent"
+                value={form.first_month_rent}
+                onChange={e => set('first_month_rent', e.target.value)}
+              />
+            </div>
+            <div className="form-group-modern">
+              <label>Security Deposit ({sym})</label>
+              <input
+                type="number" step="0.01" min="0" placeholder="0.00"
+                value={form.security_deposit}
+                onChange={e => set('security_deposit', e.target.value)}
               />
             </div>
           </div>
 
-          {/* ── Footer ── */}
-          <footer className="modal-footer-modern" style={{ padding: '2rem 0 0', marginTop: '1rem' }}>
-            <button type="button" className="modal-discard-btn" onClick={() => navigate(-1)}>Discard</button>
-            <button type="submit" className="primary-button flex-1" disabled={saving}>{saving ? 'Creating...' : 'Confirm Agreement'}</button>
-          </footer>
+          {form.rent_amount && (
+            <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 flex items-center gap-4 mt-2">
+              <span className="material-symbols-outlined text-primary">payments</span>
+              <div className="text-sm font-medium">
+                <span className="opacity-60">Initial Capital Commitment: </span>
+                <span className="font-bold text-on-surface">
+                  {sym}{(
+                    (form.first_month_rent ? parseFloat(form.first_month_rent) : parseFloat(form.rent_amount)) +
+                    (form.security_deposit  ? parseFloat(form.security_deposit) : 0)
+                  ).toLocaleString()}
+                </span>
+              </div>
+            </div>
+          )}
 
+          {/* ── Duration ── */}
+          {sectionDivider('Agreement Timeline')}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="form-group-modern">
+              <label>Commencement Date *</label>
+              <input
+                type="date" required
+                value={form.start_date}
+                onChange={e => set('start_date', e.target.value)}
+              />
+            </div>
+            <div className="form-group-modern">
+              <label>Maturity Date (Optional)</label>
+              <input
+                type="date"
+                value={form.end_date}
+                onChange={e => set('end_date', e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* ── Notes ── */}
+          {sectionDivider('Executive Remarks')}
+          <div className="form-group-modern">
+            <label>Contractual Stipulations</label>
+            <textarea
+              placeholder="Any special clauses or remarks regarding this agreement..."
+              rows={3}
+              value={form.notes}
+              onChange={e => set('notes', e.target.value)}
+              style={{ resize: 'none', lineHeight: 1.6 }}
+            />
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 mt-12 pt-8 border-t border-white/5">
+            <button 
+              type="button" 
+              className="primary-button flex-1" 
+              onClick={() => navigate(-1)}
+              style={{ background: 'var(--surface-container-highest)', color: 'var(--on-surface)' }}
+            >
+              Discard
+            </button>
+            <button 
+              type="submit" 
+              className="primary-button flex-[2]" 
+              disabled={saving}
+            >
+              <span className="font-black text-xs uppercase tracking-widest">
+                {saving ? 'Synchronizing...' : 'Finalize Agreement'}
+              </span>
+            </button>
+          </div>
         </form>
       </div>
     </div>

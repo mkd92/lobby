@@ -37,53 +37,107 @@ const AddCustomer: React.FC = () => {
   };
 
   return (
-    <div className="view-container page-fade-in" style={{ maxWidth: '800px', margin: '0 auto' }}>
+    <div className="view-container page-fade-in" style={{ maxWidth: '800px' }}>
       <header className="view-header">
-        <div>
-          <div className="view-eyebrow" style={{ cursor: 'pointer' }} onClick={() => navigate(-1)}>
-            <span className="material-symbols-outlined" style={{ fontSize: '1rem', marginRight: '0.5rem' }}>arrow_back</span>
-            Back
-          </div>
-          <h1 className="view-title">Onboard New Customer</h1>
-          <p className="text-on-surface-variant mt-2">Establish a new professional relationship in your database.</p>
-        </div>
+        <button 
+          onClick={() => navigate(-1)} 
+          className="view-eyebrow flex items-center gap-2 hover:text-on-surface transition-colors mb-10"
+          style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>arrow_back</span>
+          Back to Relationship Base
+        </button>
+        <h1 className="view-title text-4xl md:text-6xl">Identify Entity</h1>
+        <p className="text-on-surface-variant mt-4 font-medium opacity-70">Establish a new professional stakeholder relationship in the registry.</p>
       </header>
 
-      <div className="modern-card" style={{ padding: '3rem' }}>
-        <form onSubmit={handleSubmit} className="modal-form-modern" style={{ padding: 0 }}>
-          {error && <div className="error-message mb-6" style={{ background: 'rgba(186,26,26,0.1)', color: 'var(--error)', padding: '1rem', borderRadius: '0.75rem', fontWeight: 600 }}>{error}</div>}
+      <div className="modern-card">
+        <form onSubmit={handleSubmit}>
+          {error && (
+            <div className="p-4 rounded-xl bg-error/10 border border-error/20 text-error text-xs font-bold leading-relaxed mb-8">
+              {error}
+            </div>
+          )}
 
           <div className="form-group-modern">
-            <label>Legal Full Name</label>
-            <input name="full_name" type="text" placeholder="e.g. Alexandra Sterling" value={formData.full_name} onChange={handleChange} required />
+            <label>Legal Designation (Full Name)</label>
+            <input 
+              name="full_name" 
+              type="text" 
+              placeholder="e.g. Alexandra Sterling" 
+              value={formData.full_name} 
+              onChange={handleChange} 
+              required 
+              style={{ fontSize: '1.125rem', fontWeight: 700 }}
+            />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="form-group-modern">
-              <label>Official Email Address</label>
-              <input name="email" type="email" placeholder="alexandra@example.com" value={formData.email} onChange={handleChange} />
+              <label>Digital Correspondence</label>
+              <input 
+                name="email" 
+                type="email" 
+                placeholder="alexandra@example.com" 
+                value={formData.email} 
+                onChange={handleChange} 
+              />
             </div>
             <div className="form-group-modern">
-              <label>Primary Phone Number</label>
-              <input name="phone" type="tel" placeholder="+1 (555) 000-0000" value={formData.phone} onChange={handleChange} />
+              <label>Primary Tele-Channel</label>
+              <input 
+                name="phone" 
+                type="tel" 
+                placeholder="+1 (555) 000-0000" 
+                value={formData.phone} 
+                onChange={handleChange} 
+              />
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="form-group-modern">
-              <label>Aadhaar Number</label>
-              <input name="aadhar_number" type="text" placeholder="XXXX XXXX XXXX" maxLength={14} value={formData.aadhar_number} onChange={handleChange} />
+              <label>Government Identifier (Aadhaar)</label>
+              <input 
+                name="aadhar_number" 
+                type="text" 
+                placeholder="XXXX XXXX XXXX" 
+                maxLength={14} 
+                value={formData.aadhar_number} 
+                onChange={handleChange} 
+              />
             </div>
             <div className="form-group-modern">
-              <label>Aadhaar PDF (Drive Link)</label>
-              <input name="aadhar_drive_link" type="url" placeholder="https://drive.google.com/..." value={formData.aadhar_drive_link} onChange={handleChange} />
+              <label>Verification Asset (Drive Link)</label>
+              <input 
+                name="aadhar_drive_link" 
+                type="url" 
+                placeholder="https://drive.google.com/..." 
+                value={formData.aadhar_drive_link} 
+                onChange={handleChange} 
+              />
             </div>
           </div>
 
-          <footer className="modal-footer-modern" style={{ padding: '2rem 0 0', marginTop: '1rem' }}>
-            <button type="button" className="modal-discard-btn" onClick={() => navigate(-1)}>Discard</button>
-            <button type="submit" className="primary-button flex-1" disabled={loading}>{loading ? 'Establishing...' : 'Confirm Registration'}</button>
-          </footer>
+          <div className="flex flex-col sm:flex-row gap-4 mt-10 pt-8 border-t border-white/5">
+            <button 
+              type="button" 
+              className="primary-button flex-1" 
+              onClick={() => navigate(-1)}
+              style={{ background: 'var(--surface-container-highest)', color: 'var(--on-surface)' }}
+            >
+              Discard
+            </button>
+            <button 
+              type="submit" 
+              className="primary-button flex-[2]" 
+              disabled={loading}
+            >
+              <span className="font-black text-xs uppercase tracking-widest">
+                {loading ? 'Initializing...' : 'Confirm Registration'}
+              </span>
+            </button>
+          </div>
         </form>
       </div>
     </div>

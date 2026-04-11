@@ -5,7 +5,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
 import { useEscapeKey } from '../hooks/useEscapeKey';
-import '../styles/Auth.css';
 
 const AddHostel: React.FC = () => {
   const navigate = useNavigate();
@@ -42,108 +41,84 @@ const AddHostel: React.FC = () => {
   };
 
   return (
-    <div className="view-container page-fade-in" style={{ maxWidth: '560px', margin: '0 auto' }}>
-
-      {/* Back */}
-      <div
-        className="view-eyebrow"
-        style={{ cursor: 'pointer', marginBottom: '2rem', display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}
-        onClick={() => navigate(-1)}
+    <div className="view-container page-fade-in" style={{ maxWidth: '600px' }}>
+      {/* Back navigation */}
+      <button 
+        onClick={() => navigate(-1)} 
+        className="view-eyebrow flex items-center gap-2 hover:text-on-surface transition-colors mb-10"
+        style={{ background: 'none', border: 'none', cursor: 'pointer' }}
       >
-        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>arrow_back</span>
-        Back
-      </div>
+        <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>arrow_back</span>
+        Back to Registry
+      </button>
 
-      {/* Icon + heading */}
-      <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-        <div style={{
-          width: '64px', height: '64px', borderRadius: '1.25rem',
-          background: 'var(--primary-container)', color: 'var(--on-primary-container)',
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          marginBottom: '1.25rem',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-        }}>
-          <span className="material-symbols-outlined" style={{ fontSize: '2rem' }}>apartment</span>
-        </div>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.75rem', letterSpacing: '-0.03em', margin: 0 }}>
-          New Facility
-        </h1>
-        <p style={{ color: 'var(--on-surface-variant)', fontSize: '0.875rem', fontWeight: 500, marginTop: '0.5rem', opacity: 0.7 }}>
-          Register a hostel facility for shared accommodation
-        </p>
-      </div>
+      <div className="modern-card">
+        <header className="mb-10">
+          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--surface-container-highest)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem', border: '1px solid var(--outline-variant)' }}>
+            <span className="material-symbols-outlined opacity-60">apartment</span>
+          </div>
+          <h1 className="view-title text-3xl mb-2">New Facility</h1>
+          <p className="text-on-surface-variant text-sm font-medium opacity-70">Register a new hostel asset for shared accommodation management.</p>
+        </header>
 
-      {/* Form card */}
-      <div className="auth-card" style={{ padding: '2.5rem' }}>
-        {error && <div className="error-message">{error}</div>}
+        {error && (
+          <div className="p-4 rounded-xl bg-error/10 border border-error/20 text-error text-xs font-bold leading-relaxed mb-8">
+            {error}
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
-          onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleSubmit(e as unknown as React.FormEvent); }}>
-
-          {/* Name */}
-          <div className="auth-input-group">
-            <label>
-              <span className="material-symbols-outlined" style={{ fontSize: '0.875rem', verticalAlign: 'middle', marginRight: '0.35rem', opacity: 0.6 }}>corporate_fare</span>
-              Facility Name
-            </label>
+        <form onSubmit={handleSubmit} onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleSubmit(e as any); }}>
+          <div className="form-group-modern">
+            <label>Facility Name</label>
             <input
               name="name"
               type="text"
-              placeholder="e.g. Skyline Student Living"
+              placeholder="e.g. Skyline Executive Living"
               value={formData.name}
               onChange={handleChange}
-              className="auth-input"
-              style={{ width: '100%', boxSizing: 'border-box' }}
               autoFocus
               required
+              style={{ fontSize: '1.125rem', fontWeight: 700 }}
             />
           </div>
 
-          {/* Address */}
-          <div className="auth-input-group">
-            <label>
-              <span className="material-symbols-outlined" style={{ fontSize: '0.875rem', verticalAlign: 'middle', marginRight: '0.35rem', opacity: 0.6 }}>location_on</span>
-              Physical Address
-            </label>
+          <div className="form-group-modern">
+            <label>Physical Address</label>
             <input
               name="address"
               type="text"
-              placeholder="Full street address, City, Zip"
+              placeholder="Full digital and physical location"
               value={formData.address}
               onChange={handleChange}
-              className="auth-input"
-              style={{ width: '100%', boxSizing: 'border-box' }}
               required
             />
           </div>
 
-          {/* Actions */}
-          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+          <div className="flex flex-col sm:flex-row gap-4 mt-10">
             <button
               type="button"
               onClick={() => navigate(-1)}
-              style={{
-                flex: 1, padding: '1rem', borderRadius: '1.125rem', fontWeight: 700,
-                fontSize: '0.875rem', background: 'var(--surface-container-low)',
-                border: '1px solid var(--outline-variant)', cursor: 'pointer',
-                color: 'var(--on-surface-variant)', transition: 'all 0.2s',
-              }}
+              className="primary-button flex-1"
+              style={{ background: 'var(--surface-container-highest)', color: 'var(--on-surface)' }}
             >
               Discard
             </button>
             <button
               type="submit"
-              className="primary-button auth-button"
-              style={{ flex: 2, margin: 0 }}
+              className="primary-button flex-[2]"
               disabled={loading}
             >
-              {loading ? 'Creating…' : 'Confirm Facility'}
+              <span className="font-black text-xs uppercase tracking-widest">
+                {loading ? 'Initializing...' : 'Register Asset'}
+              </span>
             </button>
           </div>
 
-          <p style={{ textAlign: 'center', fontSize: '0.65rem', opacity: 0.3, fontWeight: 600, marginTop: '-0.25rem' }}>
-            ⌘ Enter to submit · Esc to cancel
-          </p>
+          <div className="mt-8 pt-6 border-t border-white/5 text-center">
+            <p className="text-[0.6rem] font-black uppercase tracking-[0.2em] opacity-30">
+              ⌘ Enter to submit · Esc to cancel
+            </p>
+          </div>
         </form>
       </div>
     </div>

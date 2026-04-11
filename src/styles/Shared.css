@@ -1,252 +1,233 @@
-/* Shared.css - Architectural Glass & Vault Patterns */
+/* Shared.css - High Fidelity Professional Styles */
 
 body {
   background-color: var(--surface);
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(var(--surface-container-highest-rgb), 0.15) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(var(--surface-container-highest-rgb), 0.1) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(var(--surface-container-highest-rgb), 0.05) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, rgba(var(--surface-container-highest-rgb), 0.1) 0px, transparent 50%);
+  background-image:
+    radial-gradient(at 0% 0%, rgba(var(--surface-container-highest-rgb), 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(var(--surface-container-highest-rgb), 0.05) 0px, transparent 50%);
   background-attachment: fixed;
   color: var(--on-surface);
   font-family: var(--font-main);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
-  transition: var(--transition-theme);
+  transition: var(--transition-base);
+  /* PWA: prevent browser pull-to-refresh gesture from reloading the app */
+  overscroll-behavior-y: contain;
 }
 
-/* ── Page Transitions ── */
-.page-fade-in {
-  animation: pageReveal 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-@keyframes pageReveal {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* ── Glassmorphism 2.0 ── */
-.glass-panel {
-  background: rgba(var(--surface-container-highest-rgb), 0.1);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--outline-variant);
-  box-shadow: var(--shadow-ambient);
-}
-
-[data-theme="light"] .glass-panel {
-  background: rgba(var(--surface-container-highest-rgb), 0.4);
-}
-
-/* ── Tonal Layering (No-Line Sectioning) ── */
-.modern-card {
-  background-color: var(--surface-container-low);
-  border-radius: 1.5rem;
-  padding: 2rem;
-  transition: var(--transition-glass);
-  border: none !important; /* Enforce no-line rule */
-}
-
-[data-theme="light"] .modern-card {
-  border: 1px solid var(--outline-variant) !important;
-}
-
-.modern-card:hover {
-  background-color: var(--surface-container-high);
-  transform: translateY(-4px);
-}
-
-/* ── Typography Scale ── */
+/* ── Typography Polishes ── */
 h1, .view-title {
   font-family: var(--font-display);
   font-weight: 800;
-  letter-spacing: -0.03em;
-  color: var(--primary);
+  letter-spacing: -0.04em;
+  color: var(--on-surface);
 }
 
-.financial-data {
-  font-family: var(--font-display);
+.view-eyebrow {
+  color: var(--on-surface-variant);
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  margin-bottom: 1rem;
 }
 
-/* ── Primary Elements ── */
+/* ── Components: Cards & Glass ── */
+.modern-card {
+  background-color: var(--surface-container-low);
+  border-radius: 1.25rem;
+  padding: 2.5rem;
+  transition: var(--transition-base);
+  border: 1px solid var(--outline-variant) !important;
+  box-shadow: var(--shadow-ambient);
+}
+
+.modern-card:hover {
+  background-color: var(--surface-container);
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  transform: translateY(-2px);
+}
+
+.glass-panel {
+  background: rgba(var(--surface-container-highest-rgb), 0.15);
+  backdrop-filter: var(--glass-effect);
+  -webkit-backdrop-filter: var(--glass-effect);
+  border: 1px solid var(--outline-variant);
+}
+
+/* ── Primary Buttons ── */
 .primary-button {
   background: var(--primary);
   color: var(--on-primary);
   border-radius: 0.75rem;
   padding: 0.875rem 1.75rem;
-  font-weight: 800;
+  font-weight: 700;
   font-family: var(--font-main);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  transition: all 0.2s ease;
-  box-shadow: 0 8px 24px rgba(255, 255, 255, 0.05);
-  border: none;
+  text-transform: none; /* Removed all-caps for a more modern, professional look */
+  letter-spacing: -0.01em;
+  transition: var(--transition-fast);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  border: 1px solid transparent;
+  cursor: pointer;
 }
 
 .primary-button:hover {
-  transform: scale(1.02);
-  box-shadow: 0 12px 32px rgba(255, 255, 255, 0.1);
+  background: #f8fafc;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 .primary-button:active {
   transform: scale(0.98);
 }
 
-/* ── Badges ── */
+.primary-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Global Table Polishes ── */
+.modern-table-wrap {
+  overflow: hidden;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-lowest);
+}
+
+.modern-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.modern-table th {
+  text-align: left;
+  padding: 1.25rem 1.5rem;
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--on-surface-variant);
+  border-bottom: 1px solid var(--outline-variant);
+  background: var(--surface-container-low);
+}
+
+.modern-table td {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--outline-variant);
+  vertical-align: middle;
+}
+
+.modern-table tr:last-child td {
+  border-bottom: none;
+}
+
+.modern-table tr:hover td {
+  background: var(--surface-container-low);
+}
+
+/* ── Professional Badges ── */
 .badge-modern {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.875rem;
-  border-radius: 99px;
-  font-size: 0.7rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.65rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--primary);
+  letter-spacing: 0.05em;
+  border: 1px solid transparent;
 }
 
-/* ── View Layout ── */
+.badge-success {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.badge-warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.badge-error {
+  background: var(--error-container);
+  color: var(--error);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+/* ── View Layout & Spacing ── */
 .view-container {
-  max-width: 1280px; /* 7xl equivalent */
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 3rem 0 10rem;
-}
-
-@media (max-width: 768px) {
-  .view-container {
-    padding: 1rem 1rem 8rem;
-    width: 100%;
-  }
-
-  .view-header {
-    margin-bottom: 2rem;
-  }
-
-  .primary-button {
-    padding: 0.75rem 1.25rem;
-    font-size: 0.75rem;
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-}
-
-@media (max-width: 480px) {
-  .view-title {
-    font-size: 2.25rem !important;
-    line-height: 1.1;
-  }
-
-  .view-container {
-    padding-top: 0.5rem;
-  }
+  padding: 4rem 2rem 10rem;
 }
 
 .view-header {
-  margin-bottom: 4rem;
+  margin-bottom: 5rem;
 }
 
-.view-eyebrow {
-  color: var(--secondary);
+/* ── Form Styling ── */
+.form-group-modern {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.form-group-modern label {
   font-size: 0.75rem;
   font-weight: 700;
+  color: var(--on-surface-variant);
   text-transform: uppercase;
-  letter-spacing: 0.2em;
-  margin-bottom: 0.75rem;
+  letter-spacing: 0.05em;
 }
 
-/* ── Modern Loading Screen ── */
-.loading-screen {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--surface);
-  z-index: 9999;
+.form-group-modern input,
+.form-group-modern select,
+.form-group-modern textarea {
+  background: var(--surface-container-high);
+  border: 1px solid var(--outline-variant);
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+  color: var(--on-surface);
+  font-family: var(--font-main);
+  font-size: 1rem; /* ≥16px prevents iOS auto-zoom on focus */
+  transition: var(--transition-fast);
+}
+
+.form-group-modern input:focus,
+.form-group-modern select:focus,
+.form-group-modern textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--surface-container-highest);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.03);
+}
+
+/* ── Utilities ── */
+.text-truncate {
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.loading-logo-container {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2rem;
-  animation: logoBreath 4s ease-in-out infinite;
-}
+.desktop-only { display: block !important; }
+.mobile-only { display: none !important; }
 
-@keyframes logoBreath {
-  0%, 100% { transform: scale(1); opacity: 0.8; filter: blur(0px); }
-  50% { transform: scale(1.05); opacity: 1; filter: blur(1px); }
-}
-
-.loading-bar-container {
-  width: 200px;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 99px;
-  overflow: hidden;
-  margin-top: 3rem;
-  position: relative;
-  z-index: 2;
-}
-
-.loading-bar-progress {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  width: 30%;
-  background: linear-gradient(90deg, transparent, var(--primary), transparent);
-  border-radius: 99px;
-  animation: vaultLoad 2s infinite cubic-bezier(0.65, 0.05, 0.36, 1);
-}
-
-@keyframes vaultLoad {
-  0% { left: -30%; width: 20%; }
-  50% { left: 40%; width: 40%; }
-  100% { left: 100%; width: 20%; }
-}
-
-.loading-text {
-  font-family: var(--font-display);
-  font-size: 0.625rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.3em;
-  color: var(--primary);
-  opacity: 0.4;
-  margin-top: 1.5rem;
-  z-index: 2;
-}
-
-.loading-mesh {
-  position: absolute;
-  inset: 0;
-  background: 
-    radial-gradient(at 0% 0%, rgba(78, 99, 94, 0.2) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(197, 197, 216, 0.15) 0px, transparent 50%);
-  opacity: 0.6;
-  filter: blur(60px);
-  z-index: 1;
-}
-
-
-/* ── Staff Dashboard Two-Column Grid ────────────────────────────────────────── */
-.staff-dashboard-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
-  align-items: start;
+@media (max-width: 1024px) {
+  .view-container { padding: 3rem 1.5rem 8rem; }
 }
 
 @media (max-width: 768px) {
-  .staff-dashboard-grid {
-    grid-template-columns: 1fr;
-  }
+  .desktop-only { display: none !important; }
+  .mobile-only { display: flex !important; }
+  .mobile-only.block { display: block !important; }
+  
+  .view-header { margin-bottom: 3rem; }
+  .view-title { font-size: 2.5rem !important; }
+  
+  .modern-card { padding: 1.5rem; }
 }

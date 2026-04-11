@@ -9,7 +9,7 @@ import { useOwner } from '../../context/OwnerContext';
 export const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; isStaff: boolean }> = ({ isCollapsed, setIsCollapsed, isStaff }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => location.pathname === path || (path !== '/' && location.pathname.startsWith(path));
   const { availableAccounts, ownerId } = useOwner();
   const ownerName = availableAccounts.find(a => a.id === ownerId)?.name ?? '';
 
@@ -23,153 +23,149 @@ export const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boole
   };
 
   return (
-    <aside className={`tonal-sidebar glass-panel ${isCollapsed ? 'collapsed' : ''}`} style={{ borderRight: '1px solid var(--outline-variant)' }}>
-      <div className="sidebar-header">
+    <aside className={`tonal-sidebar glass-panel ${isCollapsed ? 'collapsed' : ''}`} style={{ borderRight: '1px solid var(--outline-variant)', background: 'rgba(0,0,0,0.2)' }}>
+      <div className="sidebar-header" style={{ padding: isCollapsed ? '1.5rem 0' : '2.5rem 1.5rem' }}>
         {!isCollapsed && (
-          <div className="logo-wordmark">
-            <LogoMark size="md" />
-            <span className="font-display font-black text-xl tracking-tighter text-on-surface uppercase ml-2">Lobby</span>
+          <div className="logo-wordmark flex items-center gap-3">
+            <LogoMark size="sm" />
+            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.25rem', letterSpacing: '-0.05em', color: 'var(--on-surface)', textTransform: 'uppercase' }}>Lobby</span>
           </div>
         )}
         <button
           className="sidebar-toggle"
           onClick={() => setIsCollapsed(!isCollapsed)}
           title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-          style={{ background: 'var(--surface-container-highest)', color: 'var(--on-surface)' }}
+          style={{ background: 'var(--surface-container-highest)', color: 'var(--on-surface)', width: '32px', height: '32px', borderRadius: '10px' }}
         >
-          <span className="material-symbols-outlined">
+          <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
             {isCollapsed ? 'side_navigation' : 'menu_open'}
           </span>
         </button>
       </div>
 
-      <nav className="nav-links flex-1" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <nav className="nav-links flex-1" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', padding: '0 0.75rem' }}>
         <Link
           to="/"
-          className={`nav-item ${isActive('/') ? 'active' : ''}`}
-          title="Dashboard"
+          className={`nav-item ${location.pathname === '/' ? 'active' : ''}`}
+          title="Executive Overview"
           onMouseEnter={() => prefetch('lobby')}
-          style={{ padding: '1rem 1.25rem', borderRadius: '1.25rem' }}
+          style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
         >
-          <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>dashboard</span>
-          {!isCollapsed && <span style={{ fontWeight: 700 }}>Executive Overview</span>}
+          <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>analytics</span>
+          {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Executive Overview</span>}
         </Link>
 
-        {!isCollapsed && <div className="nav-section-label" style={{ marginTop: '2rem', opacity: 0.3 }}>Facilities</div>}
+        {!isCollapsed && <div className="view-eyebrow" style={{ marginTop: '2rem', marginLeft: '1rem', marginBottom: '0.75rem', fontSize: '0.6rem', opacity: 0.3 }}>Portfolio</div>}
         <Link
           to="/hostels"
-          className={`nav-item ${location.pathname.startsWith('/hostels') ? 'active' : ''}`}
-          title="Hostels"
+          className={`nav-item ${isActive('/hostels') ? 'active' : ''}`}
+          title="Facility Registry"
           onMouseEnter={() => prefetch('hostels')}
-          style={{ padding: '1rem 1.25rem', borderRadius: '1.25rem' }}
+          style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
         >
-          <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>hotel</span>
-          {!isCollapsed && <span style={{ fontWeight: 700 }}>Shared Facilities</span>}
+          <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>apartment</span>
+          {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Facility Registry</span>}
         </Link>
 
-        {!isCollapsed && <div className="nav-section-label" style={{ marginTop: '2rem', opacity: 0.3 }}>Operations</div>}
+        {!isCollapsed && <div className="view-eyebrow" style={{ marginTop: '2rem', marginLeft: '1rem', marginBottom: '0.75rem', fontSize: '0.6rem', opacity: 0.3 }}>Operations</div>}
         {!isStaff && (
           <Link
             to="/customers"
             className={`nav-item ${isActive('/customers') ? 'active' : ''}`}
-            title="Customers"
+            title="Relationship Base"
             onMouseEnter={() => prefetch('customers')}
-            style={{ padding: '1rem 1.25rem', borderRadius: '1.25rem' }}
+            style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>group</span>
-            {!isCollapsed && <span style={{ fontWeight: 700 }}>Relationship Base</span>}
+            <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>supervised_user_circle</span>
+            {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Relationship Base</span>}
           </Link>
         )}
         {!isStaff && (
           <Link
             to="/leases"
             className={`nav-item ${isActive('/leases') ? 'active' : ''}`}
-            title="Leases"
+            title="Legal Agreements"
             onMouseEnter={() => prefetch('leases')}
-            style={{ padding: '1rem 1.25rem', borderRadius: '1.25rem' }}
+            style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>contract</span>
-            {!isCollapsed && <span style={{ fontWeight: 700 }}>Legal Agreements</span>}
+            <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>gavel</span>
+            {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Legal Agreements</span>}
           </Link>
         )}
         <Link
           to="/payments"
           className={`nav-item ${isActive('/payments') ? 'active' : ''}`}
-          title="Payments"
+          title="Financial Ledger"
           onMouseEnter={() => prefetch('payments')}
-          style={{ padding: '1rem 1.25rem', borderRadius: '1.25rem' }}
+          style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
         >
-          <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>payments</span>
-          {!isCollapsed && <span style={{ fontWeight: 700 }}>Financial Ledger</span>}
+          <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>account_balance_wallet</span>
+          {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Financial Ledger</span>}
         </Link>
         {!isStaff && (
           <Link
             to="/reports"
             className={`nav-item ${isActive('/reports') ? 'active' : ''}`}
-            title="Reports"
+            title="Intelligence Reports"
             onMouseEnter={() => prefetch('reports')}
-            style={{ padding: '1rem 1.25rem', borderRadius: '1.25rem' }}
+            style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>assessment</span>
-            {!isCollapsed && <span style={{ fontWeight: 700 }}>Reports</span>}
+            <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>monitoring</span>
+            {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Intelligence Reports</span>}
           </Link>
         )}
         <Link
           to="/team"
           className={`nav-item ${isActive('/team') ? 'active' : ''}`}
-          title="Team & Access"
+          title="Personnel & Access"
           onMouseEnter={() => prefetch('team')}
-          style={{ padding: '1rem 1.25rem', borderRadius: '1.25rem' }}
+          style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
         >
-          <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>supervisor_account</span>
-          {!isCollapsed && <span style={{ fontWeight: 700 }}>Team & Access</span>}
+          <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>badge</span>
+          {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Personnel & Access</span>}
         </Link>
 
         {/* Staff mode block */}
         {isStaff && !isCollapsed && (
           <div style={{
-            margin: '0.5rem 0', padding: '1rem 1.25rem',
-            borderRadius: '1.25rem',
-            background: 'var(--surface-container-high)',
-            borderLeft: '3px solid #f59e0b',
+            margin: '1rem', padding: '1rem',
+            borderRadius: '1rem',
+            background: 'rgba(245,158,11,0.05)',
+            border: '1px solid rgba(245,158,11,0.1)',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: '#f59e0b' }}>visibility</span>
-              <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#f59e0b' }}>Staff Mode</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: 'var(--color-warning)' }}>verified_user</span>
+              <span style={{ fontSize: '0.6rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-warning)' }}>Staff Access</span>
             </div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 700, opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--on-surface)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {ownerName}
             </div>
-            <div style={{ fontSize: '0.65rem', opacity: 0.4, fontWeight: 600, marginTop: '0.15rem' }}>Read-Only Access</div>
           </div>
         )}
 
-        <div style={{ marginTop: 'auto' }}>
-          {!isCollapsed && <div className="nav-section-label" style={{ opacity: 0.3 }}>System</div>}
+        <div style={{ marginTop: 'auto', paddingBottom: '1rem' }}>
+          {!isCollapsed && <div className="view-eyebrow" style={{ marginLeft: '1rem', marginBottom: '0.75rem', fontSize: '0.6rem', opacity: 0.3 }}>System</div>}
           <Link
             to="/settings"
             className={`nav-item ${isActive('/settings') ? 'active' : ''}`}
-            title="Settings"
+            title="Preferences"
             onMouseEnter={() => prefetch('settings')}
-            style={{ padding: '1rem 1.25rem', borderRadius: '1.25rem' }}
+            style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>settings</span>
-            {!isCollapsed && <span style={{ fontWeight: 700 }}>Preferences</span>}
+            <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>tune</span>
+            {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Preferences</span>}
           </Link>
+          <button
+            onClick={handleSignOut}
+            className="nav-item sign-out-btn w-full text-left"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.875rem 1rem', borderRadius: '0.75rem', marginTop: '0.25rem' }}
+            title="Terminate Session"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>logout</span>
+            {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Terminate Session</span>}
+          </button>
         </div>
       </nav>
-
-      <div className="mt-8 pt-6 border-t border-outline-variant">
-        <button
-          onClick={handleSignOut}
-          className="nav-item sign-out-btn w-full text-left"
-          style={{ background: 'none', border: 'none', cursor: 'pointer', marginBottom: 0, padding: '1rem 1.25rem', borderRadius: '1.25rem' }}
-          title="Sign Out"
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>logout</span>
-          {!isCollapsed && <span style={{ fontWeight: 700 }}>Terminate Session</span>}
-        </button>
-      </div>
     </aside>
   );
 };

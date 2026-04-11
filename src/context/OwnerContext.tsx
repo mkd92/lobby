@@ -96,11 +96,13 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           // collection was introduced — without it Firestore rules deny reads.
           await Promise.all(
             activeStaffDocs.map(async (staffDoc) => {
-              const ownerId = staffDoc.data().owner_id as string;
+              const data = staffDoc.data();
+              const ownerId = data.owner_id as string;
+              const role = data.role as string || 'viewer';
               const lookupRef = doc(db, 'staff_lookup', user.uid, 'owners', ownerId);
               const lookupSnap = await getDoc(lookupRef);
-              if (!lookupSnap.exists()) {
-                await setDoc(lookupRef, { migrated_at: serverTimestamp() });
+              if (!lookupSnap.exists() || !lookupSnap.data()?.role) {
+                await setDoc(lookupRef, { role }, { merge: true });
               }
             }),
           );
@@ -112,7 +114,9 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
           setOwnerId(active.id);
           setUserRole(active.role);
-          void generateMonthlyPayments(active.id);
+          if (active.role === 'owner' || active.role === 'manager') {
+            void generateMonthlyPayments(active.id);
+          }
         } catch (error) {
           console.error('OwnerContext error:', error);
           setOwnerId(user.uid);
@@ -138,7 +142,9 @@ export const OwnerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem(STORAGE_KEY, id);
     setOwnerId(id);
     setUserRole(account.role);
-    void generateMonthlyPayments(id);
+    if (account.role === 'owner' || account.role === 'manager') {
+      void generateMonthlyPayments(id);
+    }
   };
 
   return (

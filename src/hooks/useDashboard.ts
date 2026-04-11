@@ -30,11 +30,13 @@ export const useDashboard = () => {
         });
       }
 
-      const [ownerSnap, bedsSnap, leasesSnap, paymentsSnap] = await Promise.all([
+      const [ownerSnap, bedsSnap, leasesSnap, paymentsSnap, invoicesSnap, receiptsSnap] = await Promise.all([
         getDoc(doc(db, 'owners', ownerId!)),
         getDocs(query(collection(db, 'beds'), where('owner_id', '==', ownerId))),
         getDocs(query(collection(db, 'leases'), where('owner_id', '==', ownerId))),
         getDocs(query(collection(db, 'payments'), where('owner_id', '==', ownerId))),
+        getDocs(query(collection(db, 'invoices'), where('owner_id', '==', ownerId))),
+        getDocs(query(collection(db, 'receipts'), where('owner_id', '==', ownerId))),
       ]);
 
       const ownerData = ownerSnap.data() as { currency?: string };
@@ -65,22 +67,68 @@ export const useDashboard = () => {
       const revenueByMonth: Record<string, number> = {};
       last6.forEach(m => { revenueByMonth[m.label] = 0; });
 
-      const payments = paymentsSnap.docs.map(d => d.data()) as {
-        amount: number;
-        status: string;
-        month_for: string;
-        payment_date: string;
-      }[];
+      const useLegacy = invoicesSnap.empty && receiptsSnap.empty;
 
-      payments.forEach(p => {
-        const amount = Number(p.amount);
-        if (p.status === 'Paid' && p.month_for === currentMonth) monthlyRevenue += amount;
-        if (p.status === 'Paid' && p.payment_date >= yearStart && p.payment_date <= yearEnd) annualRevenue += amount;
-        if (p.status === 'Pending' || p.status === 'Partial') overdueAmount += amount;
-        if (p.status === 'Paid' && revenueByMonth[p.month_for] !== undefined) {
-          revenueByMonth[p.month_for] += amount;
-        }
-      });
+      if (useLegacy) {
+        const payments = paymentsSnap.docs.map(d => d.data()) as {
+          amount: number;
+          status: string;
+          month_for: string;
+          payment_date: string;
+          rent_amount?: number;
+        }[];
+
+        payments.forEach(p => {
+          const amount = Number(p.amount);
+          if (p.status === 'Paid' && p.month_for === currentMonth) monthlyRevenue += amount;
+          if (p.status === 'Paid' && p.payment_date >= yearStart && p.payment_date <= yearEnd) annualRevenue += amount;
+          if (p.status === 'Pending' || p.status === 'Partial') {
+            const rent = Number(p.rent_amount) || 0;
+            overdueAmount += (rent - amount);
+          }
+          if (p.status === 'Paid' && revenueByMonth[p.month_for] !== undefined) {
+            revenueByMonth[p.month_for] += amount;
+          }
+        });
+      } else {
+        const invoices = invoicesSnap.docs.map(d => ({ id: d.id, ...d.data() })) as {
+          id: string;
+          amount: number;
+          status: string;
+          month_for: string;
+          due_date: string;
+        }[];
+
+        const receipts = receiptsSnap.docs.map(d => d.data()) as {
+          invoice_id: string;
+          amount: number;
+          payment_date: string;
+          month_for?: string; // Some might have it, some not
+        }[];
+
+        // Revenue comes from receipts
+        receipts.forEach(r => {
+          const amount = Number(r.amount);
+          const inv = invoices.find(i => i.id === r.invoice_id);
+          const monthFor = r.month_for || inv?.month_for;
+
+          if (monthFor === currentMonth) monthlyRevenue += amount;
+          if (r.payment_date >= yearStart && r.payment_date <= yearEnd) annualRevenue += amount;
+          if (monthFor && revenueByMonth[monthFor] !== undefined) {
+            revenueByMonth[monthFor] += amount;
+          }
+        });
+
+        // Overdue comes from invoices
+        invoices.forEach(i => {
+          if (i.status === 'Pending' || i.status === 'Partial') {
+            const paidForInv = receipts
+              .filter(r => r.invoice_id === i.id)
+              .reduce((acc, r) => acc + (Number(r.amount) || 0), 0);
+            overdueAmount += (Number(i.amount) - paidForInv);
+          }
+        });
+      }
 
       const revenueChart = last6.map(m => ({ month: m.short, revenue: revenueByMonth[m.label] || 0 }));
       const stats = {

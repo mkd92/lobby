@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  doc, getDoc, updateDoc, collection, getDocs, query, orderBy, serverTimestamp,
+  doc, getDoc, collection, getDocs, query, orderBy, serverTimestamp, writeBatch,
 } from 'firebase/firestore';
 import { db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
@@ -42,7 +42,8 @@ interface Props {
 
 const PaymentSlideOver: React.FC<Props> = ({ id, currencySymbol, onClose, onUpdated }) => {
   const { ownerId, userRole } = useOwner();
-  const isStaff = userRole !== 'owner';
+  const isOwner = userRole === 'owner';
+  const canWrite = userRole === 'owner' || userRole === 'manager';
   const queryClient = useQueryClient();
 
   const [payment, setPayment] = useState<Payment | null>(null);
@@ -59,27 +60,34 @@ const PaymentSlideOver: React.FC<Props> = ({ id, currencySymbol, onClose, onUpda
 
   useEffect(() => {
     const load = async () => {
+      if (!id) return;
       setLoading(true);
-      const snap = await getDoc(doc(db, 'payments', id));
-      if (!snap.exists()) { setLoading(false); return; }
-      const data = { id: snap.id, ...snap.data() } as Payment;
-      setPayment(data);
-      setForm({
-        amount: String(data.amount),
-        payment_date: data.payment_date || '',
-        payment_method: data.payment_method || 'Cash',
-        status: data.status,
-      });
       try {
-        const txSnap = await getDocs(query(
-          collection(db, 'payments', id, 'transactions'),
-          orderBy('recorded_at', 'asc')
-        ));
-        setTransactions(txSnap.docs.map(d => ({ id: d.id, ...d.data() } as Transaction)));
-      } catch {
-        // transactions subcollection may not exist yet — that's fine
+        const snap = await getDoc(doc(db, 'payments', id));
+        if (!snap.exists()) { setLoading(false); return; }
+        const data = { id: snap.id, ...snap.data() } as Payment;
+        setPayment(data);
+        setForm({
+          amount: String(data.amount),
+          payment_date: data.payment_date || '',
+          payment_method: data.payment_method || 'Cash',
+          status: data.status,
+        });
+        try {
+          const txSnap = await getDocs(query(
+            collection(db, 'payments', id, 'transactions'),
+            orderBy('recorded_at', 'asc')
+          ));
+          setTransactions(txSnap.docs.map(d => ({ id: d.id, ...d.data() } as Transaction)));
+        } catch {
+          // transactions subcollection may not exist yet — that's fine
+        }
+      } catch (err) {
+        console.error('Failed to load payment detail:', err);
+        setError('Failed to load record details.');
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     load();
   }, [id]);
@@ -93,18 +101,84 @@ const PaymentSlideOver: React.FC<Props> = ({ id, currencySymbol, onClose, onUpda
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!payment || isStaff) return;
+    if (!payment || !canWrite) return;
     setSaving(true);
     setError('');
     try {
       if (form.payment_date) localStorage.setItem('lastPaymentDate', form.payment_date);
-      await updateDoc(doc(db, 'payments', id), {
-        amount: parseFloat(form.amount),
+      const newAmount = parseFloat(form.amount);
+      const amountDiff = newAmount - payment.amount;
+
+      const batch = writeBatch(db);
+      
+      const paymentRef = doc(db, 'payments', id);
+      batch.update(paymentRef, {
+        amount: newAmount,
         payment_date: form.payment_date,
         payment_method: form.payment_method,
         status: form.status,
         updated_at: serverTimestamp(),
       });
+
+      const invoiceRef = doc(db, 'invoices', id);
+      batch.update(invoiceRef, {
+        status: form.status,
+        updated_at: serverTimestamp(),
+      });
+
+      if (amountDiff > 0) {
+        const receiptRef = doc(collection(db, 'receipts'));
+        batch.set(receiptRef, {
+          owner_id: ownerId!,
+          invoice_id: id,
+          tenant_name: payment.tenant_name,
+          amount: amountDiff,
+          payment_date: form.payment_date,
+          payment_method: form.payment_method,
+          legacy_transaction_id: 'manual_edit',
+          created_at: serverTimestamp(),
+        });
+
+        const jeRef = doc(collection(db, 'journal_entries'));
+        batch.set(jeRef, {
+          owner_id: ownerId!,
+          date: form.payment_date,
+          description: `Payment Adjustment - ${payment.tenant_name}`,
+          reference_type: 'Receipt',
+          reference_id: receiptRef.id,
+          debit_account_code: '1000',
+          credit_account_code: '1200',
+          amount: amountDiff,
+          created_at: serverTimestamp(),
+        });
+      } else if (amountDiff < 0) {
+        const receiptRef = doc(collection(db, 'receipts'));
+        batch.set(receiptRef, {
+          owner_id: ownerId!,
+          invoice_id: id,
+          tenant_name: payment.tenant_name,
+          amount: amountDiff,
+          payment_date: form.payment_date,
+          payment_method: form.payment_method,
+          legacy_transaction_id: 'manual_edit_reversal',
+          created_at: serverTimestamp(),
+        });
+
+        const jeRef = doc(collection(db, 'journal_entries'));
+        batch.set(jeRef, {
+          owner_id: ownerId!,
+          date: form.payment_date,
+          description: `Payment Reversal - ${payment.tenant_name}`,
+          reference_type: 'Receipt',
+          reference_id: receiptRef.id,
+          debit_account_code: '1200',
+          credit_account_code: '1000',
+          amount: Math.abs(amountDiff),
+          created_at: serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
       queryClient.invalidateQueries({ queryKey: ['payments', ownerId] });
       onUpdated();
     } catch (err) {
@@ -182,7 +256,7 @@ ${txRows ? `<hr class="thin"><div class="lbl" style="margin-bottom:0.75rem">Paym
   const inputStyle: React.CSSProperties = {
     borderRadius: '1rem', padding: '0.75rem 1rem', fontWeight: 600,
     background: 'var(--surface-container-low)', border: 'none', width: '100%',
-    boxSizing: 'border-box', color: 'var(--on-surface)', fontSize: '0.9375rem',
+    boxSizing: 'border-box', color: 'var(--on-surface)', fontSize: '1rem',
   };
 
   return (
@@ -279,7 +353,7 @@ ${txRows ? `<hr class="thin"><div class="lbl" style="margin-bottom:0.75rem">Paym
             </div>
 
             {/* Edit form */}
-            {!isStaff && (
+            {canWrite && (
               <div style={{ background: 'var(--surface-container-low)', borderRadius: '1.5rem', padding: '1.5rem' }}>
                 <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.9375rem', marginBottom: '1.25rem', opacity: 0.8 }}>Edit Record</h3>
                 <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

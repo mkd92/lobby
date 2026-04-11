@@ -37,11 +37,6 @@ interface Hostel {
   name: string;
 }
 
-const sectionLabel: React.CSSProperties = {
-  fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.12em',
-  fontWeight: 800, opacity: 0.4, marginBottom: '1rem', display: 'block',
-};
-
 const QUERY_OPTS = { staleTime: 0, refetchInterval: 60_000 };
 
 const StaffDashboard: React.FC = () => {
@@ -91,16 +86,14 @@ const StaffDashboard: React.FC = () => {
   });
 
   const isLoading = paymentsLoading || bedsLoading;
-  if (isLoading) return <LoadingScreen message="Loading workspace" />;
+  if (isLoading) return <LoadingScreen message="Compiling Operational Intelligence" />;
 
-  // Derived data
   const pendingPayments = payments.filter(p => p.status === 'Pending' || p.status === 'Partial');
   const vacantBeds      = beds.filter(b => b.status === 'Vacant');
 
   const roomMap   = new Map(rooms.map(r => [r.id, r]));
   const hostelMap = new Map(hostels.map(h => [h.id, h.name]));
 
-  // Group vacant beds by room
   const bedsByRoom = new Map<string, { hostelName: string; roomNumber: string; beds: Bed[] }>();
   vacantBeds.forEach(b => {
     const room = roomMap.get(b.room_id);
@@ -115,269 +108,122 @@ const StaffDashboard: React.FC = () => {
     bedsByRoom.get(key)!.beds.push(b);
   });
 
-  const hasPending = pendingPayments.length > 0;
-
   return (
-    <div className="view-container page-fade-in" style={{ maxWidth: '1100px', margin: '0 auto' }}>
+    <div className="view-container page-fade-in" style={{ maxWidth: '1200px' }}>
 
-      {/* Staff banner */}
-      <div style={{
-        background: 'rgba(245,158,11,0.06)',
-        border: '1px solid rgba(245,158,11,0.2)',
-        borderRadius: '1.5rem',
-        padding: '1.125rem 1.75rem',
-        marginBottom: '1.5rem',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '1rem',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-          <div style={{
-            background: 'rgba(245,158,11,0.15)',
-            borderRadius: '0.625rem',
-            padding: '0.3rem 0.625rem',
-            fontSize: '0.58rem',
-            fontWeight: 900,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: '#f59e0b',
-          }}>
-            Staff
-          </div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>
-              Viewing <span style={{ color: '#f59e0b' }}>{ownerName}</span>
+      {/* Staff Banner */}
+      <div className="modern-card mb-8" style={{ border: '1px solid var(--color-warning)', background: 'rgba(245,158,11,0.02)', padding: '1.5rem 2rem' }}>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+          <div className="flex items-center gap-4">
+            <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'var(--color-warning-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span className="material-symbols-outlined" style={{ color: 'var(--color-warning)', fontSize: '1.25rem' }}>verified_user</span>
             </div>
-            <div style={{ fontSize: '0.7rem', opacity: 0.4, fontWeight: 500 }}>
-              {isManager ? 'Manager · Can Create Records' : 'Read-only · Operational Snapshot'}
+            <div>
+              <div className="view-eyebrow mb-1" style={{ color: 'var(--color-warning)', opacity: 1 }}>Authenticated Session</div>
+              <div className="font-bold text-lg">Operating for <span style={{ color: 'var(--on-surface)' }}>{ownerName}</span></div>
             </div>
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center' }}>
-          {/* Pending payments badge */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '0.375rem',
-            fontSize: '0.75rem', fontWeight: 700,
-            color: hasPending ? '#ef4444' : 'inherit',
-            opacity: hasPending ? 1 : 0.4,
-          }}>
-            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>payments</span>
-            {hasPending ? (
-              <span style={{
-                background: 'rgba(239,68,68,0.12)',
-                color: '#ef4444',
-                padding: '0.15rem 0.5rem',
-                borderRadius: '999px',
-                fontSize: '0.65rem',
-                fontWeight: 900,
-              }}>
-                {pendingPayments.length} pending
-              </span>
-            ) : (
-              <span>{pendingPayments.length} pending</span>
-            )}
-          </div>
-          <span style={{ opacity: 0.2 }}>·</span>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '0.375rem',
-            fontSize: '0.75rem', fontWeight: 700, opacity: 0.4,
-          }}>
-            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>hotel</span>
-            <span>{vacantBeds.length} vacant beds</span>
+          <div className="flex gap-6">
+            <div className="text-right">
+              <div className="view-eyebrow mb-1">Access Tier</div>
+              <div className="font-bold text-sm uppercase tracking-widest">{userRole}</div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Manager quick-create actions */}
+      {/* Manager Actions */}
       {isManager && (
-        <div style={{
-          display: 'flex', gap: '0.625rem', flexWrap: 'wrap',
-          marginBottom: '1.5rem',
-        }}>
-          <button onClick={() => navigate('/customers/new')} className="primary-button" style={{ fontSize: '0.8rem', padding: '0.625rem 1.125rem' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle', marginRight: '0.375rem' }}>person_add</span>
-            New Customer
+        <div className="flex flex-wrap gap-4 mb-12">
+          <button onClick={() => navigate('/customers/new')} className="primary-button" style={{ background: 'var(--surface-container-highest)', color: 'var(--on-surface)', border: '1px solid var(--outline-variant)' }}>
+            <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle' }}>person_add</span>
+            Identify Tenant
           </button>
-          <button onClick={() => navigate('/leases/new')} className="primary-button" style={{ fontSize: '0.8rem', padding: '0.625rem 1.125rem' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle', marginRight: '0.375rem' }}>description</span>
-            New Lease
+          <button onClick={() => navigate('/leases/new')} className="primary-button" style={{ background: 'var(--surface-container-highest)', color: 'var(--on-surface)', border: '1px solid var(--outline-variant)' }}>
+            <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle' }}>description</span>
+            Establish Lease
           </button>
-          <button onClick={() => navigate('/payments')} className="primary-button" style={{ fontSize: '0.8rem', padding: '0.625rem 1.125rem' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle', marginRight: '0.375rem' }}>payments</span>
-            Record Payment
+          <button onClick={() => navigate('/payments')} className="primary-button" style={{ background: 'var(--surface-container-highest)', color: 'var(--on-surface)', border: '1px solid var(--outline-variant)' }}>
+            <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle' }}>payments</span>
+            Verify Receipts
           </button>
         </div>
       )}
 
-      {/* Two-column grid */}
-      <div className="staff-dashboard-grid">
+      {/* Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-        {/* ── Pending / Partial Payments ── */}
-        <div className="modern-card" style={{ padding: '1.75rem 2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span style={sectionLabel as React.CSSProperties}>
-              Outstanding Rent
-              {hasPending && (
-                <span style={{
-                  marginLeft: '0.5rem',
-                  background: 'rgba(239,68,68,0.12)',
-                  color: '#ef4444',
-                  padding: '0.12rem 0.45rem',
-                  borderRadius: '999px',
-                  fontSize: '0.58rem',
-                  fontWeight: 900,
-                  letterSpacing: '0.08em',
-                }}>
-                  {pendingPayments.length}
-                </span>
-              )}
-            </span>
-            {hasPending && (
-              <Link
-                to="/payments?status=Pending"
-                style={{
-                  fontSize: '0.7rem', fontWeight: 700, color: 'var(--primary)',
-                  textDecoration: 'none', opacity: 0.7,
-                  display: 'flex', alignItems: 'center', gap: '0.2rem',
-                }}
-              >
-                View all
-                <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>arrow_forward</span>
-              </Link>
-            )}
+        {/* Outstanding Arrears */}
+        <div className="modern-card">
+          <div className="flex justify-between items-center mb-10">
+            <div className="view-eyebrow" style={{ margin: 0 }}>Outstanding Arrears</div>
+            {pendingPayments.length > 0 && <span className="badge-modern badge-error">{pendingPayments.length} Active</span>}
           </div>
 
           {pendingPayments.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem 0', opacity: 0.2 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }}>check_circle</span>
-              <p style={{ fontWeight: 600, fontSize: '0.8125rem' }}>All rent is up to date</p>
+            <div className="py-12 text-center opacity-20">
+              <span className="material-symbols-outlined" style={{ fontSize: '3rem' }}>check_circle</span>
+              <p className="mt-4 font-bold">Ledger fully settled</p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-              {pendingPayments.map(p => (
-                <div key={p.id} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '0.6rem 0.875rem', borderRadius: '0.75rem',
-                  background: 'var(--surface-container-high)', gap: '0.75rem', flexWrap: 'wrap',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', minWidth: 0 }}>
-                    <div style={{
-                      width: '28px', height: '28px', borderRadius: '0.5rem', flexShrink: 0,
-                      background: p.status === 'Partial' ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.1)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <span className="material-symbols-outlined" style={{
-                        fontSize: '0.875rem',
-                        color: p.status === 'Partial' ? '#f59e0b' : '#ef4444',
-                      }}>
-                        {p.status === 'Partial' ? 'hourglass_top' : 'warning'}
-                      </span>
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.8125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {p.tenant_name}
-                      </div>
-                      <div style={{ fontSize: '0.65rem', opacity: 0.45, fontWeight: 500, marginTop: '0.1rem' }}>
-                        {p.bed_number
-                          ? `Bed ${p.bed_number}${p.room_number ? ` · Rm ${p.room_number}` : ''}${p.hostel_name ? ` · ${p.hostel_name}` : ''}`
-                          : '—'
-                        }
-                        {' · '}{p.month_for}
-                      </div>
+            <div className="flex flex-col gap-3">
+              {pendingPayments.slice(0, 10).map(p => (
+                <div key={p.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+                  <div className="min-w-0">
+                    <div className="font-bold text-on-surface truncate">{p.tenant_name}</div>
+                    <div className="flex items-center gap-2 mt-1 opacity-50 text-[0.7rem] font-bold uppercase tracking-wider">
+                      {p.month_for} · Rm {p.room_number || '—'}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: '0.875rem' }}>
-                      ₹{(p.amount ?? p.rent_amount).toLocaleString()}
-                    </div>
-                    <div style={{
-                      fontSize: '0.55rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase',
-                      color: p.status === 'Partial' ? '#f59e0b' : '#ef4444',
-                    }}>
-                      {p.status}
-                    </div>
+                  <div className="text-right">
+                    <div className="font-black text-on-surface">₹{(p.amount ?? p.rent_amount).toLocaleString()}</div>
+                    <span style={{ fontSize: '0.55rem', fontWeight: 900, color: p.status === 'Partial' ? 'var(--color-warning)' : 'var(--error)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{p.status}</span>
                   </div>
                 </div>
               ))}
+              {pendingPayments.length > 10 && (
+                <Link to="/payments" className="text-center py-3 text-xs font-bold text-primary hover:underline mt-2">
+                  View {pendingPayments.length - 10} additional arrears
+                </Link>
+              )}
             </div>
           )}
         </div>
 
-        {/* ── Vacant Beds ── */}
-        <div className="modern-card" style={{ padding: '1.75rem 2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span style={sectionLabel as React.CSSProperties}>
-              Vacant Beds
-              {vacantBeds.length > 0 && (
-                <span style={{
-                  marginLeft: '0.5rem',
-                  background: 'rgba(34,197,94,0.1)',
-                  color: '#22c55e',
-                  padding: '0.12rem 0.45rem',
-                  borderRadius: '999px',
-                  fontSize: '0.58rem',
-                  fontWeight: 900,
-                  letterSpacing: '0.08em',
-                }}>
-                  {vacantBeds.length}
-                </span>
-              )}
-            </span>
-            {vacantBeds.length > 0 && (
-              <Link
-                to="/hostels"
-                style={{
-                  fontSize: '0.7rem', fontWeight: 700, color: 'var(--primary)',
-                  textDecoration: 'none', opacity: 0.7,
-                  display: 'flex', alignItems: 'center', gap: '0.2rem',
-                }}
-              >
-                View hostels
-                <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>arrow_forward</span>
-              </Link>
-            )}
+        {/* Unit Availability */}
+        <div className="modern-card">
+          <div className="flex justify-between items-center mb-10">
+            <div className="view-eyebrow" style={{ margin: 0 }}>Unit Availability</div>
+            <span className="badge-modern badge-success">{vacantBeds.length} Vacant</span>
           </div>
 
           {vacantBeds.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem 0', opacity: 0.2 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }}>hotel</span>
-              <p style={{ fontWeight: 600, fontSize: '0.8125rem' }}>No vacant beds</p>
+            <div className="py-12 text-center opacity-20">
+              <span className="material-symbols-outlined" style={{ fontSize: '3rem' }}>hotel</span>
+              <p className="mt-4 font-bold">Facility fully occupied</p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-              {[...bedsByRoom.entries()].map(([roomKey, { hostelName, roomNumber, beds: roomBeds }]) => (
-                <div key={roomKey} style={{
-                  display: 'flex', alignItems: 'flex-start', gap: '0.625rem',
-                  padding: '0.6rem 0.875rem', borderRadius: '0.75rem',
-                  background: 'var(--surface-container-high)',
-                }}>
-                  <div style={{
-                    width: '28px', height: '28px', borderRadius: '0.5rem', flexShrink: 0,
-                    background: 'rgba(34,197,94,0.08)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: '0.875rem', color: '#22c55e' }}>hotel</span>
+            <div className="flex flex-col gap-3">
+              {[...bedsByRoom.entries()].slice(0, 10).map(([roomKey, { hostelName, roomNumber, beds: roomBeds }]) => (
+                <div key={roomKey} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5">
+                  <div className="min-w-0">
+                    <div className="font-bold text-on-surface">Room {roomNumber}</div>
+                    <div className="text-[0.7rem] font-bold opacity-40 uppercase tracking-wider mt-1">{hostelName}</div>
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.8125rem' }}>
-                      Room {roomNumber}
-                      <span style={{ opacity: 0.4, fontWeight: 500, fontSize: '0.75rem' }}> · {hostelName}</span>
-                    </div>
-                    <div style={{ fontSize: '0.65rem', opacity: 0.5, fontWeight: 600, marginTop: '0.1rem' }}>
-                      {roomBeds.map(b => `Bed ${b.bed_number}`).join(', ')}
-                    </div>
+                  <div className="flex gap-2">
+                    {roomBeds.map(b => (
+                      <span key={b.id} className="badge-modern" style={{ background: 'var(--surface-container-highest)', color: 'var(--on-surface)', fontSize: '0.6rem' }}>
+                        Bed {b.bed_number}
+                      </span>
+                    ))}
                   </div>
-                  <span style={{
-                    fontSize: '0.55rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase',
-                    color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '0.15rem 0.45rem', borderRadius: '999px',
-                    flexShrink: 0,
-                  }}>
-                    {roomBeds.length} vacant
-                  </span>
                 </div>
               ))}
+              {bedsByRoom.size > 10 && (
+                <Link to="/hostels" className="text-center py-3 text-xs font-bold text-primary hover:underline mt-2">
+                  View all available inventory
+                </Link>
+              )}
             </div>
           )}
         </div>

@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
+import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { useOwner } from "../context/OwnerContext";
 import { useDashboard } from "../hooks/useDashboard";
 import { LoadingScreen } from "./layout/LoadingScreen";
@@ -12,11 +12,10 @@ const Lobby: React.FC = () => {
   const isStaff = userRole !== 'owner';
   const { data, isLoading } = useDashboard();
 
-  // Staff get a focused operational view instead of the owner analytics dashboard
   if (isStaff) return <StaffDashboard />;
 
   if (isLoading && !data) {
-    return <LoadingScreen message="Accessing Secure Vault" />;
+    return <LoadingScreen message="Accessing Executive Dashboard" />;
   }
 
   const stats = data?.stats ?? {
@@ -37,11 +36,11 @@ const Lobby: React.FC = () => {
 
   return (
     <div className="view-container page-fade-in">
-      {/* Editorial Header */}
-      <header className="mb-16 flex flex-col md:flex-row md:items-end justify-between gap-8">
+      {/* Executive Header */}
+      <header className="view-header flex flex-col md:flex-row md:items-end justify-between gap-8">
         <div>
-          <p className="view-eyebrow">Portfolio Intelligence</p>
-          <h1 className="text-on-surface font-headline font-bold text-4xl md:text-6xl tracking-tight leading-tight">
+          <p className="view-eyebrow">Executive Intelligence</p>
+          <h1 className="view-title text-4xl md:text-6xl">
             Performance Overview
           </h1>
         </div>
@@ -52,217 +51,160 @@ const Lobby: React.FC = () => {
               className="primary-button"
               style={{ textDecoration: "none" }}
             >
-              <span
-                className="material-symbols-outlined mr-2"
-                style={{ verticalAlign: "middle", fontSize: "1.25rem" }}
-              >
-                add
-              </span>
-              New Hostel
+              <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle' }}>add</span>
+              New Facility
             </Link>
           </div>
         )}
       </header>
 
       {/* KPI Bento Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
         {/* Occupancy Card */}
-        <div className="glass-panel p-10 rounded-[32px] relative overflow-hidden group transition-all hover:scale-[1.02]">
-          <div className="flex justify-between items-start mb-8">
-            <span className="material-symbols-outlined text-primary-container p-4 bg-primary-container/10 rounded-2xl">
-              door_front
-            </span>
-            <span className="badge-modern bg-primary-container/20 text-primary-container font-bold">
-              +2.4%
-            </span>
+        <div className="modern-card relative overflow-hidden group">
+          <div className="flex justify-between items-start mb-10">
+            <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '1rem', border: '1px solid var(--outline-variant)' }}>
+              <span className="material-symbols-outlined text-on-surface opacity-60">door_front</span>
+            </div>
+            <span className="badge-modern badge-success">Live</span>
           </div>
-          <h3 className="text-on-surface-variant text-sm font-bold uppercase tracking-widest mb-2">
-            Portfolio Occupancy
-          </h3>
+          <h3 className="view-eyebrow text-[0.6rem] mb-2">Portfolio Occupancy</h3>
           <div className="flex items-baseline gap-2">
-            <span className="text-primary font-display font-extrabold text-5xl">
+            <span className="text-on-surface font-display font-black text-5xl">
               {occupancyRate}
             </span>
-            <span className="text-on-surface-variant font-display font-bold text-2xl">
-              %
-            </span>
+            <span className="text-on-surface-variant font-display font-bold text-2xl">%</span>
           </div>
         </div>
 
         {/* Contracted Revenue */}
-        <div className="glass-panel p-10 rounded-[32px] relative overflow-hidden group transition-all hover:scale-[1.02]">
-          <div className="flex justify-between items-start mb-8">
-            <span className="material-symbols-outlined text-secondary p-4 bg-secondary/10 rounded-2xl">
-              contract
-            </span>
-            <span className="badge-modern bg-secondary/20 text-secondary font-bold">
-              Target
-            </span>
+        <div className="modern-card relative overflow-hidden group">
+          <div className="flex justify-between items-start mb-10">
+            <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '1rem', border: '1px solid var(--outline-variant)' }}>
+              <span className="material-symbols-outlined text-on-surface opacity-60">contract</span>
+            </div>
+            <span className="badge-modern" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--on-surface-variant)' }}>Target</span>
           </div>
-          <h3 className="text-on-surface-variant text-sm font-bold uppercase tracking-widest mb-2">
-            Contracted Yield
-          </h3>
+          <h3 className="view-eyebrow text-[0.6rem] mb-2">Contracted Yield</h3>
           <div className="flex items-baseline gap-2">
-            <span className="text-primary font-display font-extrabold text-5xl">
+            <span className="text-on-surface font-display font-black text-5xl">
               {stats.activeLeaseRent}
             </span>
-            <span className="text-on-surface-variant font-display font-bold text-xl">
-              /mo
-            </span>
+            <span className="text-on-surface-variant font-display font-bold text-xl">/mo</span>
           </div>
         </div>
 
         {/* Bed Inventory */}
-        <div className="glass-panel p-10 rounded-[32px] relative overflow-hidden group transition-all hover:scale-[1.02]">
-          <div className="flex justify-between items-start mb-8">
-            <span className="material-symbols-outlined text-primary p-4 bg-primary/10 rounded-2xl">
-              hotel
-            </span>
+        <div className="modern-card relative overflow-hidden group">
+          <div className="flex justify-between items-start mb-10">
+            <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '1rem', border: '1px solid var(--outline-variant)' }}>
+              <span className="material-symbols-outlined text-on-surface opacity-60">hotel</span>
+            </div>
           </div>
-          <h3 className="text-on-surface-variant text-sm font-bold uppercase tracking-widest mb-2">
-            Bed Inventory
-          </h3>
+          <h3 className="view-eyebrow text-[0.6rem] mb-2">Asset Inventory</h3>
           <div className="flex items-baseline gap-2">
-            <span className="text-primary font-display font-extrabold text-5xl">
+            <span className="text-on-surface font-display font-black text-5xl">
               {stats.totalBeds}
             </span>
-            <span className="text-on-surface-variant font-display font-bold text-xl ml-2">
-              Beds
-            </span>
+            <span className="text-on-surface-variant font-display font-bold text-xl ml-2">Units</span>
           </div>
           {stats.vacantBeds > 0 && (
-            <p className="text-on-surface-variant text-xs font-bold opacity-40 mt-2">
-              {stats.vacantBeds} vacant
+            <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-success)', marginTop: '0.75rem' }}>
+              {stats.vacantBeds} units available for lease
             </p>
           )}
         </div>
       </div>
 
-      {/* Primary Data Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 mb-16">
+      {/* Analytics Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-16">
         {/* Revenue Trajectory Chart */}
-        <div className="lg:col-span-3 glass-panel p-10 rounded-[40px]">
+        <div className="lg:col-span-3 modern-card" style={{ padding: '2.5rem' }}>
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-12">
-            <h2 className="text-on-surface font-display font-bold text-2xl">
-              Revenue Trajectory
+            <h2 className="text-on-surface font-display font-bold text-xl tracking-tight">
+              Realized Revenue Trajectory
             </h2>
-            <div className="flex gap-4 md:gap-6 flex-wrap">
+            <div className="flex gap-6 items-center">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-primary"></span>
-                <span className="text-[10px] text-on-surface-variant uppercase tracking-widest font-black">
-                  Realized
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-outline-variant"></span>
-                <span className="text-[10px] text-on-surface-variant uppercase tracking-widest font-black">
-                  Target
-                </span>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--on-surface)' }}></span>
+                <span className="view-eyebrow text-[0.55rem] mb-0">Realized</span>
               </div>
             </div>
           </div>
 
           <div className="h-64 md:h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueChart}>
+              <AreaChart data={revenueChart} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="5%"
-                      stopColor="var(--primary)"
-                      stopOpacity={0.2}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor="var(--primary)"
-                      stopOpacity={0}
-                    />
+                    <stop offset="5%" stopColor="var(--on-surface)" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="var(--on-surface)" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
+                <XAxis 
+                  dataKey="month" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: 'var(--on-surface-variant)', fontSize: 10, fontWeight: 700 }}
+                  dy={15}
+                />
                 <Tooltip
+                  cursor={{ stroke: 'var(--outline-variant)', strokeWidth: 1 }}
                   contentStyle={{
-                    backgroundColor: "var(--surface)",
+                    backgroundColor: "var(--surface-container-highest)",
                     border: "1px solid var(--outline-variant)",
-                    borderRadius: "16px",
-                    backdropFilter: "blur(12px)",
+                    borderRadius: "1rem",
                     boxShadow: "var(--shadow-elevated)",
                     color: "var(--on-surface)",
+                    padding: '1rem',
                   }}
-                  itemStyle={{ color: "var(--primary)", fontWeight: 800 }}
-                  labelStyle={{ color: "var(--on-surface-variant)", fontWeight: 700, marginBottom: '4px' }}
+                  itemStyle={{ color: "var(--on-surface)", fontWeight: 800, fontSize: '1rem' }}
+                  labelStyle={{ color: "var(--on-surface-variant)", fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.05em' }}
                 />
                 <Area
                   type="monotone"
                   dataKey="revenue"
-                  stroke="var(--primary)"
-                  strokeWidth={4}
+                  stroke="var(--on-surface)"
+                  strokeWidth={3}
                   fillOpacity={1}
                   fill="url(#colorRev)"
+                  animationDuration={1500}
                 />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Secondary KPIs */}
+        {/* Actionable Insights */}
         <div className="lg:col-span-2 flex flex-col gap-8">
-          <Link
-            to="/payments"
-            className="modern-card group"
-            style={{
-              textDecoration: "none",
-            }}
-          >
-            <p className="view-eyebrow text-[0.6rem] mb-2 opacity-60">
-              Arrears Management
-            </p>
-            <h4 className="text-on-surface font-bold mb-1">
-              Outstanding Balance
-            </h4>
+          <Link to="/payments" className="modern-card group" style={{ textDecoration: "none" }}>
+            <p className="view-eyebrow text-[0.6rem] mb-2 opacity-60">Arrears Management</p>
+            <h4 className="text-on-surface font-bold mb-1">Outstanding Balance</h4>
             <div className="flex items-baseline gap-3">
-              <span className="text-primary font-display font-black text-4xl">
+              <span className="text-on-surface font-display font-black text-4xl">
                 {stats.overdueAmount}
               </span>
-              <span
-                className="badge-modern bg-error/10 text-error font-bold"
-                style={{ fontSize: "0.55rem" }}
-              >
-                Attention Req.
-              </span>
+              <span className="badge-modern badge-error">Action Required</span>
             </div>
           </Link>
 
-          <Link
-            to="/leases"
-            className="modern-card group"
-            style={{
-              textDecoration: "none",
-            }}
-          >
-            <p className="view-eyebrow text-[0.6rem] mb-2 opacity-60">
-              Contract Cycle
-            </p>
-            <h4 className="text-on-surface font-bold mb-1">
-              Expiring Leases
-            </h4>
+          <Link to="/leases" className="modern-card group" style={{ textDecoration: "none" }}>
+            <p className="view-eyebrow text-[0.6rem] mb-2 opacity-60">Retention Cycle</p>
+            <h4 className="text-on-surface font-bold mb-1">Upcoming Expirations</h4>
             <div className="flex items-baseline gap-3">
-              <span className="text-primary font-display font-black text-4xl">
+              <span className="text-on-surface font-display font-black text-4xl">
                 {stats.leaseExpirations}
               </span>
-              <span className="text-on-surface-variant text-sm font-bold">
-                next 30 days
-              </span>
+              <span className="text-on-surface-variant text-sm font-bold">next 30 days</span>
             </div>
           </Link>
 
-          <div className="mt-auto glass-panel p-8 rounded-[32px] bg-secondary/5 border border-outline-variant">
-            <h3 className="text-secondary text-xs font-bold uppercase tracking-widest mb-4">
-              Portfolio Valuation
-            </h3>
-            <span className="text-on-surface font-display font-extrabold text-3xl mb-1">
+          <div className="mt-auto modern-card" style={{ background: 'linear-gradient(145deg, var(--surface-container-low), var(--surface-container-high))' }}>
+            <h3 className="view-eyebrow text-[0.6rem] mb-4">Portfolio Valuation</h3>
+            <span className="text-on-surface font-display font-black text-3xl mb-1">
               {stats.annualRevenue}
             </span>
-            <p className="text-on-surface-variant text-[10px] font-bold opacity-60">
+            <p style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '0.5rem' }}>
               Trailing 12 Months Realized
             </p>
           </div>
