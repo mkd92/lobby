@@ -44,16 +44,20 @@ export const useDashboard = () => {
 
       const beds = bedsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as { id: string; status: string }[];
       const totalBeds  = beds.length;
-      const vacantBeds = beds.filter(b => b.status === 'Vacant').length;
-
+      
       const allLeases = leasesSnap.docs.map(d => ({ id: d.id, ...d.data() })) as {
         id: string;
+        bed_id: string;
         status: string;
         end_date?: string;
         rent_amount: number;
       }[];
 
       const activeLeases = allLeases.filter(l => l.status === 'Active');
+      const occupiedBedIds = new Set(activeLeases.map(l => l.bed_id));
+      
+      // SOURCE OF TRUTH: Vacant beds are those without an active lease
+      const vacantBeds = beds.filter(b => !occupiedBedIds.has(b.id) && b.status !== 'Maintenance').length;
       const activeLeaseRent = activeLeases.reduce((acc, l) => acc + (Number(l.rent_amount) || 0), 0);
 
       const expiringCount = allLeases.filter(l =>

@@ -73,11 +73,12 @@ const HostelDetail: React.FC = () => {
       if (!id) throw new Error('No hostel id');
       const symbols: { [key: string]: string } = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
 
-      const [hostelSnap, roomsSnap, bedsSnap, ownerSnap] = await Promise.all([
+      const [hostelSnap, roomsSnap, bedsSnap, ownerSnap, activeLeasesSnap] = await Promise.all([
         getDoc(doc(db, 'hostels', id)),
         getDocs(query(collection(db, 'rooms'), where('hostel_id', '==', id), where('owner_id', '==', ownerId))),
         getDocs(query(collection(db, 'beds'), where('hostel_id', '==', id), where('owner_id', '==', ownerId))),
         ownerId ? getDoc(doc(db, 'owners', ownerId)) : Promise.resolve(null),
+        getDocs(query(collection(db, 'leases'), where('hostel_id', '==', id), where('status', '==', 'Active'))),
       ]);
 
       if (!hostelSnap.exists()) {
@@ -86,8 +87,20 @@ const HostelDetail: React.FC = () => {
       }
 
       const hostel = { id: hostelSnap.id, ...hostelSnap.data() } as Hostel;
+      const activeLeases = activeLeasesSnap.docs.map(d => d.data());
+      const occupiedBedIds = new Set(activeLeases.map(l => l.bed_id));
 
-      const allBeds = bedsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as (Bed & { room_id: string })[];
+      const allBeds = bedsSnap.docs.map(d => {
+        const bedData = d.data() as Bed;
+        // SOURCE OF TRUTH REBUILD: Derive status from active leases
+        const isOccupied = occupiedBedIds.has(d.id);
+        return { 
+          id: d.id, 
+          ...bedData, 
+          status: isOccupied ? 'Occupied' : (bedData.status === 'Maintenance' ? 'Maintenance' : 'Vacant'),
+          room_id: (bedData as any).room_id 
+        };
+      }) as (Bed & { room_id: string })[];
       const roomsList = roomsSnap.docs
         .map(d => ({ id: d.id, ...d.data() } as Room & { room_id?: string }))
         .sort((a, b) => String(a.room_number).localeCompare(String(b.room_number), undefined, { numeric: true }));
