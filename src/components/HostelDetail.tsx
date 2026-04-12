@@ -1,25 +1,13 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  doc,
-  getDoc,
-  getDocs,
-  addDoc,
-  updateDoc,
-  collection,
-  query,
-  where,
-  serverTimestamp,
-  writeBatch,
-} from 'firebase/firestore';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { doc, getDoc, updateDoc, serverTimestamp, deleteDoc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoadingScreen } from './layout/LoadingScreen';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import '../styles/HostelDetail.css';
-import '../styles/Leases.css';
 
 interface Bed {
   id: string;
@@ -44,11 +32,11 @@ interface Hostel {
 const HostelDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { showAlert, DialogMount } = useDialog();
   const { ownerId, userRole } = useOwner();
   const canCreate = userRole !== 'viewer';
   const isOwner = userRole === 'owner';
   const queryClient = useQueryClient();
+  const { showAlert, showConfirm, DialogMount } = useDialog();
 
   const [hostelForm, setHostelForm] = useState({ name: '', address: '' });
   const [savingHostel, setSavingHostel] = useState(false);
@@ -73,12 +61,12 @@ const HostelDetail: React.FC = () => {
       if (!id) throw new Error('No hostel id');
       const symbols: { [key: string]: string } = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
 
-      const [hostelSnap, roomsSnap, bedsSnap, ownerSnap, activeLeasesSnap] = await Promise.all([
+      const [hostelSnap, allRoomsSnap, allBedsSnap, ownerSnap, allLeasesSnap] = await Promise.all([
         getDoc(doc(db, 'hostels', id)),
-        getDocs(query(collection(db, 'rooms'), where('hostel_id', '==', id), where('owner_id', '==', ownerId))),
-        getDocs(query(collection(db, 'beds'), where('hostel_id', '==', id), where('owner_id', '==', ownerId))),
+        getDocs(query(collection(db, 'rooms'), where('owner_id', '==', ownerId))),
+        getDocs(query(collection(db, 'beds'), where('owner_id', '==', ownerId))),
         ownerId ? getDoc(doc(db, 'owners', ownerId)) : Promise.resolve(null),
-        getDocs(query(collection(db, 'leases'), where('hostel_id', '==', id), where('status', '==', 'Active'))),
+        getDocs(query(collection(db, 'leases'), where('owner_id', '==', ownerId))),
       ]);
 
       if (!hostelSnap.exists()) {
@@ -87,26 +75,36 @@ const HostelDetail: React.FC = () => {
       }
 
       const hostel = { id: hostelSnap.id, ...hostelSnap.data() } as Hostel;
-      const activeLeases = activeLeasesSnap.docs.map(d => d.data());
+      
+      const allLeases = allLeasesSnap.docs.map(d => d.data());
+      const activeLeases = allLeases.filter(l => l.hostel_id === id && l.status === 'Active');
       const occupiedBedIds = new Set(activeLeases.map(l => l.bed_id));
 
-      const allBeds = bedsSnap.docs.map(d => {
-        const bedData = d.data() as Bed;
+      const hostelBedsRaw = allBedsSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(b => (b as any).hostel_id === id);
+
+      const allBeds = hostelBedsRaw.map(bedData => {
         // SOURCE OF TRUTH REBUILD: Derive status from active leases
-        const isOccupied = occupiedBedIds.has(d.id);
+        const isOccupied = occupiedBedIds.has(bedData.id);
         return { 
-          id: d.id, 
-          ...bedData, 
+          id: bedData.id,
+          bed_number: bedData.bed_number,
+          price: bedData.price,
           status: isOccupied ? 'Occupied' : (bedData.status === 'Maintenance' ? 'Maintenance' : 'Vacant'),
           room_id: (bedData as any).room_id 
-        };
-      }) as (Bed & { room_id: string })[];
-      const roomsList = roomsSnap.docs
-        .map(d => ({ id: d.id, ...d.data() } as Room & { room_id?: string }))
+        } as Bed & { room_id: string };
+      });
+
+      const roomsList = allRoomsSnap.docs
+        .map(d => ({ id: d.id, ...d.data() } as any))
+        .filter(r => r.hostel_id === id)
         .sort((a, b) => String(a.room_number).localeCompare(String(b.room_number), undefined, { numeric: true }));
 
       const rooms: Room[] = roomsList.map(r => ({
-        ...r,
+        id: r.id,
+        room_number: r.room_number,
+        floor: r.floor,
         beds: allBeds.filter(b => b.room_id === r.id),
       }));
 
@@ -131,7 +129,7 @@ const HostelDetail: React.FC = () => {
     if (!data) return [];
     return data.rooms.filter(room => {
       if (vacancyFilter === 'Vacant') return room.beds.some(b => b.status === 'Vacant');
-      if (vacancyFilter === 'Full') return room.beds.every(b => b.status === 'Occupied');
+      if (vacancyFilter === 'Full') return room.beds.length > 0 && room.beds.every(b => b.status === 'Occupied');
       return true;
     });
   }, [data, vacancyFilter]);
@@ -149,66 +147,15 @@ const HostelDetail: React.FC = () => {
     if (!isOwner || !id) return;
     setSavingHostel(true);
     try {
-      // 1. Update the hostel document itself first
       await updateDoc(doc(db, 'hostels', id), {
         ...hostelForm,
         updated_at: serverTimestamp(),
       });
-
-      // 2. Attempt cascading updates in the background or separately
-      // We use simple queries to avoid manual index requirements
-      try {
-        const [leaseSnap, paymentSnap, invoiceSnap] = await Promise.all([
-          getDocs(query(collection(db, 'leases'), where('hostel_id', '==', id))),
-          getDocs(query(collection(db, 'payments'), where('hostel_id', '==', id))),
-          getDocs(query(collection(db, 'invoices'), where('hostel_id', '==', id))),
-        ]);
-
-        if (!leaseSnap.empty || !paymentSnap.empty || !invoiceSnap.empty) {
-          let batch = writeBatch(db);
-          let opCount = 0;
-
-          const addOp = async () => {
-            opCount++;
-            if (opCount >= 450) {
-              await batch.commit();
-              batch = writeBatch(db);
-              opCount = 0;
-            }
-          };
-
-          for (const d of leaseSnap.docs) {
-            batch.update(d.ref, { hostel_name: hostelForm.name });
-            await addOp();
-          }
-          for (const d of paymentSnap.docs) {
-            batch.update(d.ref, { hostel_name: hostelForm.name });
-            await addOp();
-          }
-          for (const d of invoiceSnap.docs) {
-            batch.update(d.ref, { hostel_name: hostelForm.name });
-            await addOp();
-          }
-
-          if (opCount > 0) {
-            await batch.commit();
-          }
-        }
-      } catch (cascadeErr) {
-        console.warn('Cascading name change failed (non-critical):', cascadeErr);
-        // We don't alert here because the primary hostel name was updated successfully
-      }
-
       queryClient.invalidateQueries({ queryKey: ['hostel', id, ownerId] });
       queryClient.invalidateQueries({ queryKey: ['hostels', ownerId] });
-      queryClient.invalidateQueries({ queryKey: ['leases', ownerId] });
-      queryClient.invalidateQueries({ queryKey: ['payments', ownerId] });
-      queryClient.invalidateQueries({ queryKey: ['invoices', ownerId] });
-      
-      showAlert('Facility profile synchronized successfully.');
+      showAlert('Facility registry updated.');
     } catch (err) {
-      console.error('Hostel update failure:', err);
-      showAlert(`Update failed: ${(err as Error).message}`);
+      showAlert((err as Error).message);
     } finally {
       setSavingHostel(false);
     }
@@ -216,7 +163,7 @@ const HostelDetail: React.FC = () => {
 
   const handleAddRoom = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canCreate) return;
+    if (!isOwner || !id) return;
     try {
       await addDoc(collection(db, 'rooms'), {
         ...newRoom,
@@ -224,23 +171,25 @@ const HostelDetail: React.FC = () => {
         owner_id: ownerId,
         created_at: serverTimestamp(),
       });
-      setNewRoom({ room_number: '', floor: 0 });
       queryClient.invalidateQueries({ queryKey: ['hostel', id, ownerId] });
+      setNewRoom({ room_number: '', floor: 0 });
       setIsAddRoomModalOpen(false);
     } catch (err) {
       showAlert((err as Error).message);
     }
   };
 
-  const handleAddBeds = async (e: React.FormEvent) => {
+  const handleAddBed = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRoomId || !canCreate) return;
+    if (!isOwner || !id || !selectedRoomId) return;
     try {
-      const batch = writeBatch(db);
       for (let i = 0; i < newBed.count; i++) {
-        const bedRef = doc(collection(db, 'beds'));
-        batch.set(bedRef, {
-          bed_number: `Bed ${i + 1}`,
+        const room = data?.rooms.find(r => r.id === selectedRoomId);
+        const nextNum = (room?.beds.length || 0) + i + 1;
+        const bed_number = `${room?.room_number || ''}${String.fromCharCode(64 + nextNum)}`;
+        
+        await addDoc(collection(db, 'beds'), {
+          bed_number,
           price: newBed.price,
           status: 'Vacant',
           room_id: selectedRoomId,
@@ -249,8 +198,6 @@ const HostelDetail: React.FC = () => {
           created_at: serverTimestamp(),
         });
       }
-      await batch.commit();
-      setSelectedRoomId(null);
       queryClient.invalidateQueries({ queryKey: ['hostel', id, ownerId] });
       setIsAddBedModalOpen(false);
     } catch (err) {
@@ -259,27 +206,24 @@ const HostelDetail: React.FC = () => {
   };
 
   if (isLoading) return <LoadingScreen message="Accessing Facility Vault" />;
-  
   if (isError) {
     return (
-      <div className="view-container">
-        <div className="glass-panel p-10 rounded-[40px] text-center">
-          <span className="material-symbols-outlined text-6xl text-error mb-4">error</span>
-          <h2 className="text-2xl font-bold text-white mb-2">Vault Access Failure</h2>
-          <p className="text-secondary/60 mb-8">{error instanceof Error ? error.message : 'An unexpected security or network error occurred.'}</p>
-          <button className="primary-button" onClick={() => navigate('/hostels')}>Return to Registry</button>
+      <div className="view-container flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="modern-card p-12 text-center max-w-lg">
+          <span className="material-symbols-outlined text-error text-5xl mb-6">error_outline</span>
+          <h2 className="text-2xl font-bold mb-4">Vault Access Failure</h2>
+          <p className="text-on-surface-variant mb-8">{(error as any)?.message || 'Missing or insufficient permissions.'}</p>
+          <button onClick={() => navigate('/hostels')} className="primary-button w-full">Return to Registry</button>
         </div>
       </div>
     );
   }
-
   if (!data) return null;
 
   return (
     <div className="view-container page-fade-in">
       {DialogMount}
       
-      {/* Editorial Header */}
       <header className="view-header flex flex-col md:flex-row md:items-end justify-between gap-8">
         <div>
           <div className="view-eyebrow flex items-center gap-2 cursor-pointer group" onClick={() => navigate('/hostels')}>
@@ -287,79 +231,50 @@ const HostelDetail: React.FC = () => {
             Facility Registry
           </div>
           <h1 className="text-white font-display font-black text-4xl md:text-6xl tracking-tighter leading-none mt-2">
-            Facility Detail
+            Facility Profile
           </h1>
-          <p className="text-secondary/60 font-medium mt-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-[1rem]">location_on</span>
-            {data.hostel.address}
-          </p>
         </div>
         {canCreate && (
-          <button className="primary-button min-w-[200px]" onClick={() => setIsAddRoomModalOpen(true)}>
-            <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle', fontSize: '1.25rem' }}>add_circle</span>
-            Add Room
+          <button onClick={() => setIsAddRoomModalOpen(true)} className="primary-button">
+            <span className="material-symbols-outlined mr-2">add_home</span>
+            Add Room Configuration
           </button>
         )}
       </header>
 
-      {/* Metrics Bar */}
-      <div className="properties-metrics-bar custom-scrollbar">
-        <div className="prop-metric">
-          <span className="prop-metric-label">Room Inventory</span>
-          <span className="prop-metric-value">{stats.totalRooms}</span>
-        </div>
-        <div className="prop-metric">
-          <span className="prop-metric-label">Bed Capacity</span>
-          <span className="prop-metric-value">{stats.totalBeds}</span>
-        </div>
-        <div className="prop-metric">
-          <span className="prop-metric-label">Occupancy Rate</span>
-          <span className="prop-metric-value" style={{ color: 'var(--primary)' }}>
-            {stats.totalBeds > 0 ? Math.round(((stats.totalBeds - stats.vacantBeds) / stats.totalBeds) * 100) : 0}%
-          </span>
-        </div>
-        <div className="prop-metric">
-          <span className="prop-metric-label">Available Beds</span>
-          <span className="prop-metric-value" style={{ color: 'var(--color-success)' }}>{stats.vacantBeds}</span>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-        {/* Left Column: Facility Intelligence (4 cols) */}
         <div className="lg:col-span-4 flex flex-col gap-8">
-          <div className="glass-panel p-10 rounded-[40px] relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-8 opacity-5">
-              <span className="material-symbols-outlined text-[120px]">hotel</span>
-            </div>
-            
-            <h2 className="view-eyebrow text-[0.625rem] opacity-40 mb-8">Facility Profile</h2>
-            <form onSubmit={handleHostelSubmit} className="flex flex-col gap-8">
+          <div className="glass-panel p-10 rounded-[40px]">
+            <div className="view-eyebrow mb-10">Registry Parameters</div>
+            <form onSubmit={handleHostelSubmit} className="flex flex-col gap-6">
               <div className="form-group-modern">
-                <label className="text-[0.6rem] uppercase tracking-[0.2em] font-black text-secondary/40 block mb-2">Legal Facility Name</label>
+                <label>Facility Designation</label>
                 <input 
                   type="text" 
                   value={hostelForm.name} 
-                  onChange={e => setHostelForm({...hostelForm, name: e.target.value})}
-                  className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-xl p-3 font-display font-bold text-lg text-white"
-                  required
+                  onChange={e => setHostelForm({...hostelForm, name: e.target.value})} 
+                  placeholder="Official Name"
+                  required 
                   disabled={!isOwner}
                 />
               </div>
               <div className="form-group-modern">
-                <label className="text-[0.6rem] uppercase tracking-[0.2em] font-black text-secondary/40 block mb-2">Operating Address</label>
-                <input 
-                  type="text" 
+                <label>Geographic Identification</label>
+                <textarea 
                   value={hostelForm.address} 
-                  onChange={e => setHostelForm({...hostelForm, address: e.target.value})}
-                  className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-xl p-3 font-medium text-white/80"
-                  required
+                  onChange={e => setHostelForm({...hostelForm, address: e.target.value})} 
+                  placeholder="Complete Registry Address"
+                  required 
                   disabled={!isOwner}
+                  style={{ minHeight: '100px' }}
                 />
               </div>
               {isOwner && (
-                <button type="submit" className="primary-button text-[0.7rem] py-3" disabled={savingHostel}>
-                  {savingHostel ? 'Syncing...' : 'Update Facility'}
-                </button>
+                <div className="pt-4 border-t border-white/5">
+                  <button type="submit" className="primary-button w-full" disabled={savingHostel}>
+                    {savingHostel ? 'Synchronizing...' : 'Finalize Profile'}
+                  </button>
+                </div>
               )}
             </form>
           </div>
@@ -383,7 +298,6 @@ const HostelDetail: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column: Room Registry (8 cols) */}
         <div className="lg:col-span-8">
           <div className="view-toolbar mb-8">
             <div className="filter-tabs-modern">
@@ -443,7 +357,6 @@ const HostelDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* Redesigned Modals */}
       {isAddRoomModalOpen && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setIsAddRoomModalOpen(false)}>
           <div className="modal-content-modern" style={{ maxWidth: '560px' }}>
@@ -475,9 +388,9 @@ const HostelDetail: React.FC = () => {
                   />
                 </div>
               </div>
-              <footer className="flex flex-wrap justify-center sm:justify-end items-center gap-4 sm:gap-8 mt-8 pt-6 border-t border-white/5">
-                <button type="button" className="primary-button glass-panel w-full sm:w-auto" onClick={() => setIsAddRoomModalOpen(false)} style={{ background: 'rgba(255,255,255,0.05)' }}>Discard</button>
-                <button type="submit" className="primary-button w-full sm:w-auto sm:min-w-[200px]">Finalize Room</button>
+              <footer className="modal-footer-modern">
+                <button type="button" className="text-secondary/40 font-bold uppercase tracking-widest text-xs px-6" onClick={() => setIsAddRoomModalOpen(false)}>Discard</button>
+                <button type="submit" className="primary-button px-10">Register Room</button>
               </footer>
             </form>
           </div>
@@ -488,17 +401,17 @@ const HostelDetail: React.FC = () => {
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setIsAddBedModalOpen(false)}>
           <div className="modal-content-modern" style={{ maxWidth: '560px' }}>
             <header className="modal-header-modern">
-              <h2 className="modal-title">Allocate Beds</h2>
-              <p className="modal-subtitle">Define quantity and yield for the room inventory</p>
+              <h2 className="modal-title">Allocate Inventory</h2>
+              <p className="modal-subtitle">Register new sleeping units for this configuration</p>
             </header>
-            <form onSubmit={handleAddBeds} className="modal-form-modern">
+            <form onSubmit={handleAddBed} className="modal-form-modern">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="form-group-modern">
-                  <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Quantity of Units</label>
+                  <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Bed Count</label>
                   <input 
                     type="number" 
-                    min="1" 
-                    max="10" 
+                    min="1"
+                    max="10"
                     value={newBed.count} 
                     onChange={e => setNewBed({...newBed, count: parseInt(e.target.value)})} 
                     className="auth-input w-full bg-surface-container-low focus:bg-surface-container-high transition-all border-none rounded-2xl p-5 font-display font-bold text-xl"
@@ -506,7 +419,7 @@ const HostelDetail: React.FC = () => {
                   />
                 </div>
                 <div className="form-group-modern">
-                  <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Base Price per Bed ({data.currencySymbol})</label>
+                  <label className="text-[0.65rem] uppercase tracking-[0.15em] font-black text-secondary/40 block mb-3">Unit Price ({data.currencySymbol})</label>
                   <input 
                     type="number" 
                     value={newBed.price} 
@@ -516,9 +429,9 @@ const HostelDetail: React.FC = () => {
                   />
                 </div>
               </div>
-              <footer className="flex flex-wrap justify-center sm:justify-end items-center gap-4 sm:gap-8 mt-8 pt-6 border-t border-white/5">
-                <button type="button" className="primary-button glass-panel w-full sm:w-auto" onClick={() => setIsAddBedModalOpen(false)} style={{ background: 'rgba(255,255,255,0.05)' }}>Discard</button>
-                <button type="submit" className="primary-button w-full sm:w-auto sm:min-w-[200px]">Sync Inventory</button>
+              <footer className="modal-footer-modern">
+                <button type="button" className="text-secondary/40 font-bold uppercase tracking-widest text-xs px-6" onClick={() => setIsAddBedModalOpen(false)}>Discard</button>
+                <button type="submit" className="primary-button px-10">Initialize Units</button>
               </footer>
             </form>
           </div>
