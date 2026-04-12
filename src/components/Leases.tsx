@@ -245,92 +245,68 @@ const Leases: React.FC = () => {
             {filter === 'All' && canCreate && <button className="primary-button" onClick={() => navigate('/leases/new')}>Initialize First Agreement</button>}
           </div>
         ) : (
-          <>
-            {/* Desktop View */}
-            <div className="modern-table-wrap desktop-only" style={{ borderRadius: '1.5rem' }}>
-              <table className="modern-table">
-                <thead>
-                  <tr>
-                    <th>Tenant Entity</th>
-                    <th>Facility</th>
-                    <th>Inventory</th>
-                    <th>Monthly Yield</th>
-                    <th>Status</th>
-                    <th style={{ textAlign: 'right' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(lease => (
-                    <tr key={lease.id} onClick={() => navigate(`/leases/${lease.id}`)} style={{ cursor: 'pointer' }}>
-                      <td>
-                        <div className="flex items-center gap-4">
-                          <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'var(--surface-container-highest)', color: 'var(--on-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800 }}>
-                            {initials(lease.tenant_name)}
+          <div className="modern-table-wrap" style={{ borderRadius: '1.5rem' }}>
+            <table className="modern-table responsive-leases-table">
+              <thead>
+                <tr>
+                  <th className="col-tenant">Tenant Entity</th>
+                  <th className="col-facility">Facility</th>
+                  <th className="col-inventory">Inventory</th>
+                  <th className="col-yield">Monthly Yield</th>
+                  <th className="col-status">Status</th>
+                  <th className="col-actions" style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(lease => (
+                  <tr key={lease.id} onClick={() => navigate(`/leases/${lease.id}`)} style={{ cursor: 'pointer' }}>
+                    <td className="col-tenant">
+                      <div className="flex items-center gap-4">
+                        <div className="lease-avatar">
+                          {initials(lease.tenant_name)}
+                        </div>
+                        <div className="lease-info">
+                          <span className="lease-name">{lease.tenant_name}</span>
+                          <div className="lease-mobile-meta">
+                            <span className="mobile-meta-item">{lease.hostel_name || 'Shared Facility'}</span>
+                            <span className="mobile-meta-item">Rm {lease.room_number} · Bed {lease.bed_number}</span>
                           </div>
-                          <span style={{ fontWeight: 700 }}>{lease.tenant_name}</span>
                         </div>
-                      </td>
-                      <td>
-                        <div className="view-eyebrow" style={{ fontSize: '0.55rem', marginBottom: '0.25rem', opacity: 0.5 }}>Shared</div>
-                        <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{lease.hostel_name || '—'}</span>
-                      </td>
-                      <td>
-                        <span style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '0.875rem' }}>
-                          Rm {lease.room_number} · Bed {lease.bed_number}
-                        </span>
-                      </td>
-                      <td>
-                        <div style={{ fontWeight: 800 }}>{currencySymbol}{lease.rent_amount.toLocaleString()}</div>
-                        <div style={{ fontSize: '0.65rem', opacity: 0.4, fontWeight: 700 }}>{fmt(lease.start_date)}</div>
-                      </td>
-                      <td>
-                        <span className={`badge-modern ${lease.status === 'Active' ? 'badge-success' : lease.status === 'Expired' ? 'badge-warning' : 'badge-error'}`}>
-                          {lease.status}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
-                          {isOwner && (
-                            <button className="btn-icon danger" onClick={(e) => { e.stopPropagation(); handleDelete(lease); }}>
-                              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span>
-                            </button>
-                          )}
-                          <span className="material-symbols-outlined opacity-20" style={{ marginLeft: '0.5rem' }}>arrow_forward_ios</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile View */}
-            <div className="mobile-only flex flex-col gap-4">
-              {filtered.map(lease => (
-                <div key={lease.id} className="modern-card" style={{ padding: '1.5rem' }} onClick={() => navigate(`/leases/${lease.id}`)}>
-                  <div className="flex justify-between items-start mb-6">
-                    <div className="flex gap-4 items-center">
-                      <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'var(--surface-container-highest)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>hotel</span>
                       </div>
-                      <div>
-                        <h3 style={{ fontSize: '1rem', fontWeight: 800 }}>{lease.tenant_name}</h3>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)' }}>Bed {lease.bed_number}</div>
+                    </td>
+                    <td className="col-facility">
+                      <div className="view-eyebrow" style={{ fontSize: '0.55rem', marginBottom: '0.25rem', opacity: 0.5 }}>Shared</div>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{lease.hostel_name || '—'}</span>
+                    </td>
+                    <td className="col-inventory">
+                      <span style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '0.875rem' }}>
+                        Rm {lease.room_number} · Bed {lease.bed_number}
+                      </span>
+                    </td>
+                    <td className="col-yield">
+                      <div style={{ fontWeight: 800 }}>{currencySymbol}{lease.rent_amount.toLocaleString()}</div>
+                      <div style={{ fontSize: '0.65rem', opacity: 0.4, fontWeight: 700 }}>{fmt(lease.start_date)}</div>
+                    </td>
+                    <td className="col-status">
+                      <span className={`badge-modern ${lease.status === 'Active' ? 'badge-success' : lease.status === 'Expired' ? 'badge-warning' : 'badge-error'}`}>
+                        {lease.status}
+                      </span>
+                    </td>
+                    <td className="col-actions" style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                        {isOwner && (
+                          <button className="btn-icon danger" onClick={(e) => { e.stopPropagation(); handleDelete(lease); }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span>
+                          </button>
+                        )}
+                        <span className="material-symbols-outlined opacity-20" style={{ marginLeft: '0.5rem' }}>arrow_forward_ios</span>
                       </div>
-                    </div>
-                    <span className={`badge-modern ${lease.status === 'Active' ? 'badge-success' : 'badge-warning'}`}>{lease.status}</span>
-                  </div>
-                  <div className="flex justify-between items-end border-t border-white/5 pt-4">
-                    <div>
-                      <div className="view-eyebrow" style={{ fontSize: '0.55rem', marginBottom: '0.25rem' }}>Yield</div>
-                      <div style={{ fontWeight: 900, fontSize: '1.125rem' }}>{currencySymbol}{lease.rent_amount.toLocaleString()}</div>
-                    </div>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--secondary)' }}>Manage Agreement</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
