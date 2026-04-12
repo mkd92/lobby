@@ -214,15 +214,18 @@
   flex: 1;
   padding: 3rem 4rem;
   margin-left: 280px;
+  width: calc(100vw - 280px);
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
 }
 
 .main-content.sidebar-collapsed {
   margin-left: 88px;
+  width: calc(100vw - 88px);
 }
 
 @media (max-width: 768px) {

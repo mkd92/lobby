@@ -12,7 +12,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 // ── Types ──────────────────────────────────────────────────────────────
 interface Tenant { id: string; full_name: string; email: string; phone: string; }
 interface Hostel { id: string; name: string; }
-interface Room   { id: string; room_number: string; }
+interface Room   { id: string; room_number: string; hostel_id: string; }
 interface Bed    { id: string; bed_number: string; price: number; status: string; room_id: string; hostel_id: string; }
 
 const EMPTY_FORM = {
@@ -70,42 +70,37 @@ const AddLease: React.FC = () => {
     enabled: !!ownerId,
   });
 
-  const { data: allRooms = [] } = useQuery({
-    queryKey: ['rooms', form.unit_id],
+  // Fetch all inventory for the owner and filter client-side to avoid index issues
+  const { data: allRooms = [], isLoading: roomsLoading } = useQuery({
+    queryKey: ['all-rooms', ownerId],
     queryFn: async () => {
-      const snap = await getDocs(query(collection(db, 'rooms'), where('hostel_id', '==', form.unit_id)));
+      const snap = await getDocs(query(collection(db, 'rooms'), where('owner_id', '==', ownerId)));
       return snap.docs.map(d => ({ id: d.id, ...d.data() } as Room));
     },
-    enabled: !!form.unit_id,
+    enabled: !!ownerId,
   });
 
-  const { data: vacantRoomIds = [] } = useQuery({
-    queryKey: ['vacant-room-ids', form.unit_id],
+  const { data: allBeds = [], isLoading: bedsLoading } = useQuery({
+    queryKey: ['all-beds', ownerId],
     queryFn: async () => {
-      const snap = await getDocs(query(
-        collection(db, 'beds'),
-        where('hostel_id', '==', form.unit_id),
-        where('status', '==', 'Vacant'),
-      ));
-      return [...new Set(snap.docs.map(d => d.data().room_id as string))];
-    },
-    enabled: !!form.unit_id,
-  });
-
-  const rooms = allRooms.filter(r => vacantRoomIds.includes(r.id));
-
-  const { data: beds = [] } = useQuery({
-    queryKey: ['beds-vacant', roomId],
-    queryFn: async () => {
-      const snap = await getDocs(query(
-        collection(db, 'beds'),
-        where('room_id', '==', roomId),
-        where('status', '==', 'Vacant'),
-      ));
+      const snap = await getDocs(query(collection(db, 'beds'), where('owner_id', '==', ownerId)));
       return snap.docs.map(d => ({ id: d.id, ...d.data() } as Bed));
     },
-    enabled: !!roomId,
+    enabled: !!ownerId,
   });
+
+  // Derived filtered state
+  const rooms = React.useMemo(() => {
+    if (!form.unit_id) return [];
+    const hostelBeds = allBeds.filter(b => b.hostel_id === form.unit_id && b.status === 'Vacant');
+    const vacantRoomIds = [...new Set(hostelBeds.map(b => b.room_id))];
+    return allRooms.filter(r => r.hostel_id === form.unit_id && vacantRoomIds.includes(r.id));
+  }, [allRooms, allBeds, form.unit_id]);
+
+  const beds = React.useMemo(() => {
+    if (!roomId) return [];
+    return allBeds.filter(b => b.room_id === roomId && b.status === 'Vacant');
+  }, [allBeds, roomId]);
 
   // ── Submit ───────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
@@ -269,10 +264,12 @@ const AddLease: React.FC = () => {
               <select
                 required
                 value={roomId}
-                disabled={!form.unit_id}
+                disabled={!form.unit_id || roomsLoading || bedsLoading}
                 onChange={e => { setRoomId(e.target.value); set('bed_id', ''); }}
               >
-                <option value="">{form.unit_id ? '— choose room —' : 'Select facility'}</option>
+                <option value="">
+                  {roomsLoading || bedsLoading ? 'Loading available inventory...' : (form.unit_id ? '— choose room —' : 'Select facility')}
+                </option>
                 {rooms.map(r => <option key={r.id} value={r.id}>Room {r.room_number}</option>)}
               </select>
             </div>
@@ -288,7 +285,9 @@ const AddLease: React.FC = () => {
                   if (b?.price) set('rent_amount', String(b.price));
                 }}
               >
-                <option value="">{roomId ? '— choose bed —' : 'Select room'}</option>
+                <option value="">
+                  {roomId ? '— choose bed —' : 'Select room'}
+                </option>
                 {beds.map(b => (
                   <option key={b.id} value={b.id}>
                     Bed {b.bed_number}{b.price ? ` — ${sym}${b.price.toLocaleString()}` : ''}

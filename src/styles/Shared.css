@@ -90,9 +90,12 @@ h1, .view-title {
 
 /* ── Global Table Polishes ── */
 .modern-table-wrap {
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
   border: 1px solid var(--outline-variant);
   background: var(--surface-container-lowest);
+  -webkit-overflow-scrolling: touch;
 }
 
 .modern-table {

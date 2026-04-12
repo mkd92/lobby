@@ -4,6 +4,78 @@
   max-width: 1300px;
 }
 
+/* ── Responsive Table ── */
+.responsive-payments-table {
+  min-width: 100%;
+}
+
+.mobile-period-value {
+  display: none;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.mobile-period {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+}
+
+.mobile-pending-tag {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--error);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  background: rgba(239, 68, 68, 0.08);
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.25rem;
+}
+
+.mobile-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--primary);
+  margin-top: 0.15rem;
+}
+
+@media (max-width: 1280px) {
+  .responsive-payments-table th, 
+  .responsive-payments-table td {
+    padding: 1.25rem 1rem;
+  }
+}
+
+/* Mid-size screen: Hide secondary info to keep table readable */
+@media (max-width: 1200px) {
+  .col-period { display: none; }
+  
+  /* Show period/value inside payee column on smaller screens */
+  .mobile-period-value { display: flex; }
+  .col-value { display: none; }
+}
+
+@media (max-width: 1000px) {
+  .col-inventory { display: none; }
+  .col-status { display: none; }
+  
+  .payee-name {
+    font-size: 0.875rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .col-check { display: none; }
+  
+  .responsive-payments-table td {
+    padding: 1rem 0.75rem;
+  }
+}
+
 /* ── Search ── */
 .payments-search-wrap {
   position: relative;
@@ -162,20 +234,8 @@
 
 /* ── Mobile Payment Cards ── */
 .payment-cards-list {
-  flex-direction: column;
-  gap: 0.875rem;
+  display: none; /* Old cards replaced by responsive table */
 }
-
-/* ── Desktop / Mobile visibility ── */
-.payments-desktop-table {
-  display: block;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  /* override leases-table-wrap overflow:hidden */
-  overflow: auto;
-}
-
-.payments-mobile-cards { display: none; }
 
 .payment-mobile-card {
   background: var(--surface-container-lowest);
@@ -264,12 +324,6 @@
 }
 
 /* ── Responsive ── */
-@media (max-width: 1024px) {
-  .payments-desktop-table { display: none; }
-  .payments-mobile-cards  { display: flex; }
-  .payment-cards-list     { display: flex; }
-}
-
 @media (max-width: 768px) {
   .payments-search-input {
     font-size: 1rem; /* prevents iOS zoom */

@@ -36,7 +36,7 @@ interface Payment {
   status: 'Paid' | 'Partial' | 'Pending';
 }
 
-type FilterTab = 'All' | 'Paid' | 'Partial' | 'Pending';
+type FilterTab = 'All' | 'Outstanding' | 'Paid' | 'Partial' | 'Pending';
 type SortOption = 'date_desc' | 'date_asc' | 'name_asc' | 'name_desc' | 'amount_desc' | 'amount_asc' | 'unit_asc';
 type MetricPeriod = 'month' | 'quarter' | 'all';
 
@@ -377,7 +377,11 @@ const Payments: React.FC = () => {
 
   // ── Filtered / Sorted Data ──────────────────────────────────────────
   const filtered = useMemo(() => {
-    let list = payments.filter(p => filter === 'All' || p.status === filter);
+    let list = payments.filter(p => {
+      if (filter === 'All') return true;
+      if (filter === 'Outstanding') return p.status === 'Pending' || p.status === 'Partial';
+      return p.status === filter;
+    });
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(p => 
@@ -510,7 +514,7 @@ const Payments: React.FC = () => {
         </div>
 
         <div className="filter-tabs-modern" style={{ margin: 0 }}>
-          {(['All', 'Paid', 'Partial', 'Pending'] as FilterTab[]).map(tab => (
+          {(['All', 'Outstanding', 'Paid', 'Partial', 'Pending'] as FilterTab[]).map(tab => (
             <button key={tab} className={`tab-btn ${filter === tab ? 'active' : ''}`} onClick={() => setFilter(tab)}>
               {tab}
               {filter === tab && <div className="tab-indicator" />}
@@ -553,112 +557,99 @@ const Payments: React.FC = () => {
             <p className="text-on-surface-variant max-w-md mx-auto">No transaction records match your current view filters.</p>
           </div>
         ) : (
-          <>
-            {/* Desktop View */}
-            <div className="modern-table-wrap desktop-only" style={{ borderRadius: '1.5rem' }}>
-              <table className="modern-table">
-                <thead>
-                  <tr>
-                    {canWrite && <th style={{ width: '3rem' }}></th>}
-                    <th>Payee Entity</th>
-                    <th>Asset Inventory</th>
-                    <th>Service Period</th>
-                    <th>Settlement Value</th>
-                    <th>Status</th>
-                    <th style={{ textAlign: 'right' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(p => {
-                    const isHostel  = !!p.bed_number;
-                    const overdue   = isOverdue(p);
-                    const months    = overdue ? monthsOverdue(p.month_for) : 0;
-                    const isChecked = selectedIds.has(p.id);
-                    return (
-                      <tr key={p.id} onClick={() => setSelectedId(p.id)} style={{ cursor: 'pointer', opacity: isChecked ? 0.7 : 1 }}>
-                        {canWrite && (
-                          <td onClick={e => toggleSelect(e, p.id)}>
-                            <div style={{ width: '1.125rem', height: '1.125rem', borderRadius: '0.375rem', border: `2px solid ${isChecked ? 'var(--primary)' : 'var(--outline-variant)'}`, background: isChecked ? 'var(--primary)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              {isChecked && <span className="material-symbols-outlined" style={{ fontSize: '0.75rem', color: 'var(--on-primary)', fontWeight: 900 }}>check</span>}
-                            </div>
-                          </td>
-                        )}
-                        <td>
-                          <span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{p.tenant_name}</span>
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                            <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{p.property_name || p.hostel_name || 'Facility'}</span>
-                            <span style={{ fontSize: '0.75rem', opacity: 0.5, fontWeight: 600 }}>
-                              {isHostel 
-                                ? (p.room_number ? `Rm ${p.room_number} · Bed ${p.bed_number || '?'}` : (p.bed_number ? `Bed ${p.bed_number}` : 'No unit assigned'))
-                                : `Unit ${p.unit_number || '—'}`}
-                            </span>
+          <div className="modern-table-wrap" style={{ borderRadius: '1.5rem' }}>
+            <table className="modern-table responsive-payments-table">
+              <thead>
+                <tr>
+                  {canWrite && <th className="col-check" style={{ width: '3rem' }}></th>}
+                  <th className="col-payee">Payee Entity</th>
+                  <th className="col-inventory">Asset Inventory</th>
+                  <th className="col-period">Service Period</th>
+                  <th className="col-value">Settlement Value</th>
+                  <th className="col-status">Status</th>
+                  <th className="col-actions" style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(p => {
+                  const isHostel  = !!p.bed_number;
+                  const overdue   = isOverdue(p);
+                  const months    = overdue ? monthsOverdue(p.month_for) : 0;
+                  const isChecked = selectedIds.has(p.id);
+                  return (
+                    <tr key={p.id} onClick={() => setSelectedId(p.id)} style={{ cursor: 'pointer', opacity: isChecked ? 0.7 : 1 }}>
+                      {canWrite && (
+                        <td className="col-check" onClick={e => toggleSelect(e, p.id)}>
+                          <div style={{ width: '1.125rem', height: '1.125rem', borderRadius: '0.375rem', border: `2px solid ${isChecked ? 'var(--primary)' : 'var(--outline-variant)'}`, background: isChecked ? 'var(--primary)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {isChecked && <span className="material-symbols-outlined" style={{ fontSize: '0.75rem', color: 'var(--on-primary)', fontWeight: 900 }}>check</span>}
                           </div>
                         </td>
-                        <td>
-                          <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{p.month_for}</span>
-                          {overdue && <span style={{ display: 'block', fontSize: '0.6rem', fontWeight: 800, color: 'var(--error)', textTransform: 'uppercase', marginTop: '0.15rem' }}>{months}mo overdue</span>}
-                        </td>
-                        <td>
-                          <span style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '1rem' }}>{currencySymbol}{p.amount.toLocaleString()}</span>
-                          {p.status === 'Partial' && <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, opacity: 0.4 }}>of {currencySymbol}{p.rent_amount.toLocaleString()}</span>}
-                        </td>
-                        <td>
-                          <span className={`badge-modern ${p.status === 'Paid' ? 'badge-success' : p.status === 'Partial' ? 'badge-partial' : 'badge-warning'}`}>{p.status}</span>
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-                            {canWrite && (p.status === 'Pending' || p.status === 'Partial') && (
-                              <button className="btn-icon" onClick={(e) => { e.stopPropagation(); openReceiveModal(p); }} style={{ color: 'var(--primary)' }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>payments</span>
-                              </button>
+                      )}
+                      <td className="col-payee">
+                        <span className="payee-name">{p.tenant_name}</span>
+                        <div className="mobile-period-value">
+                          <div className="flex items-center gap-2">
+                            <span className="mobile-period">{p.month_for}</span>
+                            {(p.status === 'Pending' || p.status === 'Partial') && (
+                              <span className="mobile-pending-tag">
+                                {currencySymbol}{(p.rent_amount - p.amount).toLocaleString()} due
+                              </span>
                             )}
-                            {isOwner && (
-                              <button className="btn-icon danger" onClick={(e) => { e.stopPropagation(); handleDelete(e, p.id); }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span>
-                              </button>
-                            )}
-                            <span className="material-symbols-outlined opacity-20" style={{ marginLeft: '0.5rem' }}>arrow_forward_ios</span>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile View */}
-            <div className="mobile-only flex flex-col gap-4">
-              {filtered.map(p => {
-                const overdue = isOverdue(p);
-                return (
-                  <div key={p.id} className="modern-card" style={{ padding: '1.5rem', ...(overdue ? { borderLeft: '3px solid var(--error)' } : {}) }} onClick={() => setSelectedId(p.id)}>
-                    <div className="flex justify-between items-start mb-6">
-                      <div>
-                        <h3 style={{ fontSize: '1rem', fontWeight: 800 }}>{p.tenant_name}</h3>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: overdue ? 'var(--error)' : 'var(--primary)' }}>{p.month_for}</div>
-                      </div>
-                      <span className={`badge-modern ${p.status === 'Paid' ? 'badge-success' : 'badge-warning'}`}>{p.status}</span>
-                    </div>
-                    <div className="flex justify-between items-end border-t border-white/5 pt-4">
-                      <div>
-                        <div className="view-eyebrow" style={{ fontSize: '0.55rem', marginBottom: '0.25rem' }}>Amount</div>
-                        <div style={{ fontWeight: 900, fontSize: '1.125rem' }}>{currencySymbol}{p.amount.toLocaleString()}</div>
-                      </div>
-                      <div className="flex gap-2">
-                        {canWrite && (p.status === 'Pending' || p.status === 'Partial') && (
-                          <button className="btn-icon" onClick={(e) => { e.stopPropagation(); openReceiveModal(p); }} style={{ color: 'var(--primary)' }}><span className="material-symbols-outlined">payments</span></button>
+                          <span className="mobile-value">{currencySymbol}{p.rent_amount.toLocaleString()}</span>
+                        </div>
+                      </td>
+                      <td className="col-inventory">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                          <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{p.property_name || p.hostel_name || 'Facility'}</span>
+                          <span style={{ fontSize: '0.75rem', opacity: 0.5, fontWeight: 600 }}>
+                            {isHostel 
+                              ? (p.room_number ? `Rm ${p.room_number} · Bed ${p.bed_number || '?'}` : (p.bed_number ? `Bed ${p.bed_number}` : 'No unit assigned'))
+                              : `Unit ${p.unit_number || '—'}`}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="col-period">
+                        <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{p.month_for}</span>
+                        {overdue && <span style={{ display: 'block', fontSize: '0.6rem', fontWeight: 800, color: 'var(--error)', textTransform: 'uppercase', marginTop: '0.15rem' }}>{months}mo overdue</span>}
+                      </td>
+                      <td className="col-value">
+                        <span style={{ fontWeight: 800, color: 'var(--on-surface)', fontSize: '1rem' }}>{currencySymbol}{p.rent_amount.toLocaleString()}</span>
+                        {(p.status === 'Pending' || p.status === 'Partial') && (
+                          <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, color: 'var(--error)', marginTop: '0.15rem' }}>
+                            {currencySymbol}{(p.rent_amount - p.amount).toLocaleString()} Pending
+                          </span>
                         )}
-                        <span className="material-symbols-outlined opacity-20">arrow_forward_ios</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
+                        {p.status === 'Paid' && (
+                          <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, color: 'var(--color-success)', marginTop: '0.15rem' }}>
+                            Fully Settled
+                          </span>
+                        )}
+                      </td>
+                      <td className="col-status">
+                        <span className={`badge-modern ${p.status === 'Paid' ? 'badge-success' : p.status === 'Partial' ? 'badge-partial' : 'badge-warning'}`}>{p.status}</span>
+                      </td>
+                      <td className="col-actions" style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          {canWrite && (p.status === 'Pending' || p.status === 'Partial') && (
+                            <button className="btn-icon" onClick={(e) => { e.stopPropagation(); openReceiveModal(p); }} style={{ color: 'var(--primary)' }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>payments</span>
+                            </button>
+                          )}
+                          {isOwner && (
+                            <button className="btn-icon danger" onClick={(e) => { e.stopPropagation(); handleDelete(e, p.id); }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span>
+                            </button>
+                          )}
+                          <span className="material-symbols-outlined opacity-20" style={{ marginLeft: '0.5rem' }}>arrow_forward_ios</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
