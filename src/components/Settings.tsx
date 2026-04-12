@@ -8,7 +8,6 @@ import { auth, db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
 import { useTheme } from '../context/ThemeContext';
 import { LoadingScreen } from './layout/LoadingScreen';
-import { runAccountingMigration } from '../utils/accountingMigration';
 
 const currencies = [
   { code: 'USD', symbol: '$', name: 'US Dollar' },
