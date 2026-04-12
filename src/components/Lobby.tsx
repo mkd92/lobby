@@ -59,7 +59,7 @@ const Lobby: React.FC = () => {
       </header>
 
       {/* KPI Bento Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8 mb-12">
         {/* Occupancy Card */}
         <div className="modern-card relative overflow-hidden group">
           <div className="flex justify-between items-start mb-10">
@@ -70,10 +70,10 @@ const Lobby: React.FC = () => {
           </div>
           <h3 className="view-eyebrow text-[0.6rem] mb-2">Portfolio Occupancy</h3>
           <div className="flex items-baseline gap-2">
-            <span className="text-on-surface font-display font-black text-5xl">
+            <span className="text-on-surface font-display font-black text-4xl lg:text-5xl">
               {occupancyRate}
             </span>
-            <span className="text-on-surface-variant font-display font-bold text-2xl">%</span>
+            <span className="text-on-surface-variant font-display font-bold text-xl lg:text-2xl">%</span>
           </div>
         </div>
 
@@ -87,10 +87,10 @@ const Lobby: React.FC = () => {
           </div>
           <h3 className="view-eyebrow text-[0.6rem] mb-2">Contracted Yield</h3>
           <div className="flex items-baseline gap-2">
-            <span className="text-on-surface font-display font-black text-5xl">
+            <span className="text-on-surface font-display font-black text-4xl lg:text-5xl">
               {stats.activeLeaseRent}
             </span>
-            <span className="text-on-surface-variant font-display font-bold text-xl">/mo</span>
+            <span className="text-on-surface-variant font-display font-bold text-lg lg:text-xl">/mo</span>
           </div>
         </div>
 
@@ -103,10 +103,10 @@ const Lobby: React.FC = () => {
           </div>
           <h3 className="view-eyebrow text-[0.6rem] mb-2">Asset Inventory</h3>
           <div className="flex items-baseline gap-2">
-            <span className="text-on-surface font-display font-black text-5xl">
+            <span className="text-on-surface font-display font-black text-4xl lg:text-5xl">
               {stats.totalBeds}
             </span>
-            <span className="text-on-surface-variant font-display font-bold text-xl ml-2">Units</span>
+            <span className="text-on-surface-variant font-display font-bold text-lg lg:text-xl ml-2">Units</span>
           </div>
           {stats.vacantBeds > 0 && (
             <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-success)', marginTop: '0.75rem' }}>

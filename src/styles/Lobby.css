@@ -430,6 +430,11 @@
   margin-bottom: 2rem;
 }
 
+/* Ensure grid items don't push container */
+.grid > * {
+  min-width: 0;
+}
+
 .lobby-hero-card {
   background: linear-gradient(135deg, rgba(var(--surface-container-highest-rgb), 0.1) 0%, rgba(var(--surface-container-highest-rgb), 0.05) 100%);
   border: 1px solid var(--outline-variant);

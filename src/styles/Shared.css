@@ -220,8 +220,12 @@ h1, .view-title {
 .desktop-only { display: block !important; }
 .mobile-only { display: none !important; }
 
-@media (max-width: 1024px) {
+@media (max-width: 1200px) {
   .view-container { padding: 3rem 1.5rem 8rem; }
+}
+
+@media (max-width: 1024px) {
+  .view-container { padding: 3rem 1.25rem 8rem; }
 }
 
 @media (max-width: 768px) {
