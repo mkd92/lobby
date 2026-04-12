@@ -81,6 +81,44 @@ const Payments: React.FC = () => {
     queryFn: async () => { const s = await getDoc(doc(db, 'owners', ownerId!)); return s.data(); },
     enabled: !!ownerId,
   });
+
+  const { data: tenants = [] } = useQuery<any[]>({
+    queryKey: ['tenants', ownerId],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, 'tenants'), where('owner_id', '==', ownerId)));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    },
+    enabled: !!ownerId,
+  });
+
+  const { data: leases = [] } = useQuery<any[]>({
+    queryKey: ['leases', ownerId],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, 'leases'), where('owner_id', '==', ownerId)));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    },
+    enabled: !!ownerId,
+  });
+
+  const sendWhatsAppReminder = (p: Payment) => {
+    const lease = leases.find(l => l.id === p.lease_id);
+    const tenant = tenants.find(t => t.id === lease?.tenant_id || t.full_name === p.tenant_name);
+    
+    if (!tenant?.phone) {
+      showAlert(`Contact number not found for ${p.tenant_name}`);
+      return;
+    }
+
+    const pending = p.rent_amount - p.amount;
+    const cleanPhone = tenant.phone.replace(/\D/g, '');
+    const phone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+    
+    const message = `Hello ${p.tenant_name}, this is a friendly reminder for your ${p.month_for} invoice of ${currencySymbol}${p.rent_amount.toLocaleString()}. Outstanding balance is ${currencySymbol}${pending.toLocaleString()}. Please settle this at your earliest convenience. Thank you!`;
+    
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
   const SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥', CAD: '$', AUD: '$' };
   const currencySymbol = SYMBOLS[ownerProfile?.currency] || '$';
 
@@ -632,12 +670,17 @@ const Payments: React.FC = () => {
                       <td className="col-actions" style={{ textAlign: 'right' }}>
                         <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end', alignItems: 'center' }}>
                           {canWrite && (p.status === 'Pending' || p.status === 'Partial') && (
-                            <button className="btn-icon" onClick={(e) => { e.stopPropagation(); openReceiveModal(p); }} style={{ color: 'var(--primary)' }}>
-                              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>payments</span>
-                            </button>
+                            <>
+                              <button className="btn-icon" onClick={(e) => { e.stopPropagation(); sendWhatsAppReminder(p); }} style={{ color: '#25D366' }} title="Send WhatsApp Reminder">
+                                <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>chat</span>
+                              </button>
+                              <button className="btn-icon" onClick={(e) => { e.stopPropagation(); openReceiveModal(p); }} style={{ color: 'var(--primary)' }} title="Receive Payment">
+                                <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>payments</span>
+                              </button>
+                            </>
                           )}
                           {isOwner && (
-                            <button className="btn-icon danger" onClick={(e) => { e.stopPropagation(); handleDelete(e, p.id); }}>
+                            <button className="btn-icon danger" onClick={(e) => { e.stopPropagation(); handleDelete(e, p.id); }} title="Delete Record">
                               <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span>
                             </button>
                           )}
