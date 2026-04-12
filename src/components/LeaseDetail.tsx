@@ -115,6 +115,8 @@ const LeaseDetail: React.FC = () => {
       
       queryClient.invalidateQueries({ queryKey: ['lease', id] });
       queryClient.invalidateQueries({ queryKey: ['leases', ownerId] });
+      queryClient.invalidateQueries({ queryKey: ['hostel'] });
+      queryClient.invalidateQueries({ queryKey: ['hostels'] });
       showAlert('Contract records synchronized successfully.');
     } catch (err) {
       showAlert((err as Error).message);

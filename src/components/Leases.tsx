@@ -99,17 +99,34 @@ const Leases: React.FC = () => {
         expiredRef.current = true;
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const expiredBatch = writeBatch(db);
-        let hasExpired = false;
+        
+        // Fetch beds to check their current status
+        const bedsSnap = await getDocs(query(collection(db, 'beds'), where('owner_id', '==', ownerId)));
+        const bedMap = new Map(bedsSnap.docs.map(d => [d.id, d.data().status]));
+
+        const integrityBatch = writeBatch(db);
+        let hasChanges = false;
+
         for (const lease of allLeases) {
+          // 1. Auto-expire active leases past their end date
           if (lease.status === 'Active' && lease.end_date && new Date(lease.end_date) < today) {
-            expiredBatch.update(doc(db, 'leases', lease.id), { status: 'Expired' });
-            if (lease.bed_id)  expiredBatch.update(doc(db, 'beds',  lease.bed_id),  { status: 'Vacant' });
+            integrityBatch.update(doc(db, 'leases', lease.id), { status: 'Expired' });
+            if (lease.bed_id) {
+              integrityBatch.update(doc(db, 'beds', lease.bed_id), { status: 'Vacant' });
+            }
             lease.status = 'Expired';
-            hasExpired = true;
+            hasChanges = true;
+          }
+          
+          // 2. Data Integrity: If lease is Expired/Terminated, bed MUST be Vacant
+          if (lease.status !== 'Active' && lease.bed_id) {
+            if (bedMap.get(lease.bed_id) === 'Occupied') {
+              integrityBatch.update(doc(db, 'beds', lease.bed_id), { status: 'Vacant' });
+              hasChanges = true;
+            }
           }
         }
-        if (hasExpired) await expiredBatch.commit();
+        if (hasChanges) await integrityBatch.commit();
       }
 
       return allLeases.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());

@@ -403,7 +403,15 @@ const HostelDetail: React.FC = () => {
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {room.beds.map(bed => (
-                        <div key={bed.id} className={`w-3 h-3 rounded-full ${bed.status === 'Occupied' ? 'bg-primary' : bed.status === 'Maintenance' ? 'bg-error' : ''}`} style={bed.status === 'Vacant' ? { background: '#f4a4a4' } : undefined} title={`${bed.bed_number}: ${bed.status}`} />
+                        <div 
+                          key={bed.id} 
+                          className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                            bed.status === 'Occupied' ? 'bg-primary shadow-[0_0_8px_rgba(var(--primary-rgb),0.4)]' : 
+                            bed.status === 'Maintenance' ? 'bg-error' : 
+                            'border-2 border-white/20'
+                          }`} 
+                          title={`${bed.bed_number}: ${bed.status}`} 
+                        />
                       ))}
                     </div>
                   )}
