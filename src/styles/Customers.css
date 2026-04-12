@@ -1,0 +1,64 @@
+/* Customers.css - High Fidelity Responsive Table Styles */
+
+.responsive-customers-table {
+  min-width: 100%;
+}
+
+.entity-avatar {
+  width: 32px; 
+  height: 32px; 
+  border-radius: 10px; 
+  background: var(--surface-container-highest); 
+  color: var(--on-surface); 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  font-weight: 800; 
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.entity-name {
+  font-weight: 700;
+  font-size: 0.9375rem;
+}
+
+.entity-mobile-meta {
+  display: none;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-top: 0.35rem;
+}
+
+.mobile-meta-item {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+  opacity: 0.6;
+}
+
+@media (max-width: 1200px) {
+  .col-registration { display: none; }
+}
+
+@media (max-width: 1000px) {
+  .col-correspondence { display: none; }
+  .col-channel { display: none; }
+  
+  .entity-mobile-meta { display: flex; }
+  
+  .entity-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    font-size: 0.875rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .col-status { display: none; }
+  
+  .responsive-customers-table td {
+    padding: 1rem 0.75rem;
+  }
+}

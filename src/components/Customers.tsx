@@ -7,6 +7,7 @@ import { useOwner } from '../context/OwnerContext';
 import { PageSkeleton } from './layout/PageSkeleton';
 import { useDialog } from '../hooks/useDialog';
 import { useListKeyNav } from '../hooks/useListKeyNav';
+import '../styles/Customers.css';
 
 interface Customer {
   id: string;
@@ -121,79 +122,54 @@ const Customers: React.FC = () => {
           <button className="primary-button" style={{ background: 'var(--surface-container-highest)' }} onClick={() => setSearchQuery('')}>Clear Filter</button>
         </div>
       ) : (
-        <>
-          {/* Desktop Table */}
-          <div className="modern-table-wrap desktop-only" style={{ borderRadius: '1.5rem' }}>
-            <table className="modern-table">
-              <thead>
-                <tr>
-                  <th>Legal Entity Designation</th>
-                  <th>Digital Correspondence</th>
-                  <th>Tele-Channel</th>
-                  <th>Registration</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCustomers.map(customer => (
-                  <tr key={customer.id} onClick={() => navigate(`/customers/${customer.id}`)} style={{ cursor: 'pointer', outline: kbSelectedId === customer.id ? '2px solid var(--primary)' : undefined, outlineOffset: '-2px' }}>
-                    <td>
-                      <div className="flex items-center gap-4">
-                        <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'var(--surface-container-highest)', color: 'var(--on-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.75rem' }}>
-                          {initials(customer.full_name)}
+        <div className="modern-table-wrap" style={{ borderRadius: '1.5rem' }}>
+          <table className="modern-table responsive-customers-table">
+            <thead>
+              <tr>
+                <th className="col-entity">Legal Entity Designation</th>
+                <th className="col-correspondence">Digital Correspondence</th>
+                <th className="col-channel">Tele-Channel</th>
+                <th className="col-registration">Registration</th>
+                <th className="col-status">Status</th>
+                <th className="col-actions" style={{ textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCustomers.map(customer => (
+                <tr key={customer.id} onClick={() => navigate(`/customers/${customer.id}`)} style={{ cursor: 'pointer', outline: kbSelectedId === customer.id ? '2px solid var(--primary)' : undefined, outlineOffset: '-2px' }}>
+                  <td className="col-entity">
+                    <div className="flex items-center gap-4">
+                      <div className="entity-avatar">
+                        {initials(customer.full_name)}
+                      </div>
+                      <div className="entity-info">
+                        <span className="entity-name">{customer.full_name}</span>
+                        <div className="entity-mobile-meta">
+                          <span className="mobile-meta-item">{customer.phone || 'No Phone'}</span>
+                          <span className="mobile-meta-item">{customer.email || 'No Email'}</span>
                         </div>
-                        <span style={{ fontWeight: 700 }}>{customer.full_name}</span>
                       </div>
-                    </td>
-                    <td style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--on-surface-variant)' }}>{customer.email || '—'}</td>
-                    <td style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--on-surface-variant)' }}>{customer.phone || '—'}</td>
-                    <td style={{ fontSize: '0.8125rem', fontWeight: 600, opacity: 0.5 }}>{fmtDate(customer.created_at)}</td>
-                    <td><span className="badge-modern badge-success">Verified</span></td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div className="flex gap-2 justify-end items-center">
-                        {isOwner && (
-                          <button className="btn-icon danger" onClick={(e) => handleDelete(e, customer)}>
-                            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span>
-                          </button>
-                        )}
-                        <span className="material-symbols-outlined opacity-20" style={{ marginLeft: '0.5rem' }}>arrow_forward_ios</span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile Cards */}
-          <div className="mobile-only flex flex-col gap-4">
-            {filteredCustomers.map(customer => (
-              <div key={customer.id} className="modern-card" style={{ padding: '1.5rem' }} onClick={() => navigate(`/customers/${customer.id}`)}>
-                <div className="flex justify-between items-start mb-6">
-                  <div className="flex gap-4 items-center">
-                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'var(--surface-container-highest)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '1.125rem' }}>
-                      {initials(customer.full_name)}
                     </div>
-                    <div>
-                      <h3 style={{ fontSize: '1rem', fontWeight: 800 }}>{customer.full_name}</h3>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)' }}>Registered Entity</div>
+                  </td>
+                  <td className="col-correspondence" style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--on-surface-variant)' }}>{customer.email || '—'}</td>
+                  <td className="col-channel" style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--on-surface-variant)' }}>{customer.phone || '—'}</td>
+                  <td className="col-registration" style={{ fontSize: '0.8125rem', fontWeight: 600, opacity: 0.5 }}>{fmtDate(customer.created_at)}</td>
+                  <td className="col-status"><span className="badge-modern badge-success">Verified</span></td>
+                  <td className="col-actions" style={{ textAlign: 'right' }}>
+                    <div className="flex gap-2 justify-end items-center">
+                      {isOwner && (
+                        <button className="btn-icon danger" onClick={(e) => handleDelete(e, customer)}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>delete</span>
+                        </button>
+                      )}
+                      <span className="material-symbols-outlined opacity-20" style={{ marginLeft: '0.5rem' }}>arrow_forward_ios</span>
                     </div>
-                  </div>
-                  <span className="badge-modern badge-success">Verified</span>
-                </div>
-                <div className="flex flex-col gap-2 text-sm" style={{ color: 'var(--on-surface-variant)', fontWeight: 500 }}>
-                  <div className="flex items-center gap-3"><span className="material-symbols-outlined opacity-40" style={{ fontSize: '1.125rem' }}>call</span>{customer.phone || 'No contact channel'}</div>
-                  <div className="flex items-center gap-3"><span className="material-symbols-outlined opacity-40" style={{ fontSize: '1.125rem' }}>mail</span>{customer.email || 'No digital address'}</div>
-                </div>
-                <div className="flex justify-between items-center mt-6 pt-4 border-t border-white/5">
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.3 }}>Since {fmtDate(customer.created_at)}</span>
-                  <span className="material-symbols-outlined opacity-20">arrow_forward_ios</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
