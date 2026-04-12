@@ -82,12 +82,21 @@ const LeaseDetail: React.FC = () => {
       const batch = writeBatch(db);
       const leaseRef = doc(db, 'leases', id!);
       
+      // Automatically derive status from end_date if it's set
+      let derivedStatus = form.status;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (form.end_date && new Date(form.end_date) < today && form.status === 'Active') {
+        derivedStatus = 'Expired';
+      }
+
       const updates = {
         rent_amount: parseFloat(form.rent_amount),
         security_deposit: form.security_deposit ? parseFloat(form.security_deposit) : null,
         start_date: form.start_date,
         end_date: form.end_date || null,
-        status: form.status,
+        status: derivedStatus,
         notes: form.notes || null,
         updated_at: serverTimestamp(),
       };
@@ -95,9 +104,9 @@ const LeaseDetail: React.FC = () => {
       batch.update(leaseRef, updates);
 
       // If status changed to Expired/Terminated, free up the bed
-      if (form.status !== 'Active' && lease.bed_id) {
+      if (derivedStatus !== 'Active' && lease.bed_id) {
         batch.update(doc(db, 'beds', lease.bed_id), { status: 'Vacant' });
-      } else if (form.status === 'Active' && lease.bed_id) {
+      } else if (derivedStatus === 'Active' && lease.bed_id) {
         // If re-activated, mark bed as occupied
         batch.update(doc(db, 'beds', lease.bed_id), { status: 'Occupied' });
       }
