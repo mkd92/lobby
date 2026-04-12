@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, updateDoc, serverTimestamp, deleteDoc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
@@ -36,7 +36,7 @@ const HostelDetail: React.FC = () => {
   const canCreate = userRole !== 'viewer';
   const isOwner = userRole === 'owner';
   const queryClient = useQueryClient();
-  const { showAlert, showConfirm, DialogMount } = useDialog();
+  const { showAlert, DialogMount } = useDialog();
 
   const [hostelForm, setHostelForm] = useState({ name: '', address: '' });
   const [savingHostel, setSavingHostel] = useState(false);
@@ -81,8 +81,8 @@ const HostelDetail: React.FC = () => {
       const occupiedBedIds = new Set(activeLeases.map(l => l.bed_id));
 
       const hostelBedsRaw = allBedsSnap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(b => (b as any).hostel_id === id);
+        .map(d => ({ id: d.id, ...d.data() } as any))
+        .filter(b => b.hostel_id === id);
 
       const allBeds = hostelBedsRaw.map(bedData => {
         // SOURCE OF TRUTH REBUILD: Derive status from active leases
@@ -92,7 +92,7 @@ const HostelDetail: React.FC = () => {
           bed_number: bedData.bed_number,
           price: bedData.price,
           status: isOccupied ? 'Occupied' : (bedData.status === 'Maintenance' ? 'Maintenance' : 'Vacant'),
-          room_id: (bedData as any).room_id 
+          room_id: bedData.room_id 
         } as Bed & { room_id: string };
       });
 

@@ -30,7 +30,6 @@ const Settings: React.FC = () => {
   const queryClient = useQueryClient();
   const [profile, setProfile] = useState({ name: '', email: '', phone: '', currency: 'USD' });
   const [saving, setSaving] = useState(false);
-  const [migrationLoading, setMigrationLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const messageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW();
@@ -71,22 +70,6 @@ const Settings: React.FC = () => {
       setMessage({ text: (err as Error).message, type: 'error' });
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleMigration = async () => {
-    if (!ownerId) return;
-    setMigrationLoading(true);
-    setMessage(null);
-    try {
-      await runAccountingMigration(ownerId);
-      setMessage({ text: 'Accounting systems migrated to Double-Entry Ledger.', type: 'success' });
-      if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
-      messageTimeoutRef.current = setTimeout(() => setMessage(null), 5000);
-    } catch (err) {
-      setMessage({ text: (err as Error).message, type: 'error' });
-    } finally {
-      setMigrationLoading(false);
     }
   };
 

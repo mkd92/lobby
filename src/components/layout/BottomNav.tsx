@@ -6,7 +6,6 @@ import { useOwner } from '../../context/OwnerContext';
 export const BottomNav: React.FC = () => {
   const location = useLocation();
   const { userRole } = useOwner();
-  const isStaff = userRole !== 'owner';
   const isViewer = userRole === 'viewer';
   const isActive = (path: string) => location.pathname === path;
   const [moreOpen, setMoreOpen] = useState(false);
