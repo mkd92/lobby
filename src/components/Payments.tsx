@@ -113,7 +113,16 @@ const Payments: React.FC = () => {
     const cleanPhone = tenant.phone.replace(/\D/g, '');
     const phone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
     
-    const message = `Hello ${p.tenant_name}, this is a friendly reminder for your ${p.month_for} invoice of ${currencySymbol}${p.rent_amount.toLocaleString()}. Outstanding balance is ${currencySymbol}${pending.toLocaleString()}. Please settle this at your earliest convenience. Thank you!`;
+    const message = `Dear *${p.tenant_name}*,
+
+Friendly reminder from *${p.hostel_name || p.property_name || 'Management'}* regarding your rent for *${p.month_for}*.
+
+Invoice Amount: *${currencySymbol}${p.rent_amount.toLocaleString()}*
+Outstanding Balance: *${currencySymbol}${pending.toLocaleString()}*
+
+Please settle the outstanding amount at your earliest convenience. If you have already initiated the transfer, please share the transaction reference.
+
+Thank you!`;
     
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
