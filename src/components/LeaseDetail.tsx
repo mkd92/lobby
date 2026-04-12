@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '../firebaseClient';
 import { useDialog } from '../hooks/useDialog';
 import { useOwner } from '../context/OwnerContext';
@@ -76,10 +76,13 @@ const LeaseDetail: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isOwner) return;
+    if (!isOwner || !lease) return;
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'leases', id!), {
+      const batch = writeBatch(db);
+      const leaseRef = doc(db, 'leases', id!);
+      
+      const updates = {
         rent_amount: parseFloat(form.rent_amount),
         security_deposit: form.security_deposit ? parseFloat(form.security_deposit) : null,
         start_date: form.start_date,
@@ -87,7 +90,20 @@ const LeaseDetail: React.FC = () => {
         status: form.status,
         notes: form.notes || null,
         updated_at: serverTimestamp(),
-      });
+      };
+
+      batch.update(leaseRef, updates);
+
+      // If status changed to Expired/Terminated, free up the bed
+      if (form.status !== 'Active' && lease.bed_id) {
+        batch.update(doc(db, 'beds', lease.bed_id), { status: 'Vacant' });
+      } else if (form.status === 'Active' && lease.bed_id) {
+        // If re-activated, mark bed as occupied
+        batch.update(doc(db, 'beds', lease.bed_id), { status: 'Occupied' });
+      }
+
+      await batch.commit();
+      
       queryClient.invalidateQueries({ queryKey: ['lease', id] });
       queryClient.invalidateQueries({ queryKey: ['leases', ownerId] });
       showAlert('Contract records synchronized successfully.');
