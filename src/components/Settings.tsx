@@ -183,20 +183,6 @@ const Settings: React.FC = () => {
                   </button>
                 </div>
               </div>
-
-              {/* Financial Integrity */}
-              <div className="modern-card">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-                  <div>
-                    <div className="view-eyebrow mb-2">Financial Integrity</div>
-                    <h2 className="text-xl font-bold mb-2">Ledger Migration</h2>
-                    <p className="text-on-surface-variant text-sm font-medium opacity-70">Synchronize legacy data with professional accounting standards.</p>
-                  </div>
-                  <button onClick={handleMigration} disabled={migrationLoading} className="primary-button" style={{ background: 'var(--surface-container-highest)', color: 'var(--on-surface)' }}>
-                    {migrationLoading ? 'Migrating...' : 'Trigger Migration'}
-                  </button>
-                </div>
-              </div>
             </>
           )}
         </div>
