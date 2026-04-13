@@ -44,19 +44,38 @@ const Lobby: React.FC = () => {
             Performance Overview
           </h1>
         </div>
-        {!isStaff && (
-          <div className="flex gap-4">
-            <Link
-              to="/hostels/new"
-              className="primary-button"
-              style={{ textDecoration: "none" }}
-            >
-              <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle' }}>add</span>
-              New Facility
-            </Link>
-          </div>
-        )}
       </header>
+
+      {/* Quick Actions Grid */}
+      <div className="mb-12">
+        <p className="view-eyebrow text-[0.6rem] opacity-40 mb-6">Operational Shortcuts</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Link to="/leases/new" className="modern-card group flex flex-col items-center text-center gap-4 hover:border-primary/30" style={{ padding: '1.5rem', textDecoration: 'none' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(var(--primary-rgb), 0.1)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span className="material-symbols-outlined">description</span>
+            </div>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--on-surface)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>New Hostel Lease</span>
+          </Link>
+          <Link to="/property-leases/new" className="modern-card group flex flex-col items-center text-center gap-4 hover:border-primary/30" style={{ padding: '1.5rem', textDecoration: 'none' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(var(--primary-rgb), 0.1)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span className="material-symbols-outlined">contract</span>
+            </div>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--on-surface)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>New Property Lease</span>
+          </Link>
+          <Link to="/customers/new" className="modern-card group flex flex-col items-center text-center gap-4 hover:border-primary/30" style={{ padding: '1.5rem', textDecoration: 'none' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(var(--secondary-rgb), 0.1)', color: 'var(--secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span className="material-symbols-outlined">person_add</span>
+            </div>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--on-surface)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Add Tenant</span>
+          </Link>
+          <Link to="/payments" className="modern-card group flex flex-col items-center text-center gap-4 hover:border-primary/30" style={{ padding: '1.5rem', textDecoration: 'none' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(var(--color-success-rgb), 0.1)', color: 'var(--color-success)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span className="material-symbols-outlined">payments</span>
+            </div>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--on-surface)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Record Payment</span>
+          </Link>
+        </div>
+      </div>
 
       {/* KPI Bento Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8 mb-12">

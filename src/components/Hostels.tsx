@@ -16,7 +16,7 @@ interface HostelData {
   roomCount: number;
 }
 
-const Hostels: React.FC = () => {
+const Hostels: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded }) => {
   const navigate = useNavigate();
   const { ownerId, userRole } = useOwner();
   const canCreate = userRole !== 'viewer';
@@ -84,21 +84,23 @@ const Hostels: React.FC = () => {
   if (isLoading) return <div className="view-container"><PageSkeleton variant="cards" rows={6} /></div>;
 
   return (
-    <div className="view-container page-fade-in">
+    <div className={`${!isEmbedded ? 'view-container' : ''} page-fade-in`}>
       {DialogMount}
       
-      <header className="view-header flex flex-col md:flex-row md:items-end justify-between gap-8">
-        <div>
-          <p className="view-eyebrow">Registry Overview</p>
-          <h1 className="view-title text-4xl md:text-6xl">Hostel Facilities</h1>
-        </div>
-        {canCreate && (
-          <button onClick={() => navigate('/hostels/new')} className="primary-button">
-            <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle' }}>add_home</span>
-            Register Facility
-          </button>
-        )}
-      </header>
+      {!isEmbedded && (
+        <header className="view-header flex flex-col md:flex-row md:items-end justify-between gap-8">
+          <div>
+            <p className="view-eyebrow">Registry Overview</p>
+            <h1 className="view-title text-4xl md:text-6xl">Hostel Facilities</h1>
+          </div>
+          {canCreate && (
+            <button onClick={() => navigate('/hostels/new')} className="primary-button">
+              <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle' }}>add_home</span>
+              Register Facility
+            </button>
+          )}
+        </header>
+      )}
 
       {/* Metrics Bar */}
       {hostels.length > 0 && (

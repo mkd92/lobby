@@ -31,7 +31,7 @@ interface PropertyLease {
 type FilterTab = 'All' | 'Active' | 'Expired' | 'Terminated';
 type SortOption = 'date_desc' | 'date_asc' | 'name_asc' | 'name_desc' | 'unit_asc' | 'rent_desc' | 'rent_asc';
 
-const PropertyLeases: React.FC = () => {
+const PropertyLeases: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded }) => {
   const { ownerId, userRole } = useOwner();
   const canCreate = userRole !== 'viewer';
   const isOwner = userRole === 'owner';
@@ -151,23 +151,25 @@ const PropertyLeases: React.FC = () => {
   const fmt = (d: string) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
   return (
-    <div className="view-container page-fade-in">
+    <div className={`${!isEmbedded ? 'view-container' : ''} page-fade-in`}>
       {DialogMount}
 
-      <header className="view-header">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
-          <div>
-            <p className="view-eyebrow">Property Lease Portfolio</p>
-            <h1 className="view-title text-4xl md:text-6xl">Property Agreements</h1>
+      {!isEmbedded && (
+        <header className="view-header">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+            <div>
+              <p className="view-eyebrow">Property Lease Portfolio</p>
+              <h1 className="view-title text-4xl md:text-6xl">Property Agreements</h1>
+            </div>
+            {canCreate && (
+              <button onClick={() => navigate('/property-leases/new')} className="primary-button">
+                <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle' }}>description</span>
+                New Agreement
+              </button>
+            )}
           </div>
-          {canCreate && (
-            <button onClick={() => navigate('/property-leases/new')} className="primary-button">
-              <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle' }}>description</span>
-              New Agreement
-            </button>
-          )}
-        </div>
-      </header>
+        </header>
+      )}
 
       {leases.length > 0 && (
         <div className="properties-metrics-bar custom-scrollbar mb-12">

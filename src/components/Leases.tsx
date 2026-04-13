@@ -34,7 +34,7 @@ type FilterTab  = 'All' | 'Active' | 'Expired' | 'Terminated';
 type SortOption = 'date_desc' | 'date_asc' | 'name_asc' | 'name_desc' | 'unit_asc' | 'rent_desc' | 'rent_asc';
 
 // ── Main Component ─────────────────────────────────────────────────────
-const Leases: React.FC = () => {
+const Leases: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded }) => {
   const { ownerId, userRole } = useOwner();
   const canCreate = userRole !== 'viewer';
   const isOwner = userRole === 'owner';
@@ -175,23 +175,25 @@ const Leases: React.FC = () => {
   const fmt = (d: string) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
   return (
-    <div className="view-container page-fade-in">
+    <div className={`${!isEmbedded ? 'view-container' : ''} page-fade-in`}>
       {DialogMount}
-      
-      <header className="view-header">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
-          <div>
-            <p className="view-eyebrow">Lease Portfolio</p>
-            <h1 className="view-title text-4xl md:text-6xl">Contractual Yield</h1>
+
+      {!isEmbedded && (
+        <header className="view-header">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+            <div>
+              <p className="view-eyebrow">Registry of Active Commitments</p>
+              <h1 className="view-title text-4xl md:text-6xl">Legal Agreements</h1>
+            </div>
+            {canCreate && (
+              <button onClick={() => navigate('/leases/new')} className="primary-button">
+                <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle' }}>description</span>
+                New Agreement
+              </button>
+            )}
           </div>
-          {canCreate && (
-            <button onClick={() => navigate('/leases/new')} className="primary-button">
-              <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle' }}>description</span>
-              Generate Agreement
-            </button>
-          )}
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Metrics Bar */}
       {leases.length > 0 && (

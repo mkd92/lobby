@@ -75,26 +75,15 @@ export const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boole
               {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Executive Overview</span>}
             </Link>
 
-            {!isCollapsed && <div className="view-eyebrow" style={{ marginTop: '2rem', marginLeft: '1rem', marginBottom: '0.75rem', fontSize: '0.6rem', opacity: 0.3 }}>Portfolio</div>}
             <Link
-              to="/hostels"
-              className={`nav-item ${isActive('/hostels') ? 'active' : ''}`}
-              title="Facility Registry"
-              onMouseEnter={() => prefetch('hostels')}
-              style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>apartment</span>
-              {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Facility Registry</span>}
-            </Link>
-            <Link
-              to="/properties"
-              className={`nav-item ${isActive('/properties') ? 'active' : ''}`}
-              title="Property Portfolio"
-              onMouseEnter={() => prefetch('properties')}
+              to="/portfolio"
+              className={`nav-item ${isActive('/portfolio') ? 'active' : ''}`}
+              title="Asset Portfolio"
+              onMouseEnter={() => prefetch('portfolio')}
               style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
             >
               <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>home_work</span>
-              {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Property Portfolio</span>}
+              {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Asset Portfolio</span>}
             </Link>
 
             {!isCollapsed && <div className="view-eyebrow" style={{ marginTop: '2rem', marginLeft: '1rem', marginBottom: '0.75rem', fontSize: '0.6rem', opacity: 0.3 }}>Operations</div>}
@@ -112,26 +101,14 @@ export const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boole
             )}
             {!isStaff && (
               <Link
-                to="/leases"
-                className={`nav-item ${isActive('/leases') ? 'active' : ''}`}
-                title="Legal Agreements"
-                onMouseEnter={() => prefetch('leases')}
+                to="/agreements"
+                className={`nav-item ${isActive('/agreements') ? 'active' : ''}`}
+                title="Contractual Agreements"
+                onMouseEnter={() => prefetch('agreements')}
                 style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>gavel</span>
                 {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Legal Agreements</span>}
-              </Link>
-            )}
-            {!isStaff && (
-              <Link
-                to="/property-leases"
-                className={`nav-item ${isActive('/property-leases') ? 'active' : ''}`}
-                title="Property Agreements"
-                onMouseEnter={() => prefetch('propertyLeases')}
-                style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>description</span>
-                {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Property Agreements</span>}
               </Link>
             )}
             <Link

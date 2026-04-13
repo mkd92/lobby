@@ -35,22 +35,6 @@ export const BottomNav: React.FC = () => {
             ) : (
               <>
                 <Link
-                  to="/properties"
-                  className={`more-sheet-item ${isActive('/properties') ? 'active' : ''}`}
-                  onMouseEnter={() => prefetch('properties')}
-                >
-                  <span className="material-symbols-outlined">home_work</span>
-                  <span>Property Portfolio</span>
-                </Link>
-                <Link
-                  to="/property-leases"
-                  className={`more-sheet-item ${isActive('/property-leases') ? 'active' : ''}`}
-                  onMouseEnter={() => prefetch('propertyLeases')}
-                >
-                  <span className="material-symbols-outlined">description</span>
-                  <span>Property Agreements</span>
-                </Link>
-                <Link
                   to="/reports"
                   className={`more-sheet-item ${isActive('/reports') ? 'active' : ''}`}
                   onMouseEnter={() => prefetch('reports')}
@@ -96,11 +80,11 @@ export const BottomNav: React.FC = () => {
           </Link>
 
           <Link
-            to="/hostels"
-            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/hostels') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
-            onMouseEnter={() => prefetch('hostels')}
+            to="/portfolio"
+            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/portfolio') || location.pathname.startsWith('/hostels') || location.pathname.startsWith('/properties') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
+            onMouseEnter={() => prefetch('portfolio')}
           >
-            <span className="material-symbols-outlined" style={{ fontVariationSettings: location.pathname.startsWith('/hostels') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.5rem' }}>apartment</span>
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: location.pathname.startsWith('/portfolio') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.5rem' }}>home_work</span>
           </Link>
 
           <Link
@@ -112,11 +96,11 @@ export const BottomNav: React.FC = () => {
           </Link>
 
           <Link
-            to="/leases"
-            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/leases') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
-            onMouseEnter={() => prefetch('leases')}
+            to="/agreements"
+            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 ${location.pathname.startsWith('/agreements') || location.pathname.startsWith('/leases') || location.pathname.startsWith('/property-leases') ? 'bg-surface-container-highest text-primary scale-110' : 'text-on-surface-variant opacity-50 hover:text-primary hover:opacity-100'}`}
+            onMouseEnter={() => prefetch('agreements')}
           >
-            <span className="material-symbols-outlined" style={{ fontVariationSettings: location.pathname.startsWith('/leases') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.5rem' }}>gavel</span>
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: location.pathname.startsWith('/agreements') ? "'FILL' 1" : "'FILL' 0", fontSize: '1.5rem' }}>gavel</span>
           </Link>
 
           <Link

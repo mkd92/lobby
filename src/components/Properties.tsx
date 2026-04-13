@@ -16,7 +16,7 @@ interface PropertyData {
   unitCount: number;
 }
 
-const Properties: React.FC = () => {
+const Properties: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded }) => {
   const navigate = useNavigate();
   const { ownerId, userRole } = useOwner();
   const canCreate = userRole !== 'viewer';
@@ -84,21 +84,23 @@ const Properties: React.FC = () => {
   if (isLoading) return <div className="view-container"><PageSkeleton variant="cards" rows={6} /></div>;
 
   return (
-    <div className="view-container page-fade-in">
+    <div className={`${!isEmbedded ? 'view-container' : ''} page-fade-in`}>
       {DialogMount}
 
-      <header className="view-header flex flex-col md:flex-row md:items-end justify-between gap-8">
-        <div>
-          <p className="view-eyebrow">Portfolio Registry</p>
-          <h1 className="view-title text-4xl md:text-6xl">Property Portfolio</h1>
-        </div>
-        {canCreate && (
-          <button onClick={() => navigate('/properties/new')} className="primary-button">
-            <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle' }}>add_home_work</span>
-            Add Property
-          </button>
-        )}
-      </header>
+      {!isEmbedded && (
+        <header className="view-header flex flex-col md:flex-row md:items-end justify-between gap-8">
+          <div>
+            <p className="view-eyebrow">Portfolio Registry</p>
+            <h1 className="view-title text-4xl md:text-6xl">Property Portfolio</h1>
+          </div>
+          {canCreate && (
+            <button onClick={() => navigate('/properties/new')} className="primary-button">
+              <span className="material-symbols-outlined mr-2" style={{ verticalAlign: 'middle' }}>add_home_work</span>
+              Add Property
+            </button>
+          )}
+        </header>
+      )}
 
       {properties.length > 0 && (
         <div className="properties-metrics-bar mb-12">

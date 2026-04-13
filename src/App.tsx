@@ -15,19 +15,17 @@ const Settings    = lazy(() => import('./components/Settings'));
 const Customers   = lazy(() => import('./components/Customers'));
 const AddCustomer = lazy(() => import('./components/AddCustomer'));
 const CustomerDetail = lazy(() => import('./components/CustomerDetail'));
-const Hostels     = lazy(() => import('./components/Hostels'));
 const AddHostel   = lazy(() => import('./components/AddHostel'));
 const HostelDetail = lazy(() => import('./components/HostelDetail'));
 const RoomDetail  = lazy(() => import('./components/RoomDetail'));
-const Leases      = lazy(() => import('./components/Leases'));
 const AddLease    = lazy(() => import('./components/AddLease'));
 const LeaseDetail = lazy(() => import('./components/LeaseDetail'));
-const Properties  = lazy(() => import('./components/Properties'));
 const AddProperty = lazy(() => import('./components/AddProperty'));
 const PropertyDetail = lazy(() => import('./components/PropertyDetail'));
-const PropertyLeases = lazy(() => import('./components/PropertyLeases'));
 const AddPropertyLease = lazy(() => import('./components/AddPropertyLease'));
 const PropertyLeaseDetail = lazy(() => import('./components/PropertyLeaseDetail'));
+const Portfolio   = lazy(() => import('./components/Portfolio'));
+const Agreements  = lazy(() => import('./components/Agreements'));
 const Reports     = lazy(() => import('./components/Reports'));
 const Team        = lazy(() => import('./components/Team'));
 
@@ -53,6 +51,8 @@ export const prefetchMap = {
   propertyLeases: () => import('./components/PropertyLeases'),
   addPropertyLease: () => import('./components/AddPropertyLease'),
   propertyLeaseDetail: () => import('./components/PropertyLeaseDetail'),
+  portfolio:   () => import('./components/Portfolio'),
+  agreements:  () => import('./components/Agreements'),
   reports:     () => import('./components/Reports'),
   team:        () => import('./components/Team'),
 };
@@ -100,17 +100,19 @@ function App() {
                   <Route path="/customers" element={<Customers />} />
                   <Route path="/customers/new" element={<AddCustomer />} />
                   <Route path="/customers/:id" element={<CustomerDetail />} />
-                  <Route path="/hostels" element={<Hostels />} />
+                  <Route path="/portfolio" element={<Portfolio />} />
+                  <Route path="/hostels" element={<Navigate to="/portfolio" replace />} />
                   <Route path="/hostels/new" element={<AddHostel />} />
                   <Route path="/hostels/:id" element={<HostelDetail />} />
                   <Route path="/rooms/:id" element={<RoomDetail />} />
-                  <Route path="/properties" element={<Properties />} />
+                  <Route path="/properties" element={<Navigate to="/portfolio" replace />} />
                   <Route path="/properties/new" element={<AddProperty />} />
                   <Route path="/properties/:id" element={<PropertyDetail />} />
-                  <Route path="/leases" element={<Leases />} />
+                  <Route path="/agreements" element={<Agreements />} />
+                  <Route path="/leases" element={<Navigate to="/agreements" replace />} />
                   <Route path="/leases/new" element={<AddLease />} />
                   <Route path="/leases/:id" element={<LeaseDetail />} />
-                  <Route path="/property-leases" element={<PropertyLeases />} />
+                  <Route path="/property-leases" element={<Navigate to="/agreements" replace />} />
                   <Route path="/property-leases/new" element={<AddPropertyLease />} />
                   <Route path="/property-leases/:id" element={<PropertyLeaseDetail />} />
                   <Route path="/reports" element={<Reports />} />
