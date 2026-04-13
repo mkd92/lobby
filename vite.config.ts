@@ -53,7 +53,7 @@ export default defineConfig({
           },
         ],
       },
-      includeAssets: ['favicon.svg', 'icon.svg'],
+      includeAssets: ['logo.png', 'icon.png'],
       manifest: {
         name: 'Kinetic Architect - Lobby',
         short_name: 'Lobby',
@@ -65,15 +65,15 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: 'icon.svg',
+            src: 'logo.png',
             sizes: 'any',
-            type: 'image/svg+xml',
+            type: 'image/png',
             purpose: 'any'
           },
           {
-            src: 'icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
+            src: 'icon.png',
+            sizes: '512x512',
+            type: 'image/png',
             purpose: 'maskable'
           }
         ]

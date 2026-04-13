@@ -8,13 +8,7 @@ import {
 } from 'firebase/auth';
 import { auth } from '../firebaseClient';
 import '../styles/Auth.css';
-
-const LogoMark: React.FC = () => (
-  <div className="logo-mark size-lg" style={{ marginBottom: '1.5rem' }}>
-    <span className="logo-l">L</span>
-    <span className="logo-l logo-l-flip">L</span>
-  </div>
-);
+import { LogoMark } from './layout/LogoMark';
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -63,8 +57,8 @@ const Auth: React.FC = () => {
     <div className="view-container flex items-center justify-center min-h-screen py-10">
       <div className="modern-card w-full max-w-md" style={{ padding: '3rem' }}>
         <div className="text-center mb-10">
-          <div className="flex justify-center">
-            <LogoMark />
+          <div className="flex justify-center mb-6">
+            <LogoMark size="lg" />
           </div>
           <h1 className="view-title text-3xl mb-2">Lobby</h1>
           <p className="text-on-surface-variant text-sm font-medium opacity-70">

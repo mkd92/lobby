@@ -21,30 +21,19 @@
 /* ── Logo Mark ── */
 .logo-mark {
   display: inline-flex;
-  align-items: flex-end;
-  font-family: var(--font-main);
-  font-weight: 900;
-  line-height: 1;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 
-.logo-l {
-  display: inline-block;
+.logo-mark svg {
+  display: block;
+  flex-shrink: 0;
 }
 
-.logo-l-flip {
-  display: inline-block;
-  transform: scaleX(-1);
-  margin-left: -0.08em;
-}
-
-.logo-mark.size-sm { font-size: 1.375rem; }
-.logo-mark.size-md { font-size: 1.75rem; }
-.logo-mark.size-lg { font-size: 2.25rem; }
+.logo-mark.size-sm svg { width: 32px; height: 32px; }
+.logo-mark.size-md svg { width: 44px; height: 44px; }
+.logo-mark.size-lg svg { width: 64px; height: 64px; }
 
 .logo-wordmark {
   display: inline-flex;
