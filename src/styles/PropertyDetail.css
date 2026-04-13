@@ -1,0 +1,11 @@
+/* PropertyDetail.css - Rental Property Detail Styles */
+
+.prop-filter-count {
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.3;
+  white-space: nowrap;
+  margin-left: auto;
+}

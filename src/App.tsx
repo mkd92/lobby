@@ -22,6 +22,12 @@ const RoomDetail  = lazy(() => import('./components/RoomDetail'));
 const Leases      = lazy(() => import('./components/Leases'));
 const AddLease    = lazy(() => import('./components/AddLease'));
 const LeaseDetail = lazy(() => import('./components/LeaseDetail'));
+const Properties  = lazy(() => import('./components/Properties'));
+const AddProperty = lazy(() => import('./components/AddProperty'));
+const PropertyDetail = lazy(() => import('./components/PropertyDetail'));
+const PropertyLeases = lazy(() => import('./components/PropertyLeases'));
+const AddPropertyLease = lazy(() => import('./components/AddPropertyLease'));
+const PropertyLeaseDetail = lazy(() => import('./components/PropertyLeaseDetail'));
 const Reports     = lazy(() => import('./components/Reports'));
 const Team        = lazy(() => import('./components/Team'));
 
@@ -41,6 +47,12 @@ export const prefetchMap = {
   leases:      () => import('./components/Leases'),
   addLease:    () => import('./components/AddLease'),
   leaseDetail: () => import('./components/LeaseDetail'),
+  properties:  () => import('./components/Properties'),
+  addProperty: () => import('./components/AddProperty'),
+  propertyDetail: () => import('./components/PropertyDetail'),
+  propertyLeases: () => import('./components/PropertyLeases'),
+  addPropertyLease: () => import('./components/AddPropertyLease'),
+  propertyLeaseDetail: () => import('./components/PropertyLeaseDetail'),
   reports:     () => import('./components/Reports'),
   team:        () => import('./components/Team'),
 };
@@ -92,9 +104,15 @@ function App() {
                   <Route path="/hostels/new" element={<AddHostel />} />
                   <Route path="/hostels/:id" element={<HostelDetail />} />
                   <Route path="/rooms/:id" element={<RoomDetail />} />
+                  <Route path="/properties" element={<Properties />} />
+                  <Route path="/properties/new" element={<AddProperty />} />
+                  <Route path="/properties/:id" element={<PropertyDetail />} />
                   <Route path="/leases" element={<Leases />} />
                   <Route path="/leases/new" element={<AddLease />} />
                   <Route path="/leases/:id" element={<LeaseDetail />} />
+                  <Route path="/property-leases" element={<PropertyLeases />} />
+                  <Route path="/property-leases/new" element={<AddPropertyLease />} />
+                  <Route path="/property-leases/:id" element={<PropertyLeaseDetail />} />
                   <Route path="/reports" element={<Reports />} />
                   <Route path="/team" element={<Team />} />
                   <Route path="/payments" element={<Payments />} />

@@ -35,6 +35,22 @@ export const BottomNav: React.FC = () => {
             ) : (
               <>
                 <Link
+                  to="/properties"
+                  className={`more-sheet-item ${isActive('/properties') ? 'active' : ''}`}
+                  onMouseEnter={() => prefetch('properties')}
+                >
+                  <span className="material-symbols-outlined">home_work</span>
+                  <span>Property Portfolio</span>
+                </Link>
+                <Link
+                  to="/property-leases"
+                  className={`more-sheet-item ${isActive('/property-leases') ? 'active' : ''}`}
+                  onMouseEnter={() => prefetch('propertyLeases')}
+                >
+                  <span className="material-symbols-outlined">description</span>
+                  <span>Property Agreements</span>
+                </Link>
+                <Link
                   to="/reports"
                   className={`more-sheet-item ${isActive('/reports') ? 'active' : ''}`}
                   onMouseEnter={() => prefetch('reports')}

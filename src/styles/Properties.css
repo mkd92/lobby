@@ -1,0 +1,46 @@
+/* Properties.css - Rental Property Portfolio Styles */
+
+.properties-metrics-bar {
+  display: flex;
+  gap: 2rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.properties-metrics-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.prop-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.prop-metric-label {
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.35;
+}
+
+.prop-metric-value {
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  color: var(--on-surface);
+  font-family: var(--font-display);
+  line-height: 1;
+}
+
+@media (max-width: 768px) {
+  .properties-metrics-bar {
+    gap: 1.5rem;
+  }
+
+  .prop-metric-value {
+    font-size: 1.5rem;
+  }
+}
