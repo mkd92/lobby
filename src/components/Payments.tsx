@@ -68,6 +68,7 @@ const Payments: React.FC = () => {
   const [sort,   setSort]   = useState<SortOption>('date_desc');
   const [search, setSearch] = useState('');
   const [metricPeriod, setMetricPeriod] = useState<MetricPeriod>('month');
+  const [activeTab, setActiveTab] = useState<'hostel' | 'property'>('hostel');
 
   const [selectedId, setSelectedId] = useState<string | null>(initialId);
   const [receiveModal, setReceiveModal] = useState<{ open: boolean; payment: Payment | null }>({ open: false, payment: null });
@@ -425,6 +426,10 @@ Thank you!`;
   // ── Filtered / Sorted Data ──────────────────────────────────────────
   const filtered = useMemo(() => {
     let list = payments.filter(p => {
+      const isHostelPayment = !!p.hostel_id || !!p.bed_number;
+      if (activeTab === 'hostel' && !isHostelPayment) return false;
+      if (activeTab === 'property' && isHostelPayment) return false;
+
       if (filter === 'All') return true;
       if (filter === 'Outstanding') return p.status === 'Pending' || p.status === 'Partial';
       return p.status === filter;
@@ -449,7 +454,7 @@ Thank you!`;
         default:            return b.month_for.localeCompare(a.month_for) || b.payment_date.localeCompare(a.payment_date);
       }
     });
-  }, [payments, filter, sort, search]);
+  }, [payments, filter, sort, search, activeTab]);
 
   const metrics = useMemo(() => {
     let totalCollected = 0;
@@ -462,6 +467,10 @@ Thank you!`;
     const currentYear = today.getFullYear();
 
     payments.forEach(p => {
+      const isHostelPayment = !!p.hostel_id || !!p.bed_number;
+      if (activeTab === 'hostel' && !isHostelPayment) return;
+      if (activeTab === 'property' && isHostelPayment) return;
+
       const isInScope = metricPeriod === 'all' || 
         (metricPeriod === 'month' && p.month_for === currentMonth) ||
         (metricPeriod === 'quarter' && new Date(p.month_for).getFullYear() === currentYear);
@@ -475,7 +484,7 @@ Thank you!`;
     });
 
     return { totalCollected, settledCount, outstanding, overdue };
-  }, [payments, metricPeriod]);
+  }, [payments, metricPeriod, activeTab]);
 
   if (isLoading) return <div className="view-container"><PageSkeleton hasMetrics cols={[3, 3, 2, 2, 2]} rows={8} /></div>;
 
@@ -509,6 +518,26 @@ Thank you!`;
           </div>
         )}
       </header>
+
+      {/* Tab Switcher */}
+      <div className="view-toolbar mb-12" style={{ background: 'var(--surface-container-low)', padding: '0.5rem', borderRadius: '1.5rem', display: 'inline-flex', gap: '0.5rem' }}>
+        <button
+          className={`tab-btn ${activeTab === 'hostel' ? 'active' : ''}`}
+          onClick={() => setActiveTab('hostel')}
+          style={{ padding: '0.75rem 2rem', borderRadius: '1rem', border: 'none', cursor: 'pointer', position: 'relative' }}
+        >
+          Hostel Revenue
+          {activeTab === 'hostel' && <div className="tab-indicator" />}
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'property' ? 'active' : ''}`}
+          onClick={() => setActiveTab('property')}
+          style={{ padding: '0.75rem 2rem', borderRadius: '1rem', border: 'none', cursor: 'pointer', position: 'relative' }}
+        >
+          Property Revenue
+          {activeTab === 'property' && <div className="tab-indicator" />}
+        </button>
+      </div>
 
       {/* Metrics Bar */}
       <div className="properties-metrics-bar mb-12">
