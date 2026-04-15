@@ -38,6 +38,7 @@ const AddLease: React.FC = () => {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [roomId, setRoomId] = useState('');
+  const [occupiedBedIds, setOccupiedBedIds] = useState<Set<string>>(new Set());
 
   const set = (key: keyof typeof EMPTY_FORM, val: string) =>
     setForm(f => ({ ...f, [key]: val }));
@@ -101,33 +102,31 @@ const AddLease: React.FC = () => {
     enabled: !!ownerId,
   });
 
-  const { data: activeLeaseBedIds = new Set<string>() } = useQuery({
-    queryKey: ['active-lease-beds', ownerId],
-    queryFn: async () => {
-      const snap = await getDocs(query(collection(db, 'leases'), where('owner_id', '==', ownerId), where('status', '==', 'Active')));
-      return new Set(snap.docs.map(d => d.data().bed_id as string).filter(Boolean));
-    },
-    enabled: !!ownerId,
-  });
-
   // Derived filtered state — a bed is vacant only if it has no active lease
   const rooms = React.useMemo(() => {
     if (!form.unit_id) return [];
-    const hostelBeds = allBeds.filter(b => b.hostel_id === form.unit_id && !activeLeaseBedIds.has(b.id) && b.status !== 'Maintenance');
+    const hostelBeds = allBeds.filter(b => b.hostel_id === form.unit_id && !occupiedBedIds.has(b.id) && b.status !== 'Maintenance');
     const vacantRoomIds = [...new Set(hostelBeds.map(b => b.room_id))];
     return allRooms.filter(r => r.hostel_id === form.unit_id && vacantRoomIds.includes(r.id));
-  }, [allRooms, allBeds, activeLeaseBedIds, form.unit_id]);
+  }, [allRooms, allBeds, occupiedBedIds, form.unit_id]);
 
   const beds = React.useMemo(() => {
     if (!roomId) return [];
-    return allBeds.filter(b => b.room_id === roomId && !activeLeaseBedIds.has(b.id) && b.status !== 'Maintenance');
-  }, [allBeds, activeLeaseBedIds, roomId]);
+    return allBeds.filter(b => b.room_id === roomId && !occupiedBedIds.has(b.id) && b.status !== 'Maintenance');
+  }, [allBeds, occupiedBedIds, roomId]);
 
   // ── Handlers ─────────────────────────────────────────────────────────
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === 1 && !form.tenant_id) { showAlert('Please select a stakeholder.'); return; }
     if (step === 2 && !form.bed_id) { showAlert('Please select a room and bed.'); return; }
     if (step === 3 && (!form.rent_amount || !form.start_date)) { showAlert('Please specify rent amount and start date.'); return; }
+
+    // Fetch live occupied bed IDs just before showing the bed picker
+    if (step === 1) {
+      const snap = await getDocs(query(collection(db, 'leases'), where('owner_id', '==', ownerId), where('status', '==', 'Active')));
+      setOccupiedBedIds(new Set(snap.docs.map(d => d.data().bed_id as string).filter(Boolean)));
+    }
+
     setStep(s => s + 1);
   };
 
@@ -222,7 +221,6 @@ const AddLease: React.FC = () => {
 
       await batch.commit();
       queryClient.invalidateQueries({ queryKey: ['leases', ownerId] });
-      queryClient.invalidateQueries({ queryKey: ['active-lease-beds', ownerId] });
       queryClient.invalidateQueries({ queryKey: ['hostel'] });
       navigate('/agreements');
     } catch (err) {
