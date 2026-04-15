@@ -101,18 +101,27 @@ const AddLease: React.FC = () => {
     enabled: !!ownerId,
   });
 
-  // Derived filtered state
+  const { data: activeLeaseBedIds = new Set<string>() } = useQuery({
+    queryKey: ['active-lease-beds', ownerId],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, 'leases'), where('owner_id', '==', ownerId), where('status', '==', 'Active')));
+      return new Set(snap.docs.map(d => d.data().bed_id as string).filter(Boolean));
+    },
+    enabled: !!ownerId,
+  });
+
+  // Derived filtered state — a bed is vacant only if it has no active lease
   const rooms = React.useMemo(() => {
     if (!form.unit_id) return [];
-    const hostelBeds = allBeds.filter(b => b.hostel_id === form.unit_id && b.status === 'Vacant');
+    const hostelBeds = allBeds.filter(b => b.hostel_id === form.unit_id && !activeLeaseBedIds.has(b.id) && b.status !== 'Maintenance');
     const vacantRoomIds = [...new Set(hostelBeds.map(b => b.room_id))];
     return allRooms.filter(r => r.hostel_id === form.unit_id && vacantRoomIds.includes(r.id));
-  }, [allRooms, allBeds, form.unit_id]);
+  }, [allRooms, allBeds, activeLeaseBedIds, form.unit_id]);
 
   const beds = React.useMemo(() => {
     if (!roomId) return [];
-    return allBeds.filter(b => b.room_id === roomId && b.status === 'Vacant');
-  }, [allBeds, roomId]);
+    return allBeds.filter(b => b.room_id === roomId && !activeLeaseBedIds.has(b.id) && b.status !== 'Maintenance');
+  }, [allBeds, activeLeaseBedIds, roomId]);
 
   // ── Handlers ─────────────────────────────────────────────────────────
   const handleNext = () => {
