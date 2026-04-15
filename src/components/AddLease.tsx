@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   collection, query, where, getDocs, doc, getDoc,
   writeBatch, serverTimestamp,
@@ -41,6 +41,18 @@ const AddLease: React.FC = () => {
 
   const set = (key: keyof typeof EMPTY_FORM, val: string) =>
     setForm(f => ({ ...f, [key]: val }));
+
+  // ── Auto-prorate first month rent ───────────────────────────────────
+  useEffect(() => {
+    if (!form.start_date || !form.rent_amount) return;
+    const [year, month, day] = form.start_date.split('-').map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate(); // day 0 of next month = last day of this month
+    const daysOccupied = daysInMonth - day + 1;
+    const monthly = parseFloat(form.rent_amount);
+    if (isNaN(monthly) || monthly <= 0) return;
+    const prorated = Math.round((monthly / daysInMonth) * daysOccupied * 100) / 100;
+    set('first_month_rent', String(prorated));
+  }, [form.start_date, form.rent_amount]);
 
   // ── Currency ────────────────────────────────────────────────────────
   const { data: ownerProfile } = useQuery({
@@ -201,6 +213,7 @@ const AddLease: React.FC = () => {
 
       await batch.commit();
       queryClient.invalidateQueries({ queryKey: ['leases', ownerId] });
+      queryClient.invalidateQueries({ queryKey: ['hostel'] });
       navigate('/agreements');
     } catch (err) {
       showAlert((err as Error).message);
@@ -294,7 +307,7 @@ const AddLease: React.FC = () => {
               <div className="view-eyebrow mb-8">Contractual Terms</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="form-group-modern">
-                  <label>Monthly Yield ({sym}) *</label>
+                  <label>Monthly Rent ({sym}) *</label>
                   <input type="number" step="0.01" min="0" required value={form.rent_amount} onChange={e => set('rent_amount', e.target.value)} style={{ fontWeight: 700 }} />
                 </div>
                 <div className="form-group-modern">
@@ -302,7 +315,12 @@ const AddLease: React.FC = () => {
                   <input type="date" required value={form.start_date} onChange={e => set('start_date', e.target.value)} />
                 </div>
                 <div className="form-group-modern">
-                  <label>Security Deposit ({sym})</label>
+                  <label>First Month Rent ({sym})</label>
+                  <input type="number" step="0.01" min="0" value={form.first_month_rent} onChange={e => set('first_month_rent', e.target.value)} placeholder={form.rent_amount || 'Defaults to monthly rent'} />
+                  <span style={{ fontSize: '0.7rem', opacity: 0.5, marginTop: '0.25rem', display: 'block' }}>Leave blank to use monthly rent. Combined with advance to form the opening invoice.</span>
+                </div>
+                <div className="form-group-modern">
+                  <label>Advance / Security Deposit ({sym})</label>
                   <input type="number" step="0.01" min="0" value={form.security_deposit} onChange={e => set('security_deposit', e.target.value)} />
                 </div>
                 <div className="form-group-modern">
@@ -324,8 +342,18 @@ const AddLease: React.FC = () => {
                   <span className="font-bold">{hostels.find(h => h.id === form.unit_id)?.name}</span>
                   <span className="opacity-40 uppercase font-black text-[0.6rem] tracking-widest">Unit</span>
                   <span className="font-bold">Room {rooms.find(r => r.id === roomId)?.room_number} · Bed {beds.find(b => b.id === form.bed_id)?.bed_number}</span>
-                  <span className="opacity-40 uppercase font-black text-[0.6rem] tracking-widest">Financials</span>
+                  <span className="opacity-40 uppercase font-black text-[0.6rem] tracking-widest">Monthly Rent</span>
                   <span className="font-bold text-primary">{sym}{parseFloat(form.rent_amount || '0').toLocaleString()} / month</span>
+                  <span className="opacity-40 uppercase font-black text-[0.6rem] tracking-widest">Opening Invoice</span>
+                  <span className="font-bold text-primary">
+                    {sym}{(
+                      (form.first_month_rent ? parseFloat(form.first_month_rent) : parseFloat(form.rent_amount || '0')) +
+                      (form.security_deposit ? parseFloat(form.security_deposit) : 0)
+                    ).toLocaleString()}
+                    <span style={{ fontWeight: 400, opacity: 0.5, fontSize: '0.75rem', marginLeft: '0.4rem' }}>
+                      (1st month{form.security_deposit ? ' + advance' : ''})
+                    </span>
+                  </span>
                 </div>
               </div>
               <div className="form-group-modern">

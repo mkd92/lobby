@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  collection, query, where, getDocs, doc, getDoc, deleteDoc,
+  collection, query, where, getDocs, doc, getDoc,
   serverTimestamp, writeBatch,
 } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -232,7 +232,10 @@ Thank you!`;
     const ok = await showConfirm('Delete this billing record? All associated receipts will be lost.');
     if (!ok) return;
     try {
-      await deleteDoc(doc(db, 'payments', id));
+      const batch = writeBatch(db);
+      batch.delete(doc(db, 'payments', id));
+      batch.delete(doc(db, 'invoices', id));
+      await batch.commit();
       queryClient.invalidateQueries({ queryKey: ['payments', ownerId] });
       showAlert('Ledger entry purged.');
     } catch (err) { showAlert((err as Error).message); }

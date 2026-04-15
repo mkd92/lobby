@@ -100,14 +100,15 @@ service cloud.firestore {
     // ── Payments ───────────────────────────────────────────────────────────
 
     match /payments/{docId} {
-      allow read:          if canRead(resource.data.owner_id);
-      allow create:        if canWrite(request.resource.data.owner_id);
-      allow update, delete: if canWrite(resource.data.owner_id);
+      allow read:   if canRead(resource.data.owner_id);
+      allow create: if canWrite(request.resource.data.owner_id);
+      allow update: if canWrite(resource.data.owner_id);
+      allow delete: if resource == null || canWrite(resource.data.get('owner_id', request.auth.uid));
 
       // Subcollections (e.g., transactions)
       match /{allPaths=**} {
         allow read: if canRead(get(/databases/$(database)/documents/payments/$(docId)).data.owner_id);
-        allow write: if canWrite(get(/databases/$(database)/documents/payments/$(docId)).data.owner_id) || 
+        allow write: if canWrite(get(/databases/$(database)/documents/payments/$(docId)).data.owner_id) ||
                       canWrite(request.resource.data.owner_id);
       }
     }
@@ -125,14 +126,14 @@ service cloud.firestore {
       allow read:   if canRead(resource.data.owner_id);
       allow create: if canWrite(request.resource.data.owner_id);
       allow update: if canWrite(resource.data.owner_id);
-      allow delete: if false;
+      allow delete: if resource == null || canWrite(resource.data.get('owner_id', request.auth.uid));
     }
 
     match /receipts/{docId} {
       allow read:   if canRead(resource.data.owner_id);
       allow create: if canWrite(request.resource.data.owner_id);
       allow update: if false;
-      allow delete: if false;
+      allow delete: if resource == null || canWrite(resource.data.get('owner_id', request.auth.uid));
     }
 
     match /journal_entries/{docId} {

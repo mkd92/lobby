@@ -76,13 +76,14 @@ const HostelDetail: React.FC = () => {
 
       const hostel = { id: hostelSnap.id, ...hostelSnap.data() } as Hostel;
       
-      const allLeases = allLeasesSnap.docs.map(d => d.data());
-      const activeLeases = allLeases.filter(l => l.hostel_id === id && l.status === 'Active');
-      const occupiedBedIds = new Set(activeLeases.map(l => l.bed_id));
-
       const hostelBedsRaw = allBedsSnap.docs
         .map(d => ({ id: d.id, ...d.data() } as any))
         .filter(b => b.hostel_id === id);
+
+      const hostelBedIds = new Set(hostelBedsRaw.map(b => b.id));
+      const allLeases = allLeasesSnap.docs.map(d => d.data());
+      const activeLeases = allLeases.filter(l => l.bed_id && hostelBedIds.has(l.bed_id) && l.status === 'Active');
+      const occupiedBedIds = new Set(activeLeases.map(l => l.bed_id));
 
       const allBeds = hostelBedsRaw.map(bedData => {
         // SOURCE OF TRUTH REBUILD: Derive status from active leases
