@@ -222,6 +222,7 @@ const AddLease: React.FC = () => {
 
       await batch.commit();
       queryClient.invalidateQueries({ queryKey: ['leases', ownerId] });
+      queryClient.invalidateQueries({ queryKey: ['active-lease-beds', ownerId] });
       queryClient.invalidateQueries({ queryKey: ['hostel'] });
       navigate('/agreements');
     } catch (err) {
