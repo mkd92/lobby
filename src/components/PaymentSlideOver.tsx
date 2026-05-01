@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  doc, getDoc, collection, getDocs, query, orderBy, serverTimestamp, writeBatch,
+  doc, getDoc, collection, getDocs, query, orderBy, where, serverTimestamp, writeBatch,
 } from 'firebase/firestore';
 import { db } from '../firebaseClient';
 import { useOwner } from '../context/OwnerContext';
@@ -47,6 +47,7 @@ const PaymentSlideOver: React.FC<Props> = ({ id, currencySymbol, onClose, onUpda
 
   const [payment, setPayment] = useState<Payment | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [receipts, setReceipts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
     amount: '',
@@ -73,11 +74,12 @@ const PaymentSlideOver: React.FC<Props> = ({ id, currencySymbol, onClose, onUpda
           status: data.status,
         });
         try {
-          const txSnap = await getDocs(query(
-            collection(db, 'payments', id, 'transactions'),
-            orderBy('recorded_at', 'asc')
-          ));
+          const [txSnap, rcSnap] = await Promise.all([
+            getDocs(query(collection(db, 'payments', id, 'transactions'), orderBy('recorded_at', 'asc'))),
+            getDocs(query(collection(db, 'receipts'), where('owner_id', '==', ownerId))),
+          ]);
           setTransactions(txSnap.docs.map(d => ({ id: d.id, ...d.data() } as Transaction)));
+          setReceipts(rcSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.invoice_id === id));
         } catch {
           // transactions subcollection may not exist yet — that's fine
         }
@@ -194,6 +196,31 @@ const PaymentSlideOver: React.FC<Props> = ({ id, currencySymbol, onClose, onUpda
       setError((err as Error).message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteTransaction = async (tx: Transaction) => {
+    if (!canWrite || !payment) return;
+    if (!window.confirm('Delete this payment entry? The invoice total will be recalculated.')) return;
+    try {
+      const remaining = transactions.filter(t => t.id !== tx.id);
+      const newTotal = remaining.reduce((sum, t) => sum + t.amount, 0);
+      const newStatus: Payment['status'] = newTotal >= payment.rent_amount ? 'Paid' : newTotal > 0 ? 'Partial' : 'Pending';
+      const matchingReceipt = receipts.find((r: any) => r.legacy_transaction_id === tx.id);
+
+      const batch = writeBatch(db);
+      batch.delete(doc(db, 'payments', id, 'transactions', tx.id));
+      if (matchingReceipt) batch.delete(doc(db, 'receipts', matchingReceipt.id));
+      batch.set(doc(db, 'payments', id), { amount: newTotal, status: newStatus, updated_at: serverTimestamp() }, { merge: true });
+      batch.set(doc(db, 'invoices', id), { status: newStatus, updated_at: serverTimestamp() }, { merge: true });
+      await batch.commit();
+
+      setTransactions(remaining);
+      setPayment(p => p ? { ...p, amount: newTotal, status: newStatus } : p);
+      if (matchingReceipt) setReceipts(prev => prev.filter((r: any) => r.id !== matchingReceipt.id));
+      queryClient.invalidateQueries({ queryKey: ['payments', ownerId] });
+    } catch (err) {
+      setError((err as Error).message);
     }
   };
 
@@ -419,13 +446,26 @@ ${txRows ? `<hr class="thin"><div class="lbl" style="margin-bottom:0.75rem">Paym
                         </div>
                         <div style={{ fontSize: '0.7rem', opacity: 0.5, fontWeight: 600 }}>{tx.payment_method}</div>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.9375rem' }}>
-                          {currencySymbol}{tx.amount.toLocaleString()}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.9375rem' }}>
+                            {currencySymbol}{tx.amount.toLocaleString()}
+                          </div>
+                          <div style={{ fontSize: '0.65rem', opacity: 0.4, fontWeight: 600 }}>
+                            #{i + 1} · total {currencySymbol}{tx.cumulative_total.toLocaleString()}
+                          </div>
                         </div>
-                        <div style={{ fontSize: '0.65rem', opacity: 0.4, fontWeight: 600 }}>
-                          #{i + 1} · total {currencySymbol}{tx.cumulative_total.toLocaleString()}
-                        </div>
+                        {canWrite && (
+                          <button
+                            onClick={() => handleDeleteTransaction(tx)}
+                            title="Delete entry"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem', borderRadius: '0.5rem', color: 'var(--error, #ef4444)', opacity: 0.6, display: 'flex', alignItems: 'center' }}
+                            onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                            onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>delete</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
