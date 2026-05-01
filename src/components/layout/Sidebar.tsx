@@ -53,12 +53,12 @@ export const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boole
             <Link
               to="/payments"
               className={`nav-item ${isActive('/payments') ? 'active' : ''}`}
-              title="Financial Ledger"
+              title="Payments"
               onMouseEnter={() => prefetch('payments')}
               style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
             >
               <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>account_balance_wallet</span>
-              {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Financial Ledger</span>}
+              {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Payments</span>}
             </Link>
           </>
         ) : (
@@ -67,23 +67,23 @@ export const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boole
             <Link
               to="/"
               className={`nav-item ${location.pathname === '/' ? 'active' : ''}`}
-              title="Executive Overview"
+              title="Dashboard"
               onMouseEnter={() => prefetch('lobby')}
               style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
             >
               <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>analytics</span>
-              {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Executive Overview</span>}
+              {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Dashboard</span>}
             </Link>
 
             <Link
               to="/portfolio"
               className={`nav-item ${isActive('/portfolio') ? 'active' : ''}`}
-              title="Asset Portfolio"
+              title="Properties"
               onMouseEnter={() => prefetch('portfolio')}
               style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
             >
               <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>home_work</span>
-              {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Asset Portfolio</span>}
+              {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Properties</span>}
             </Link>
 
             {!isCollapsed && <div className="view-eyebrow" style={{ marginTop: '2rem', marginLeft: '1rem', marginBottom: '0.75rem', fontSize: '0.6rem', opacity: 0.3 }}>Operations</div>}
@@ -91,57 +91,57 @@ export const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boole
               <Link
                 to="/customers"
                 className={`nav-item ${isActive('/customers') ? 'active' : ''}`}
-                title="Relationship Base"
+                title="Tenants"
                 onMouseEnter={() => prefetch('customers')}
                 style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>supervised_user_circle</span>
-                {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Relationship Base</span>}
+                {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Tenants</span>}
               </Link>
             )}
             {!isStaff && (
               <Link
                 to="/agreements"
                 className={`nav-item ${isActive('/agreements') ? 'active' : ''}`}
-                title="Contractual Agreements"
+                title="Leases"
                 onMouseEnter={() => prefetch('agreements')}
                 style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>gavel</span>
-                {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Legal Agreements</span>}
+                {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Leases</span>}
               </Link>
             )}
             <Link
               to="/payments"
               className={`nav-item ${isActive('/payments') ? 'active' : ''}`}
-              title="Financial Ledger"
+              title="Payments"
               onMouseEnter={() => prefetch('payments')}
               style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
             >
               <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>account_balance_wallet</span>
-              {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Financial Ledger</span>}
+              {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Payments</span>}
             </Link>
             {!isStaff && (
               <Link
                 to="/reports"
                 className={`nav-item ${isActive('/reports') ? 'active' : ''}`}
-                title="Intelligence Reports"
+                title="Reports"
                 onMouseEnter={() => prefetch('reports')}
                 style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>monitoring</span>
-                {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Intelligence Reports</span>}
+                {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Reports</span>}
               </Link>
             )}
             <Link
               to="/team"
               className={`nav-item ${isActive('/team') ? 'active' : ''}`}
-              title="Personnel & Access"
+              title="Team"
               onMouseEnter={() => prefetch('team')}
               style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
             >
               <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>badge</span>
-              {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Personnel & Access</span>}
+              {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Team</span>}
             </Link>
           </>
         )}
@@ -171,21 +171,21 @@ export const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (v: boole
           <Link
             to="/settings"
             className={`nav-item ${isActive('/settings') ? 'active' : ''}`}
-            title="Preferences"
+            title="Settings"
             onMouseEnter={() => prefetch('settings')}
             style={{ padding: '0.875rem 1rem', borderRadius: '0.75rem' }}
           >
             <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>tune</span>
-            {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Preferences</span>}
+            {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Settings</span>}
           </Link>
           <button
             onClick={handleSignOut}
             className="nav-item sign-out-btn w-full text-left"
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.875rem 1rem', borderRadius: '0.75rem', marginTop: '0.25rem' }}
-            title="Terminate Session"
+            title="Sign Out"
           >
             <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>logout</span>
-            {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Terminate Session</span>}
+            {!isCollapsed && <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Sign Out</span>}
           </button>
         </div>
       </nav>
